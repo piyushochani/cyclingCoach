@@ -15,10 +15,19 @@ export interface Config {
     model: string;
     apiKey: string;
     authProfile?: string;
+    embeddingModel?: string;
   };
-  intervals: {
+  strava: {
+    clientId: string;
+    clientSecret: string;
+    accessToken?: string;
+    refreshToken?: string;
+    expiresAt?: number;
+  };
+  pinecone: {
     apiKey: string;
-    athleteId: string;
+    indexName: string;
+    namespace?: string;
   };
   telegram: {
     botToken: string;
@@ -60,6 +69,8 @@ const CONTEXT_WINDOWS: Record<string, number> = {
   "claude-haiku-4-5-20251001": 200_000,
   "gpt-4o": 128_000,
   "gemini-2.0-flash": 1_000_000,
+  "gemini-2.0-flash-lite": 1_000_000,
+  "gemini-1.5-pro": 1_000_000,
   "gpt-5.4": 272_000,
   "gpt-5.4-mini": 272_000,
   "gpt-5.4-pro": 272_000,
@@ -101,7 +112,11 @@ function envFloat(key: string): number | undefined {
 // SECRET REF HANDLING
 // ============================================================================
 
-type SecretFieldPath = "llm.api_key" | "intervals.api_key" | "telegram.bot_token";
+type SecretFieldPath =
+  | "llm.api_key"
+  | "strava.client_secret"
+  | "pinecone.api_key"
+  | "telegram.bot_token";
 
 const PENDING_REFS = new WeakMap<Config, Map<SecretFieldPath, SecretRef>>();
 
@@ -117,14 +132,16 @@ function readSecretField(value: unknown, path: SecretFieldPath): string | Secret
 
 function assignFieldByPath(cfg: Config, path: SecretFieldPath, value: string): void {
   if (path === "llm.api_key") cfg.llm.apiKey = value;
-  else if (path === "intervals.api_key") cfg.intervals.apiKey = value;
+  else if (path === "strava.client_secret") cfg.strava.clientSecret = value;
+  else if (path === "pinecone.api_key") cfg.pinecone.apiKey = value;
   else if (path === "telegram.bot_token") cfg.telegram.botToken = value;
 }
 
 export function loadConfig(): Config {
   const yaml = readConfigYaml();
   const llmYaml = (yaml.llm as Record<string, unknown>) ?? {};
-  const intervalsYaml = (yaml.intervals as Record<string, unknown>) ?? {};
+  const stravaYaml = (yaml.strava as Record<string, unknown>) ?? {};
+  const pineconeYaml = (yaml.pinecone as Record<string, unknown>) ?? {};
   const telegramYaml = (yaml.telegram as Record<string, unknown>) ?? {};
   const sessionYaml = (yaml.session as Record<string, unknown>) ?? {};
 
@@ -133,7 +150,8 @@ export function loadConfig(): Config {
     "anthropic") as Config["llm"]["provider"];
 
   const llmApiKeyRaw = readSecretField(llmYaml.api_key, "llm.api_key");
-  const intervalsApiKeyRaw = readSecretField(intervalsYaml.api_key, "intervals.api_key");
+  const stravaClientSecretRaw = readSecretField(stravaYaml.client_secret, "strava.client_secret");
+  const pineconeApiKeyRaw = readSecretField(pineconeYaml.api_key, "pinecone.api_key");
   const telegramTokenRaw = readSecretField(telegramYaml.bot_token, "telegram.bot_token");
 
   const envKeyForProvider: Record<string, string | undefined> = {
@@ -169,10 +187,15 @@ export function loadConfig(): Config {
     provider === "openai-codex"
       ? ""
       : resolveWithPrecedence(envKeyForProvider[provider], llmApiKeyRaw, "llm.api_key");
-  const intervalsApiKey = resolveWithPrecedence(
-    "INTERVALS_API_KEY",
-    intervalsApiKeyRaw,
-    "intervals.api_key",
+  const stravaClientSecret = resolveWithPrecedence(
+    "STRAVA_CLIENT_SECRET",
+    stravaClientSecretRaw,
+    "strava.client_secret",
+  );
+  const pineconeApiKey = resolveWithPrecedence(
+    "PINECONE_API_KEY",
+    pineconeApiKeyRaw,
+    "pinecone.api_key",
   );
   const telegramBotToken = resolveWithPrecedence(
     "TELEGRAM_BOT_TOKEN",
@@ -199,13 +222,19 @@ export function loadConfig(): Config {
         provider === "openai-codex"
           ? ((llmYaml.auth_profile as string | undefined) ?? "openai-codex")
           : undefined,
+      embeddingModel: (llmYaml.embedding_model as string | undefined) ?? "text-embedding-004",
     },
-    intervals: {
-      apiKey: intervalsApiKey,
-      athleteId:
-        env("INTERVALS_ATHLETE_ID") ??
-        (intervalsYaml.athlete_id as string | undefined) ??
-        "0",
+    strava: {
+      clientId: env("STRAVA_CLIENT_ID") ?? (stravaYaml.client_id as string | undefined) ?? "",
+      clientSecret: stravaClientSecret,
+      accessToken: env("STRAVA_ACCESS_TOKEN") ?? (stravaYaml.access_token as string | undefined),
+      refreshToken: env("STRAVA_REFRESH_TOKEN") ?? (stravaYaml.refresh_token as string | undefined),
+      expiresAt: envInt("STRAVA_EXPIRES_AT") ?? (stravaYaml.expires_at as number | undefined),
+    },
+    pinecone: {
+      apiKey: pineconeApiKey,
+      indexName: env("PINECONE_INDEX") ?? (pineconeYaml.index_name as string | undefined) ?? "",
+      namespace: env("PINECONE_NAMESPACE") ?? (pineconeYaml.namespace as string | undefined),
     },
     telegram: {
       botToken: telegramBotToken,
@@ -240,7 +269,8 @@ export async function resolveConfigSecrets(cfg: Config): Promise<Config> {
   const next: Config = {
     ...cfg,
     llm: { ...cfg.llm },
-    intervals: { ...cfg.intervals },
+    strava: { ...cfg.strava },
+    pinecone: { ...cfg.pinecone },
     telegram: { ...cfg.telegram },
     session: { ...cfg.session },
   };

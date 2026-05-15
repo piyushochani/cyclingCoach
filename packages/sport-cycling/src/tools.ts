@@ -1,15 +1,11 @@
 import { tool, zodSchema } from "ai";
 import { z } from "zod";
-import type { MemoryStore } from "@enduragent/core";
-import type { IntervalsClient } from "intervals-icu-api";
+import type { MemoryStore, StravaClient } from "@enduragent/core";
 import {
   calculateCyclingZones,
   buildPlanSkeleton,
   assessGoalFeasibility,
   getSampleWeek,
-  serializeIntervalsWorkout,
-  intervalsWorkoutInputSchema,
-  InvalidWorkoutError,
 } from "./index.js";
 import type {
   AthleteProfile,
@@ -17,23 +13,22 @@ import type {
   VolumeTier,
   DayOfWeek,
   RaceType,
-  IntervalsWorkoutInput,
 } from "./index.js";
 
 const daysEnum = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"]);
 
 /**
  * Pure-Sport cycling tools per ADR-0004 — sport-specific math (FTP zones,
- * periodized plan-skeleton) + the cycling-flavored intervals.icu workout
- * creator (hardcoded `type: "Ride"`). Pure-Core and Core-with-sport-config
- * intervals tools live in `@enduragent/core`'s `createPureCoreIntervalsTools`
- * and `createCoreToolsWithSportConfig`.
+ * periodized plan-skeleton). Strava Pure-Core tools live in `@enduragent/core`.
  */
 export function createCyclingTools(
   memory: MemoryStore,
-  intervals: IntervalsClient | null,
+  strava: StravaClient | null,
   tz: string = "UTC",
 ) {
+  // Strava client is available for future sport-specific Strava tools.
+  void strava;
+
   return {
     calculate_zones: tool({
       description: "Calculate 6 power zones from FTP watts",
@@ -141,47 +136,5 @@ export function createCyclingTools(
           params.sessionsPerWeek,
         ),
     }),
-
-    ...(intervals
-      ? {
-          intervals_create_workout: tool({
-            description:
-              "Create a structured workout on the intervals.icu calendar. Auto-syncs to Garmin/Wahoo. " +
-              "Supply the workout as structured steps — the tool serializes them into the intervals.icu " +
-              "native description syntax so the power chart renders. Put athlete-facing coaching narrative " +
-              "(feel, notes, hydration) in your chat reply, not in this tool.",
-            inputSchema: zodSchema(
-              z.object({
-                date: z.string().describe("Workout date (YYYY-MM-DD)"),
-                workout: intervalsWorkoutInputSchema.describe(
-                  "Structured workout: name + ordered steps. Top-level steps can be simple (warmup/steady/interval/ramp/recovery/rest/cooldown/freeride) or a set {type:'set', repeat, interval, recovery}. Durations use seconds or minutes only. Power targets: {kind:'percent_ftp'|'watts'|'zone', value} or {kind, low, high} for ranges. Ramps require low+high.",
-                ),
-              }),
-            ),
-            execute: async (input: { date: string; workout: IntervalsWorkoutInput }) => {
-              let serialized: ReturnType<typeof serializeIntervalsWorkout>;
-              try {
-                serialized = serializeIntervalsWorkout(input.workout);
-              } catch (err) {
-                if (err instanceof InvalidWorkoutError) {
-                  return { error: "invalid_workout", details: err.message };
-                }
-                throw err;
-              }
-              const result = await intervals.events.create({
-                start_date_local: `${input.date}T00:00:00`,
-                category: "WORKOUT",
-                name: input.workout.name,
-                type: "Ride",
-                moving_time: serialized.movingTime,
-                icu_training_load: serialized.trainingLoad,
-                description: serialized.description,
-              });
-              if (!result.ok) return { error: result.error.kind };
-              return { created: true, event: result.value };
-            },
-          }),
-        }
-      : {}),
   };
 }

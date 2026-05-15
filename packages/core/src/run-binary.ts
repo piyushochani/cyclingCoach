@@ -283,10 +283,13 @@ export async function runBinary(
   // per ADR-0011 (two-phase scheduler — no timer until first runSync resolves).
   await runStartupHook(agent.getMemory(), hooks.onStartup);
 
+  const { StravaClient } = await import("./strava/client.js");
+  const strava = config.strava.clientId ? new StravaClient(config.strava) : null;
+
   const { bootstrapReference } = await import("./reference/runtime.js");
   const reference = await bootstrapReference({
     dataDir: config.dataDir,
-    intervals: config.intervals,
+    strava,
   });
 
   if (config.telegram.botToken) {

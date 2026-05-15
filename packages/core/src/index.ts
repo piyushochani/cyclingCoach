@@ -87,6 +87,9 @@ export {
 // ─── Intervals ────────────────────────────────────────────────────────
 export type { IntervalsClient } from "./intervals.js";
 
+// ─── Strava ───────────────────────────────────────────────────────────
+export { StravaClient } from "./strava/client.js";
+
 // ─── Agent ────────────────────────────────────────────────────────────
 export { CoachAgent } from "./agent/coach-agent.js";
 export { ChatStore } from "./agent/chat-store.js";
@@ -131,9 +134,8 @@ export {
   createMemoryTools,
 } from "./agent/tools.js";
 export {
-  createPureCoreIntervalsTools,
-  createCoreToolsWithSportConfig,
-} from "./agent/intervals-tools.js";
+  createStravaTools,
+} from "./agent/strava-tools.js";
 export {
   appendCurrentTimeLine,
   buildCurrentTimeLine,
