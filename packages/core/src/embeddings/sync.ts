@@ -1,6 +1,7 @@
 import { StravaClient, type StravaActivity, type StravaAthlete } from "../strava/client.js";
 import { EmbeddingService } from "./service.js";
 import { PineconeClient } from "./pinecone.js";
+import { ActivityTracker } from "./activity-tracker.js";
 import type { Config } from "../config.js";
 import type { ActivityChunk, AthleteProfile } from "../reference/schemas/strava.js";
 
@@ -8,17 +9,19 @@ export class EmbeddingSync {
   private strava: StravaClient;
   private embedder: EmbeddingService;
   private pinecone: PineconeClient;
+  private tracker: ActivityTracker;
 
   constructor(config: Config) {
     this.strava = new StravaClient(config.strava);
     this.embedder = new EmbeddingService(config.llm);
     this.pinecone = new PineconeClient(config.pinecone);
+    this.tracker = new ActivityTracker(config);
   }
 
   async syncAthleteProfile(profile: AthleteProfile): Promise<void> {
     const summary = this.formatAthleteProfile(profile);
     const vector = await this.embedder.embedText(summary);
-    
+
     await this.pinecone.upsert([
       {
         id: "athlete_profile",
@@ -30,12 +33,37 @@ export class EmbeddingSync {
         },
       },
     ]);
+
+    // Track athlete profile (though not a ride, we can track it for completeness)
+    // We'll create a mock activity chunk for tracking purposes
+    const profileChunk: ActivityChunk = {
+      id: -1, // Special ID for profile
+      name: "Athlete Profile",
+      sportType: "profile",
+      startDateLocal: new Date().toISOString().split('T')[0], // Today's date
+      elapsedTime: 0,
+      movingTime: 0,
+      distance: 0,
+      averagePower: null,
+      maxPower: null,
+      weightedAveragePower: null,
+      averageHeartRate: null,
+      maxHeartRate: null,
+      totalElevationGain: null,
+      averageCadence: null,
+      averageSpeed: null,
+      kilojoules: null,
+      description: `Athlete profile for ${profile.firstname ?? ""} ${profile.lastname ?? ""}`,
+      summary: summary
+    };
+
+    await this.tracker.trackActivitySync(profileChunk);
   }
 
   async syncActivities(daysBack: number = 90): Promise<number> {
     const after = Math.floor((Date.now() - daysBack * 24 * 60 * 60 * 1000) / 1000);
     const activities = await this.strava.listActivities({ after });
-    
+
     const chunks: ActivityChunk[] = [];
     for (const activity of activities) {
       // Get detailed activity for laps and description
@@ -58,6 +86,12 @@ export class EmbeddingSync {
     }));
 
     await this.pinecone.upsert(pineconeVectors);
+
+    // Track each activity that was successfully synced
+    for (const chunk of chunks) {
+      await this.tracker.trackActivitySync(chunk);
+    }
+
     return chunks.length;
   }
 
