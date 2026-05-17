@@ -76,7 +76,7 @@ export const cyclingSport: Sport = {
     // strava Pure-Core, and the sport-specific cycling tools.
     const toolset = {
       ...createMemoryTools(deps.memory, sections),
-      ...createStravaTools(deps.strava),
+      ...createStravaTools(deps.strava, deps.embedder, deps.pinecone),
       ...createCyclingTools(deps.memory, deps.strava, deps.tz),
     };
     return Object.entries(toolset).map(([name, t]) => ({

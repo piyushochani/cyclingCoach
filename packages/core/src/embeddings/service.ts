@@ -20,7 +20,7 @@ export class EmbeddingService {
     }
 
     const { embedding } = await embed({
-      model: this.googleAI.embedding(this.config.embeddingModel ?? "text-embedding-004"),
+      model: (this.googleAI as any).embedding("gemini-embedding-001", { outputDimensionality: 3072 }),
       value: text,
     });
     return embedding;
@@ -32,7 +32,7 @@ export class EmbeddingService {
     }
 
     const { embeddings } = await embedMany({
-      model: this.googleAI.embedding(this.config.embeddingModel ?? "text-embedding-004"),
+      model: (this.googleAI as any).embedding("gemini-embedding-001", { outputDimensionality: 3072 }),
       values: texts,
     });
     return embeddings;

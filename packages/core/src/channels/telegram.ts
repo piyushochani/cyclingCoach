@@ -34,13 +34,12 @@ function formatRateLimitWait(err: unknown): string {
 const WELCOME_MESSAGE =
   "Welcome to Cycling Coach!\n\n" +
   "I'm your AI cycling coach. I can build training plans, suggest workouts, " +
-  "and track your fitness using intervals.icu data.\n\n" +
+  "and track your fitness using your Strava history and athlete profile.\n\n" +
   "Commands:\n" +
   "/plan — Generate a training plan\n" +
   "/workout — Get today's workout\n" +
   "/status — Check current fitness, fatigue, and form\n" +
   "/review — Review your last session\n" +
-  "/sync — Force-refresh training data from intervals.icu\n" +
   "/version — Show current version\n" +
   "/whatsnew — See what changed in the latest version\n" +
   "/update — Check for and install updates\n\n" +

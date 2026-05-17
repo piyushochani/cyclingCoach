@@ -28,7 +28,9 @@ export class EmbeddingSync {
         values: vector,
         metadata: {
           kind: "profile",
-          ...profile,
+          ...Object.fromEntries(Object.entries(profile)
+            .filter(([, value]) => value !== null && value !== undefined) // Filter out null/undefined values
+            .filter(([key]) => key !== 'bikes' && key !== 'clubs' && key !== 'shoes')), // Continue to filter out complex objects
           summary,
         },
       },
@@ -66,6 +68,8 @@ export class EmbeddingSync {
 
     const chunks: ActivityChunk[] = [];
     for (const activity of activities) {
+      // Introduce a small delay to avoid Strava API rate limits
+      await new Promise(resolve => setTimeout(resolve, 200)); 
       // Get detailed activity for laps and description
       const detailed = await this.strava.getActivity(activity.id);
       chunks.push(this.mapToChunk(detailed));

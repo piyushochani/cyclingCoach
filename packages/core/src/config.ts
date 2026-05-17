@@ -27,6 +27,7 @@ export interface Config {
   pinecone: {
     apiKey: string;
     indexName: string;
+    host?: string;
     namespace?: string;
   };
   telegram: {
@@ -234,6 +235,7 @@ export function loadConfig(): Config {
     pinecone: {
       apiKey: pineconeApiKey,
       indexName: env("PINECONE_INDEX") ?? (pineconeYaml.index_name as string | undefined) ?? "",
+      host: env("PINECONE_HOST") ?? (pineconeYaml.host as string | undefined) ?? "",
       namespace: env("PINECONE_NAMESPACE") ?? (pineconeYaml.namespace as string | undefined),
     },
     telegram: {

@@ -78,6 +78,8 @@ export class CoachAgent {
       memory: this.memory,
       secrets,
       tz: this.tz,
+      embedder: this.embedder,
+      pinecone: this.pinecone,
     };
     const registrations = sport.tools(coreDeps);
     this.tools = Object.fromEntries(registrations.map((r) => [r.name, r.tool])) as ToolSet;
@@ -108,7 +110,10 @@ export class CoachAgent {
       const vector = await this.embedder.embedText(query);
       const { matches } = await this.pinecone.query(vector, 5);
 
-      if (matches.length === 0) return "";
+      if (matches.length === 0) {
+        console.log("[RAG DEBUG] Pinecone returned 0 matches for query:", query);
+        return "";
+      }
 
       const contextLines = matches.map((m) => {
         const meta = m.metadata as any;
@@ -118,7 +123,13 @@ export class CoachAgent {
         return `[Activity] ${meta.summary}`;
       });
 
-      return "Here is some relevant context from the athlete's history:\n" + contextLines.join("\n");
+      console.log("[RAG DEBUG] Pinecone returned", matches.length, "matches for query:", query);
+      for (const m of matches) {
+        const meta = m.metadata as any;
+        console.log("  - match id:", m.id, "score:", m.score?.toFixed(4), "kind:", meta?.kind, "name:", meta?.name);
+      }
+
+      return "Here are some semantically relevant activities from the athlete's history (may include older activities — use strava_fetch_activities for the most recent data):\n" + contextLines.join("\n");
     } catch (err) {
       console.warn("Failed to retrieve context from Pinecone:", err);
       return "";
@@ -207,6 +218,15 @@ export class CoachAgent {
         }
 
         try {
+          console.log("=== LLM PROMPT DEBUG ===");
+          console.log("--- SYSTEM PROMPT ---");
+          console.log(this.systemPrompt);
+          console.log("--- MESSAGES (" + messages.length + ") ---");
+          for (const [idx, m] of messages.entries()) {
+            console.log("Message " + idx + " [" + m.role + "]: " + (typeof m.content === "string" ? m.content.slice(0, 2000) : JSON.stringify(m.content).slice(0, 2000)));
+          }
+          console.log("=== END LLM PROMPT DEBUG ===");
+
           const { text } = await this.llm.generate({
             system: this.systemPrompt,
             messages,

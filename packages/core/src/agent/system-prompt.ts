@@ -93,6 +93,16 @@ export function buildSystemPrompt(
   const skillsContent = Object.values(persona.skills).join("\n\n---\n\n");
   const context = memory.getContext();
 
+  const toolsNote = `# Available Tools
+
+You have direct access to the athlete's Strava account via these tools:
+- \`strava_fetch_athlete\` — fetch athlete profile (FTP, weight, etc.)
+- \`strava_fetch_activities\` — fetch recent/past activities from Strava directly (always use this for "recent rides", "last workout", "what did I do" questions)
+- \`strava_fetch_activity\` — fetch detailed metrics + laps for a specific activity by ID
+- \`strava_search_history\` — semantic search over the athlete's full activity history
+
+When the athlete asks about recent rides, their last workout, or any time-sensitive query, always call \`strava_fetch_activities\` rather than relying on the Retrieved History section (which may contain older activities).`;
+
   const parts = [persona.soul];
 
   if (skillsContent) {
