@@ -2,7 +2,8 @@ import { StravaClient, type StravaActivity, type StravaAthlete } from "../strava
 import { EmbeddingService } from "./service.js";
 import { PineconeClient } from "./pinecone.js";
 import { ActivityTracker } from "./activity-tracker.js";
-import { analyzeActivity, computeTimeInZones, type ActivityAnalysis, type ZoneDistribution } from "./analysis.js";
+import { analyzeActivity, type ActivityAnalysis } from "./analysis.js";
+import { parseRide, type ParsedRide } from "./analysis-parser.js";
 import { LLM } from "../llm.js";
 import type { Config } from "../config.js";
 import type { ActivityChunk, AthleteProfile } from "../reference/schemas/strava.js";
@@ -10,25 +11,33 @@ import type { ActivityChunk, AthleteProfile } from "../reference/schemas/strava.
 export interface EnrichedActivityMetadata {
   kind: "activity";
 
-  // Raw Strava fields
+  // Identity
   id: number;
   name: string;
   sportType: string;
   startDateLocal: string;
+
+  // Basic
   elapsedTime: number;
   movingTime: number;
   distance: number;
-  averagePower?: number;
-  maxPower?: number;
-  weightedAveragePower?: number;
-  averageHeartRate?: number;
-  maxHeartRate?: number;
-  totalElevationGain?: number;
-  averageCadence?: number;
-  averageSpeedKmh?: number;
-  description?: string;
+  totalElevationGain: number;
+  avgSpeedKmh: number;
 
-  // Zone analysis (flattened for Pinecone metadata — no nested objects)
+  // Power
+  avgPower?: number;
+  maxPower?: number;
+  np?: number;
+  if_?: number;
+  tss?: number;
+  kJ?: number;
+
+  // Heart rate
+  avgHeartRate?: number;
+  maxHeartRate?: number;
+  avgCadence?: number;
+
+  // Zone seconds (flattened)
   z1_seconds: number;
   z2_seconds: number;
   z3_seconds: number;
@@ -37,14 +46,40 @@ export interface EnrichedActivityMetadata {
   z6_seconds: number;
   z7_seconds: number;
 
-  // LLM-generated analysis
-  rideType: string;
+  // Pacing
+  firstHalfAvgPower?: number;
+  secondHalfAvgPower?: number;
+  fadePercent?: number;
+  vi?: number;
+  surgeCount?: number;
+
+  // Intervals
+  intervalCount: number;
+  intervalDetails: string;
+
+  // Classification
+  sessionType: string;
+  intensityBand: string;
+
+  // Structure
   rideBreakup: string;
-  overallIntensity: string;
-  couldBeBetter: string;
-  dietRecommendation: string;
-  reviewSummary: string;
-  tags: string[];
+
+  // Hard tags
+  hardTags: string[];
+
+  // Data quality
+  hasPowerData: boolean;
+  hasHrData: boolean;
+  powerDropoutSeconds: number;
+  hrDropoutSeconds: number;
+  unrealisticSpikes: number;
+
+  // LLM-generated
+  sessionTitle: string;
+  coachSummary: string;
+  loadNotes: string;
+  pacingNotes: string;
+  softTags: string[];
 
   // Combined text for embedding
   summary: string;
@@ -109,7 +144,7 @@ export class EmbeddingSync {
       try {
         const detailed = await this.strava.getActivity(activity.id);
 
-        // Fetch streams for zone analysis
+        // Fetch streams
         await new Promise(resolve => setTimeout(resolve, 150));
         const streams = await this.strava.getActivityStreams(activity.id);
 
@@ -120,16 +155,16 @@ export class EmbeddingSync {
           if (athlete.ftp) ftp = athlete.ftp;
         } catch { /* use default */ }
 
-        // Compute time in zones
-        const zoneSeconds = computeTimeInZones(streams.watts, ftp);
+        // Step 1: Parser — deterministic computation
+        const parsed = parseRide(detailed, streams, ftp);
 
-        // Analyze with LLM (pass power stream for fallback breakup computation)
-        const analysis = await analyzeActivity(this.llm, detailed, zoneSeconds, ftp, streams.watts);
+        // Step 2: LLM — natural language (coachSummary, loadNotes, pacingNotes, etc.)
+        const analysis = await analyzeActivity(this.llm, parsed);
 
-        // Build enriched metadata
-        const enriched = this.buildEnrichedMetadata(detailed, zoneSeconds, analysis);
+        // Step 3: Build enriched metadata
+        const enriched = this.buildEnrichedMetadata(detailed, parsed, analysis);
 
-        // Upsert to Pinecone (metadata must only have scalar / string[] values)
+        // Upsert to Pinecone
         const vector = await this.embedder.embedText(enriched.summary);
         await this.pinecone.upsert([{
           id: `activity_${enriched.id}`,
@@ -142,7 +177,7 @@ export class EmbeddingSync {
         await this.tracker.trackActivitySync(chunk);
 
         syncedCount++;
-        console.log(`Synced activity ${enriched.id}: ${enriched.name} (${enriched.rideType})`);
+        console.log(`Synced activity ${enriched.id}: ${enriched.name} (${enriched.sessionType})`);
       } catch (err) {
         console.warn(`Failed to sync activity ${activity.id} (${activity.name}):`, err);
       }
@@ -153,127 +188,131 @@ export class EmbeddingSync {
 
   private buildEnrichedMetadata(
     activity: StravaActivity,
-    zoneSeconds: ZoneDistribution,
+    parsed: ParsedRide,
     analysis: ActivityAnalysis,
   ): EnrichedActivityMetadata {
-    const summary = this.buildSummary(activity, zoneSeconds, analysis);
+    const summary = this.buildSummary(parsed, analysis);
     const opt = <T>(v: T | null | undefined): T | undefined => v ?? undefined;
 
     return {
       kind: "activity",
-      id: activity.id,
-      name: activity.name,
-      sportType: activity.sport_type,
-      startDateLocal: activity.start_date_local,
-      elapsedTime: activity.elapsed_time,
-      movingTime: activity.moving_time,
-      distance: activity.distance,
-      averagePower: opt(activity.average_watts),
-      maxPower: opt(activity.max_watts),
-      weightedAveragePower: opt(activity.weighted_average_watts),
-      averageHeartRate: opt(activity.average_heartrate),
-      maxHeartRate: opt(activity.max_heartrate),
-      totalElevationGain: opt(activity.total_elevation_gain),
-      averageCadence: opt(activity.average_cadence),
-      averageSpeedKmh: activity.average_speed ? Math.round(activity.average_speed * 3.6 * 10) / 10 : undefined,
-      description: opt(activity.description),
-      z1_seconds: zoneSeconds.z1,
-      z2_seconds: zoneSeconds.z2,
-      z3_seconds: zoneSeconds.z3,
-      z4_seconds: zoneSeconds.z4,
-      z5_seconds: zoneSeconds.z5,
-      z6_seconds: zoneSeconds.z6,
-      z7_seconds: zoneSeconds.z7,
-      rideType: analysis.rideType,
-      rideBreakup: analysis.rideBreakup,
-      overallIntensity: analysis.overallIntensity,
-      couldBeBetter: analysis.couldBeBetter,
-      dietRecommendation: analysis.dietRecommendation,
-      reviewSummary: analysis.reviewSummary,
-      tags: analysis.tags,
+      id: parsed.id,
+      name: parsed.name,
+      sportType: parsed.sportType,
+      startDateLocal: parsed.startDate,
+      elapsedTime: parsed.elapsedTime,
+      movingTime: parsed.movingTime,
+      distance: parsed.distance,
+      totalElevationGain: parsed.elevationGain,
+      avgSpeedKmh: parsed.avgSpeedKmh,
+      avgPower: parsed.avgPower,
+      maxPower: parsed.maxPower,
+      np: parsed.np,
+      if_: parsed.if_,
+      tss: parsed.tss,
+      kJ: parsed.kJ,
+      avgHeartRate: parsed.avgHr,
+      maxHeartRate: parsed.maxHr,
+      avgCadence: opt(activity.average_cadence),
+      z1_seconds: parsed.powerZoneSeconds.z1,
+      z2_seconds: parsed.powerZoneSeconds.z2,
+      z3_seconds: parsed.powerZoneSeconds.z3,
+      z4_seconds: parsed.powerZoneSeconds.z4,
+      z5_seconds: parsed.powerZoneSeconds.z5,
+      z6_seconds: parsed.powerZoneSeconds.z6,
+      z7_seconds: parsed.powerZoneSeconds.z7,
+      firstHalfAvgPower: parsed.firstHalfAvgPower,
+      secondHalfAvgPower: parsed.secondHalfAvgPower,
+      fadePercent: parsed.fadePercent,
+      vi: parsed.vi,
+      surgeCount: parsed.surgeCount,
+      intervalCount: parsed.intervalCount,
+      intervalDetails: parsed.intervalDetails,
+      sessionType: parsed.sessionType,
+      intensityBand: parsed.intensityBand,
+      rideBreakup: parsed.rideBreakup,
+      hardTags: parsed.hardTags,
+      hasPowerData: parsed.dataQuality.hasPowerData,
+      hasHrData: parsed.dataQuality.hasHrData,
+      powerDropoutSeconds: parsed.dataQuality.powerDropoutSeconds,
+      hrDropoutSeconds: parsed.dataQuality.hrDropoutSeconds,
+      unrealisticSpikes: parsed.dataQuality.unrealisticSpikes,
+      sessionTitle: analysis.sessionTitle,
+      coachSummary: analysis.coachSummary,
+      loadNotes: analysis.loadNotes,
+      pacingNotes: analysis.pacingNotes,
+      softTags: analysis.softTags,
       summary,
     };
   }
 
-  private buildSummary(
-    activity: StravaActivity,
-    zoneSeconds: ZoneDistribution,
-    analysis: ActivityAnalysis,
-  ): string {
-    const date = new Date(activity.start_date_local).toLocaleDateString();
-    const durationMin = Math.round(activity.moving_time / 60);
-    const movingHours = activity.moving_time / 3600;
-    const distanceKm = (activity.distance / 1000).toFixed(1);
-    const avgSpeedKmh = movingHours > 0 ? (activity.distance / 1000 / movingHours).toFixed(1) : "?";
-    const zTotal = Object.values(zoneSeconds).reduce((a, b) => a + b, 0);
+  private buildSummary(parsed: ParsedRide, analysis: ActivityAnalysis): string {
+    const date = new Date(parsed.startDate).toLocaleDateString();
+    const durationMin = Math.round(parsed.movingTime / 60);
+    const distanceKm = (parsed.distance / 1000).toFixed(1);
+    const zTotal = Object.values(parsed.powerZoneSeconds).reduce((a, b) => a + b, 0);
 
     const parts: string[] = [
-      `Activity on ${date}: ${activity.name}.`,
-      `Type: ${activity.sport_type}.`,
-      `Duration: ${durationMin} minutes (${Math.round(activity.elapsed_time / 60)} min elapsed).`,
-      `Distance: ${distanceKm} km at ${avgSpeedKmh} km/h average speed.`,
-      `Elevation gain: ${Math.round(activity.total_elevation_gain ?? 0)}m.`,
-      `Ride type: ${analysis.rideType}.`,
-      `Overall intensity: ${analysis.overallIntensity}.`,
+      `Activity on ${date}: ${parsed.name}.`,
+      `Type: ${parsed.sportType}.`,
+      `Duration: ${durationMin} minutes (${Math.round(parsed.elapsedTime / 60)} min elapsed).`,
+      `Distance: ${distanceKm} km at ${parsed.avgSpeedKmh} km/h average speed.`,
+      `Elevation gain: ${parsed.elevationGain} m.`,
+      `Session type: ${parsed.sessionType}.`,
+      `Intensity band: ${parsed.intensityBand}.`,
     ];
 
-    if (activity.average_watts !== null && activity.average_watts !== undefined) {
-      parts.push(`Average power: ${Math.round(activity.average_watts)}W.`);
-    }
-    if (activity.weighted_average_watts !== null && activity.weighted_average_watts !== undefined) {
-      parts.push(`Weighted average power (NP): ${Math.round(activity.weighted_average_watts)}W.`);
-    }
-    if (activity.max_watts !== null && activity.max_watts !== undefined) {
-      parts.push(`Max power: ${Math.round(activity.max_watts)}W.`);
-    }
-    if (activity.average_heartrate !== null && activity.average_heartrate !== undefined) {
-      parts.push(`Average heart rate: ${Math.round(activity.average_heartrate)} bpm.`);
-    }
-    if (activity.max_heartrate !== null && activity.max_heartrate !== undefined) {
-      parts.push(`Max heart rate: ${Math.round(activity.max_heartrate)} bpm.`);
-    }
-    if (activity.average_cadence !== null && activity.average_cadence !== undefined) {
-      parts.push(`Average cadence: ${Math.round(activity.average_cadence)} rpm.`);
-    }
-    if (activity.kilojoules !== null && activity.kilojoules !== undefined) {
-      parts.push(`Energy output: ${Math.round(activity.kilojoules)} kJ.`);
-    }
+    if (parsed.avgPower !== undefined) parts.push(`Average power: ${parsed.avgPower} W.`);
+    if (parsed.np !== undefined) parts.push(`Normalized Power (NP): ${parsed.np} W.`);
+    if (parsed.maxPower !== undefined) parts.push(`Max power: ${parsed.maxPower} W.`);
+    if (parsed.if_ !== undefined) parts.push(`Intensity Factor (IF): ${parsed.if_}.`);
+    if (parsed.tss !== undefined) parts.push(`Training Stress Score (TSS): ${parsed.tss}.`);
+    if (parsed.avgHr !== undefined) parts.push(`Average heart rate: ${parsed.avgHr} bpm.`);
+    if (parsed.maxHr !== undefined) parts.push(`Max heart rate: ${parsed.maxHr} bpm.`);
+    if (parsed.kJ !== undefined) parts.push(`Energy output: ${parsed.kJ} kJ.`);
 
     // Zone breakdown
     if (zTotal > 0) {
       const pct = (s: number) => ((s / zTotal) * 100).toFixed(0);
       const zoneDesc = [
-        `Z1(Recovery) ${Math.round(zoneSeconds.z1 / 60)}min (${pct(zoneSeconds.z1)}%)`,
-        `Z2(Endurance) ${Math.round(zoneSeconds.z2 / 60)}min (${pct(zoneSeconds.z2)}%)`,
-        `Z3(Tempo) ${Math.round(zoneSeconds.z3 / 60)}min (${pct(zoneSeconds.z3)}%)`,
-        `Z4(SweetSpot) ${Math.round(zoneSeconds.z4 / 60)}min (${pct(zoneSeconds.z4)}%)`,
-        `Z5(Threshold) ${Math.round(zoneSeconds.z5 / 60)}min (${pct(zoneSeconds.z5)}%)`,
-        `Z6(VO2Max) ${Math.round(zoneSeconds.z6 / 60)}min (${pct(zoneSeconds.z6)}%)`,
-        `Z7(Anaerobic) ${Math.round(zoneSeconds.z7 / 60)}min (${pct(zoneSeconds.z7)}%)`,
+        `Z1(Recovery) ${Math.round(parsed.powerZoneSeconds.z1 / 60)}min (${pct(parsed.powerZoneSeconds.z1)}%)`,
+        `Z2(Endurance) ${Math.round(parsed.powerZoneSeconds.z2 / 60)}min (${pct(parsed.powerZoneSeconds.z2)}%)`,
+        `Z3(Tempo) ${Math.round(parsed.powerZoneSeconds.z3 / 60)}min (${pct(parsed.powerZoneSeconds.z3)}%)`,
+        `Z4(SweetSpot) ${Math.round(parsed.powerZoneSeconds.z4 / 60)}min (${pct(parsed.powerZoneSeconds.z4)}%)`,
+        `Z5(Threshold) ${Math.round(parsed.powerZoneSeconds.z5 / 60)}min (${pct(parsed.powerZoneSeconds.z5)}%)`,
+        `Z6(VO2Max) ${Math.round(parsed.powerZoneSeconds.z6 / 60)}min (${pct(parsed.powerZoneSeconds.z6)}%)`,
+        `Z7(Anaerobic) ${Math.round(parsed.powerZoneSeconds.z7 / 60)}min (${pct(parsed.powerZoneSeconds.z7)}%)`,
       ].join(", ");
       parts.push(`Time in power zones: ${zoneDesc}.`);
     }
 
-    // Ride structure
-    if (analysis.rideBreakup) {
-      parts.push(`Ride structure: ${analysis.rideBreakup}.`);
+    // Pacing
+    if (parsed.intervalCount > 0 && parsed.intervalDetails) {
+      parts.push(`Intervals: ${parsed.intervalDetails}.`);
+    }
+    if (parsed.rideBreakup) {
+      parts.push(`Ride structure: ${parsed.rideBreakup}.`);
+    }
+    if (parsed.fadePercent !== undefined) {
+      parts.push(`Power fade: ${parsed.fadePercent}% (first half ${parsed.firstHalfAvgPower ?? "?"} W → second half ${parsed.secondHalfAvgPower ?? "?"} W).`);
+    }
+    if (parsed.vi !== undefined) {
+      parts.push(`Variability Index: ${parsed.vi}.`);
     }
 
-    // Feedback
-    if (analysis.couldBeBetter) {
-      parts.push(`Improvement suggestions: ${analysis.couldBeBetter}`);
+    // Hard tags
+    if (parsed.hardTags.length > 0) {
+      parts.push(`Tags: ${parsed.hardTags.join(", ")}.`);
     }
-    if (analysis.dietRecommendation) {
-      parts.push(`Nutrition: ${analysis.dietRecommendation}`);
-    }
-    if (analysis.reviewSummary) {
-      parts.push(`Review: ${analysis.reviewSummary}`);
-    }
-    if (analysis.tags && analysis.tags.length > 0) {
-      parts.push(`Tags: ${analysis.tags.join(", ")}.`);
-    }
-    if (activity.description) {
-      parts.push(`Athlete notes: ${activity.description}`);
+
+    // LLM sections
+    if (analysis.coachSummary) parts.push(`Coach summary: ${analysis.coachSummary}`);
+    if (analysis.loadNotes) parts.push(`Load notes: ${analysis.loadNotes}`);
+    if (analysis.pacingNotes) parts.push(`Pacing notes: ${analysis.pacingNotes}`);
+
+    // Soft tags
+    if (analysis.softTags && analysis.softTags.length > 0) {
+      parts.push(`Qualitative tags: ${analysis.softTags.join(", ")}.`);
     }
 
     return parts.join(" ");

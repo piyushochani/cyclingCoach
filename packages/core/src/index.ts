@@ -91,11 +91,10 @@ export type { IntervalsClient } from "./intervals.js";
 export { StravaClient } from "./strava/client.js";
 
 // ─── Embeddings / Analysis ───────────────────────────────────────────
-export {
-  analyzeActivity,
-  computeTimeInZones,
-} from "./embeddings/analysis.js";
-export type { ActivityAnalysis, ZoneDistribution } from "./embeddings/analysis.js";
+export { analyzeActivity } from "./embeddings/analysis.js";
+export type { ActivityAnalysis } from "./embeddings/analysis.js";
+export { parseRide, computeTimeInZones, computeNormalizedPower, computeRideBreakup } from "./embeddings/analysis-parser.js";
+export type { ParsedRide, ZoneDistribution, DataQualityFlags } from "./embeddings/analysis-parser.js";
 export { EmbeddingSync } from "./embeddings/sync.js";
 
 // ─── Agent ────────────────────────────────────────────────────────────
