@@ -18,13 +18,35 @@ export interface ActivityAnalysis {
 // ============================================================================
 
 function buildPrompt(ride: ParsedRide): string {
+  const isDataPoor = !ride.dataQuality.hasPowerData && !ride.dataQuality.hasHrData && ride.rpe === undefined;
+
   const lines: string[] = [
     `You are a professional cycling coach analyzing a ride. Return ONLY valid JSON with these fields:`,
     `- sessionTitle: a short human-friendly title (e.g. "2×20 min sweet-spot with strong finish")`,
-    `- coachSummary: 3-6 sentence natural language summary describing focus, how hard it was, and main takeaways`,
+    `- coachSummary: 3-6 sentence natural language summary describing focus, effort level, and main takeaways`,
     `- loadNotes: 1-2 sentences translating the numeric load into human language`,
     `- pacingNotes: 1-2 sentences interpreting the pacing stats`,
     `- softTags: array of qualitative tags like ["good-pacing", "fatigued", "breakthrough"]`,
+    ``,
+  ];
+
+  // Data-poor ride instructions
+  if (isDataPoor) {
+    lines.push(
+      `NOTE: This ride has NO power data, NO heart rate data, and NO rider effort rating (RPE).`,
+      `Do NOT state how hard it was as a fact. Instead, describe what kind of ride it was based on`,
+      `GPS-available characteristics (duration, distance, elevation, speed). You may mention once that`,
+      `"Without HR or power data, only basic characteristics like duration and elevation are known."`,
+      `Focus the summary on ride type (long, hilly, commute, etc.), not intensity.`,
+    );
+    if (ride.rpe !== undefined) {
+      lines.push(
+        `The rider rated this effort ${ride.rpe}/10. You CAN reference this as a subjective effort indicator.`,
+      );
+    }
+  }
+
+  lines.push(
     ``,
     `Ride Data:`,
     `---`,
@@ -34,9 +56,10 @@ function buildPrompt(ride: ParsedRide): string {
     `Duration: ${Math.round(ride.movingTime / 60)} min (elapsed ${Math.round(ride.elapsedTime / 60)} min)`,
     `Distance: ${(ride.distance / 1000).toFixed(1)} km at ${ride.avgSpeedKmh} km/h`,
     `Elevation: ${ride.elevationGain} m`,
+    `GPS difficulty band: ${ride.gpsDifficultyBand}`,
     `Session type: ${ride.sessionType}`,
     `Intensity band: ${ride.intensityBand}`,
-  ];
+  );
 
   if (ride.avgPower !== undefined) lines.push(`Avg power: ${ride.avgPower} W`);
   if (ride.maxPower !== undefined) lines.push(`Max power: ${ride.maxPower} W`);
@@ -66,17 +89,40 @@ function buildPrompt(ride: ParsedRide): string {
 }
 
 function buildFallbackText(ride: ParsedRide): ActivityAnalysis {
+  const isDataPoor = !ride.dataQuality.hasPowerData && !ride.dataQuality.hasHrData && ride.rpe === undefined;
+
+  let coachSummary: string;
+  if (isDataPoor) {
+    const distKm = (ride.distance / 1000).toFixed(1);
+    const durMin = Math.round(ride.movingTime / 60);
+    coachSummary = `${ride.name}: ${distKm} km in ${durMin} min. GPS-based classification: ${ride.gpsDifficultyBand}. Without HR or power data, only basic characteristics like duration and elevation are known for this ride.`;
+  } else {
+    coachSummary = `${ride.name}: ${(ride.distance / 1000).toFixed(1)} km in ${Math.round(ride.movingTime / 60)} min. ${ride.sessionType} session at ${ride.intensityBand} intensity.${ride.avgPower ? ` Avg power ${ride.avgPower} W.` : ""}${ride.rideBreakup ? ` Structure: ${ride.rideBreakup}.` : ""}`;
+  }
+
+  let loadNotes: string;
+  if (ride.rpe !== undefined) {
+    loadNotes = `Rider rated this a ${ride.rpe}/10 effort subjectively.`;
+  } else if (ride.tss !== undefined) {
+    loadNotes = `TSS of ${ride.tss} indicates a ${ride.tss < 100 ? "moderate" : ride.tss < 150 ? "hard" : "very demanding"} session.`;
+  } else {
+    loadNotes = "Without HR or power data, precise load estimation is not available.";
+  }
+
+  let pacingNotes: string;
+  if (ride.fadePercent !== undefined && ride.fadePercent > 5) {
+    pacingNotes = `Power faded ${ride.fadePercent}% from first to second half. Consider more even pacing.`;
+  } else if (ride.fadePercent !== undefined) {
+    pacingNotes = `Pacing was steady with only ${ride.fadePercent}% fade.`;
+  } else {
+    pacingNotes = "Insufficient data for pacing analysis.";
+  }
+
   return {
     sessionTitle: ride.sessionType,
-    coachSummary: `${ride.name}: ${(ride.distance / 1000).toFixed(1)} km in ${Math.round(ride.movingTime / 60)} min. ${ride.sessionType} session at ${ride.intensityBand} intensity.${ride.avgPower ? ` Avg power ${ride.avgPower} W.` : ""}${ride.rideBreakup ? ` Structure: ${ride.rideBreakup}.` : ""}`,
-    loadNotes: ride.tss !== undefined
-      ? `TSS of ${ride.tss} indicates a ${ride.tss < 100 ? "moderate" : ride.tss < 150 ? "hard" : "very demanding"} session.`
-      : "Load data not available for detailed load notes.",
-    pacingNotes: ride.fadePercent !== undefined && ride.fadePercent > 5
-      ? `Power faded ${ride.fadePercent}% from first to second half. Consider more even pacing.`
-      : ride.fadePercent !== undefined
-        ? `Pacing was steady with only ${ride.fadePercent}% fade.`
-        : "Insufficient data for pacing analysis.",
+    coachSummary,
+    loadNotes,
+    pacingNotes,
     softTags: [ride.sessionType.toLowerCase()],
   };
 }

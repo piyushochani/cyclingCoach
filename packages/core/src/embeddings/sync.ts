@@ -60,6 +60,8 @@ export interface EnrichedActivityMetadata {
   // Classification
   sessionType: string;
   intensityBand: string;
+  gpsDifficultyBand: string;
+  rpe?: number;
 
   // Structure
   rideBreakup: string;
@@ -156,7 +158,7 @@ export class EmbeddingSync {
         } catch { /* use default */ }
 
         // Step 1: Parser — deterministic computation
-        const parsed = parseRide(detailed, streams, ftp);
+        const parsed = parseRide(detailed, streams, ftp, undefined);
 
         // Step 2: LLM — natural language (coachSummary, loadNotes, pacingNotes, etc.)
         const analysis = await analyzeActivity(this.llm, parsed);
@@ -230,6 +232,8 @@ export class EmbeddingSync {
       intervalDetails: parsed.intervalDetails,
       sessionType: parsed.sessionType,
       intensityBand: parsed.intensityBand,
+      gpsDifficultyBand: parsed.gpsDifficultyBand,
+      rpe: parsed.rpe,
       rideBreakup: parsed.rideBreakup,
       hardTags: parsed.hardTags,
       hasPowerData: parsed.dataQuality.hasPowerData,
@@ -260,8 +264,10 @@ export class EmbeddingSync {
       `Elevation gain: ${parsed.elevationGain} m.`,
       `Session type: ${parsed.sessionType}.`,
       `Intensity band: ${parsed.intensityBand}.`,
+      `GPS difficulty band: ${parsed.gpsDifficultyBand}.`,
     ];
 
+    if (parsed.rpe !== undefined) parts.push(`RPE: ${parsed.rpe}/10.`);
     if (parsed.avgPower !== undefined) parts.push(`Average power: ${parsed.avgPower} W.`);
     if (parsed.np !== undefined) parts.push(`Normalized Power (NP): ${parsed.np} W.`);
     if (parsed.maxPower !== undefined) parts.push(`Max power: ${parsed.maxPower} W.`);

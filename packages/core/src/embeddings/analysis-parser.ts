@@ -62,6 +62,10 @@ export interface ParsedRide {
   // Classification
   sessionType: string;   // Endurance / Sweet Spot / Threshold / VO2Max / Anaerobic / Recovery / Race / Mixed
   intensityBand: "Low" | "Moderate" | "High" | "Very High";
+  gpsDifficultyBand: "short-easy" | "medium" | "long-hard";
+
+  // RPE (1-10, rider-submitted after ride)
+  rpe?: number;
 
   // Structure
   rideBreakup: string;   // computed from power stream
@@ -354,11 +358,26 @@ export function classifySession(
 }
 
 // ============================================================================
+// GPS DIFFICULTY BAND — for rides without power/HR data
+// ============================================================================
+
+export function computeGpsDifficultyBand(movingTime: number, elevationGain: number): "short-easy" | "medium" | "long-hard" {
+  const hours = movingTime / 3600;
+  if (hours > 2 && elevationGain > 800) return "long-hard";
+  if (hours > 1.5 || elevationGain > 500) return "medium";
+  return "short-easy";
+}
+
+// ============================================================================
 // HARD TAGS
 // ============================================================================
 
+function getHourUtc(isoDate: string): number {
+  try { return parseInt(isoDate.slice(11, 13), 10); } catch { return 12; }
+}
+
 export function generateHardTags(
-  parsed: Pick<ParsedRide, "powerZoneSeconds" | "np" | "avgPower" | "avgHr" | "elevationGain" | "distance" | "sessionType" | "intervalCount" | "dataQuality" | "sportType" | "avgSpeedKmh" | "vi">,
+  parsed: Pick<ParsedRide, "powerZoneSeconds" | "np" | "avgPower" | "avgHr" | "elevationGain" | "distance" | "sessionType" | "intervalCount" | "dataQuality" | "sportType" | "avgSpeedKmh" | "vi" | "movingTime" | "startDate">,
 ): string[] {
   const tags: string[] = [];
   tags.push(parsed.sessionType.toLowerCase());
@@ -388,6 +407,20 @@ export function generateHardTags(
 
   // Race
   if (parsed.sessionType === "Race") tags.push("race");
+
+  // GPS-based structural tags (work even without power/HR)
+  const distKm = parsed.distance / 1000;
+  const movingHours = parsed.movingTime / 3600;
+
+  if (distKm < 20 && parsed.elevationGain < 100) tags.push("commute");
+  if (distKm > 80) tags.push("long-ride");
+  if (movingHours > 2) tags.push("long-ride");
+  if (movingHours > 4) tags.push("epic");
+
+  // Time of day
+  const hour = getHourUtc(parsed.startDate);
+  if (hour >= 5 && hour < 9) tags.push("morning-ride");
+  else if (hour >= 17 && hour < 21) tags.push("evening-ride");
 
   return tags;
 }
@@ -447,7 +480,7 @@ export interface Streams {
   distance?: number[];
 }
 
-export function parseRide(activity: StravaActivity, streams: Streams, ftp: number): ParsedRide {
+export function parseRide(activity: StravaActivity, streams: Streams, ftp: number, rpe?: number): ParsedRide {
   const movingHours = activity.moving_time / 3600;
   const avgSpeedKmh = movingHours > 0 ? round1((activity.distance / 1000) / movingHours) : 0;
 
@@ -504,6 +537,8 @@ export function parseRide(activity: StravaActivity, streams: Streams, ftp: numbe
     intervalDetails: intervals.intervalDetails,
     sessionType: session.sessionType,
     intensityBand: session.intensityBand,
+    gpsDifficultyBand: computeGpsDifficultyBand(activity.moving_time, activity.total_elevation_gain ?? 0),
+    rpe,
     rideBreakup,
     hardTags: [],
     dataQuality,
