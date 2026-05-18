@@ -81,7 +81,11 @@ const BACKEND_OP_SIGNIN = "op-signin";
 
 export type BackendChoice = "plain" | "op" | "keychain";
 
-type SecretFieldPath = "llm.api_key" | "intervals.api_key" | "telegram.bot_token";
+type SecretFieldPath =
+  | "llm.api_key"
+  | "strava.client_secret"
+  | "pinecone.api_key"
+  | "telegram.bot_token";
 
 export type CreatedEntry = {
   backend: "op" | "keychain";
@@ -106,7 +110,8 @@ const DEFAULT_MODELS: Record<string, string> = {
 
 const FIELD_KEYCHAIN_ACCOUNT: Record<SecretFieldPath, string> = {
   "llm.api_key": "llm_api_key",
-  "intervals.api_key": "intervals_api_key",
+  "strava.client_secret": "strava_client_secret",
+  "pinecone.api_key": "pinecone_api_key",
   "telegram.bot_token": "telegram_bot_token",
 };
 
@@ -264,8 +269,10 @@ async function _runWizardCore(ctx: WizardCtx, binary: BinaryConfig): Promise<voi
   const prevProvider = getString(previous, "llm", "provider");
   const prevModel = getString(previous, "llm", "model");
   const prevLlmKey = readFieldValue(previous, "llm", "api_key");
-  const prevIntervalsKey = readFieldValue(previous, "intervals", "api_key");
-  const prevIntervalsId = getString(previous, "intervals", "athlete_id");
+  const prevStravaClientId = getString(previous, "strava", "client_id");
+  const prevStravaSecret = readFieldValue(previous, "strava", "client_secret");
+  const prevPineconeApiKey = readFieldValue(previous, "pinecone", "api_key");
+  const prevPineconeIndex = getString(previous, "pinecone", "index_name");
   const prevTelegramToken = readFieldValue(previous, "telegram", "bot_token");
 
   // Provider
@@ -370,50 +377,66 @@ async function _runWizardCore(ctx: WizardCtx, binary: BinaryConfig): Promise<voi
   }
   merged.llm = llmConfig;
 
-  // intervals.api_key (optional)
-  let intervalsAthleteId = prevIntervalsId ?? "";
-  {
-    const hasPrev = isNonEmptySecret(prevIntervalsKey);
-    const result = await _collectAndWriteSecret(ctx, {
-      field: "intervals.api_key",
-      label: "intervals.icu API key",
-      required: false,
-      prevValue: prevIntervalsKey,
-      backend,
-      chosenVaultRef: { current: chosenVault },
-      opAbsPathRef: { current: opAbsPath },
-      keychainPathRef: { current: keychainPath },
-    }, binary);
-    chosenVault = result.chosenVault;
-    opAbsPath = result.opAbsPath;
-    keychainPath = result.keychainPath;
-    backend = result.backend;
-    if (result.yamlValue !== undefined) {
-      // Ask for athlete ID when the user typed a new key (reuse prev athlete id on keep).
-      if (result.providedNewValue) {
-        const athleteId = await text({
-          message: "intervals.icu athlete ID",
-          defaultValue: prevIntervalsId ?? "0",
-          placeholder: prevIntervalsId ?? "0",
-        });
-        handleCancel(athleteId, ctx, binary);
-        intervalsAthleteId = (typeof athleteId === "string" && athleteId) || prevIntervalsId || "0";
-      } else if (hasPrev) {
-        intervalsAthleteId = prevIntervalsId ?? "0";
-      }
-      merged.intervals = {
-        api_key: result.yamlValue,
-        athlete_id: intervalsAthleteId || "0",
-      };
-    } else if (prevIntervalsId) {
-      // User skipped the api_key prompt but a prior athlete_id exists (common
-      // when api_key comes from INTERVALS_API_KEY env var and only athlete_id
-      // is in YAML). Preserve it — don't silently wipe the section.
-      merged.intervals = { athlete_id: prevIntervalsId };
-    } else {
-      delete merged.intervals;
-    }
+  // Strava client_id (required)
+  const stravaClientId = await text({
+    message: "Strava Client ID",
+    defaultValue: prevStravaClientId,
+    placeholder: "Required for Strava integration",
+    validate: (v) => (!v ? "Strava Client ID is required" : undefined),
+  });
+  handleCancel(stravaClientId, ctx, binary);
+  merged.strava = { ...(merged.strava as object), client_id: stravaClientId };
+
+  // Strava client_secret (required)
+  const stravaSecretResult = await _collectAndWriteSecret(ctx, {
+    field: "strava.client_secret",
+    label: "Strava Client Secret",
+    required: true,
+    prevValue: prevStravaSecret,
+    backend,
+    chosenVaultRef: { current: chosenVault },
+    opAbsPathRef: { current: opAbsPath },
+    keychainPathRef: { current: keychainPath },
+  }, binary);
+  chosenVault = stravaSecretResult.chosenVault;
+  opAbsPath = stravaSecretResult.opAbsPath;
+  keychainPath = stravaSecretResult.keychainPath;
+  backend = stravaSecretResult.backend;
+  if (stravaSecretResult.yamlValue !== undefined) {
+    (merged.strava as any).client_secret = stravaSecretResult.yamlValue;
   }
+
+  // Pinecone api_key (required)
+  const pineconeApiKeyResult = await _collectAndWriteSecret(ctx, {
+    field: "pinecone.api_key",
+    label: "Pinecone API Key",
+    required: true,
+    prevValue: prevPineconeApiKey,
+    backend,
+    chosenVaultRef: { current: chosenVault },
+    opAbsPathRef: { current: opAbsPath },
+    keychainPathRef: { current: keychainPath },
+  }, binary);
+  chosenVault = pineconeApiKeyResult.chosenVault;
+  opAbsPath = pineconeApiKeyResult.opAbsPath;
+  keychainPath = pineconeApiKeyResult.keychainPath;
+  backend = pineconeApiKeyResult.backend;
+  if (pineconeApiKeyResult.yamlValue !== undefined) {
+    merged.pinecone = {
+      ...(merged.pinecone as object),
+      api_key: pineconeApiKeyResult.yamlValue,
+    };
+  }
+
+  // Pinecone index_name (required)
+  const pineconeIndexName = await text({
+    message: "Pinecone Index Name (Host URL)",
+    defaultValue: prevPineconeIndex,
+    placeholder: "Required for vector storage",
+    validate: (v) => (!v ? "Pinecone Index Name is required" : undefined),
+  });
+  handleCancel(pineconeIndexName, ctx, binary);
+  merged.pinecone = { ...(merged.pinecone as any), index_name: pineconeIndexName };
 
   // telegram.bot_token (optional)
   {

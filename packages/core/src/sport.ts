@@ -1,10 +1,12 @@
 import type { Tool } from "ai";
 import type { z } from "zod";
-import type { IntervalsClient } from "./intervals.js";
+import type { StravaClient } from "./strava/client.js";
 import type { LLM } from "./llm.js";
 import type { MemorySnapshot, MemoryStore } from "./memory.js";
 import type { ReferenceSportAdapter } from "./reference/sport-adapter.js";
 import type { SecretsResolver } from "./secrets/types.js";
+import type { EmbeddingService } from "./embeddings/service.js";
+import type { PineconeClient } from "./embeddings/pinecone.js";
 
 // ─── Identity ──────────────────────────────────────────────────────────
 /** Closed literal union — adding a sport requires a Core bump. Intentional. */
@@ -41,18 +43,20 @@ export interface ToolRegistration {
 
 // ─── Runtime services Core provides to tool factories ──────────────────
 /**
- * `intervals` is nullable because intervals.icu is BYOK-optional — users
- * without an intervals API key still run the agent. Sport.tools() filters
- * intervals-bound tools when null.
+ * `strava` is nullable because Strava is BYOK-optional — users
+ * without a Strava API key still run the agent. Sport.tools() filters
+ * Strava-bound tools when null.
  */
 export interface CoreDeps {
   llm: LLM;
-  intervals: IntervalsClient | null;
+  strava: StravaClient | null;
   memory: MemoryStore;
   secrets: SecretsResolver;
   /** Athlete IANA timezone, resolved by Core. Used so tools see the same
    * "today" the system prompt references. */
   tz: string;
+  embedder: EmbeddingService;
+  pinecone: PineconeClient;
 }
 
 // ─── Sport: the plug-point ─────────────────────────────────────────────
@@ -112,4 +116,3 @@ export type SportPersona = Pick<Sport, "soul" | "skills">;
 
 /** Slice consumed by the memory store factory and the compaction module. */
 export type SportMemoryShape = Pick<Sport, "memorySections" | "mustPreserveTokens">;
-

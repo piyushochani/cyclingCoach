@@ -95,6 +95,16 @@ export {
 // ─── Intervals ────────────────────────────────────────────────────────
 export type { IntervalsClient } from "./intervals.js";
 
+// ─── Strava ───────────────────────────────────────────────────────────
+export { StravaClient } from "./strava/client.js";
+
+// ─── Embeddings / Analysis ───────────────────────────────────────────
+export { analyzeActivity } from "./embeddings/analysis.js";
+export type { ActivityAnalysis } from "./embeddings/analysis.js";
+export { parseRide, computeTimeInZones, computeNormalizedPower, computeRideBreakup } from "./embeddings/analysis-parser.js";
+export type { ParsedRide, ZoneDistribution, DataQualityFlags } from "./embeddings/analysis-parser.js";
+export { EmbeddingSync } from "./embeddings/sync.js";
+
 // ─── Agent ────────────────────────────────────────────────────────────
 export { CoachAgent } from "./agent/coach-agent.js";
 export { ChatStore } from "./agent/chat-store.js";
@@ -139,9 +149,8 @@ export {
   createMemoryTools,
 } from "./agent/tools.js";
 export {
-  createPureCoreIntervalsTools,
-  createCoreToolsWithSportConfig,
-} from "./agent/intervals-tools.js";
+  createStravaTools,
+} from "./agent/strava-tools.js";
 export {
   appendCurrentTimeLine,
   buildCurrentTimeLine,

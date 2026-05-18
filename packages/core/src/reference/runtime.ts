@@ -13,6 +13,8 @@ import { SYNC_COOLDOWN_MS, SCHEDULED_SYNC_INTERVAL_MS } from "./freshness.js";
 import type { FetchedReference } from "./sync/run-sync.js";
 import type { ReferenceServices } from "./services.js";
 
+import { StravaClient } from "../strava/client.js";
+
 /** Shared between runtime + tests so the strings stay in sync. */
 export const INITIAL_SYNC_FAILED_LOG_PREFIX = "Reference: initial sync failed";
 
@@ -29,7 +31,7 @@ export interface ReferenceRuntime {
 export interface BootstrapReferenceDeps {
   /** Binary's per-coach data root (e.g., `~/.cycling-coach/`). */
   readonly dataDir: string;
-  readonly intervals: { readonly apiKey: string; readonly athleteId?: string };
+  readonly strava: StravaClient | null;
   /** Inject a fetcher for tests. Defaults to `makeProductionFetcher`. */
   readonly fetchReferenceData?: (signal: AbortSignal) => Promise<FetchedReference>;
 }
@@ -57,8 +59,7 @@ export async function bootstrapReference(
   const fetchReferenceData =
     deps.fetchReferenceData ??
     makeProductionFetcher({
-      apiKey: deps.intervals.apiKey,
-      athleteId: deps.intervals.athleteId,
+      strava: deps.strava,
     });
 
   const mutex = new AsyncMutex();
