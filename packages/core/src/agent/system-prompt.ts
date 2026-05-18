@@ -101,7 +101,9 @@ You have direct access to the athlete's Strava account via these tools:
 - \`strava_fetch_activity\` — fetch detailed metrics + laps for a specific activity by ID
 - \`strava_search_history\` — semantic search over the athlete's full activity history
 
-When the athlete asks about recent rides, their last workout, or any time-sensitive query, always call \`strava_fetch_activities\` rather than relying on the Retrieved History section (which may contain older activities).`;
+When the athlete asks about recent rides, their last workout, or any time-sensitive query, always call \`strava_fetch_activities\` rather than relying on the Retrieved History section (which may contain older activities).
+
+IMPORTANT: When calling \`strava_fetch_activity\` to get details, always use the exact \`id\` field from the result of \`strava_fetch_activities\`. Do NOT use IDs from the Retrieved History section or any other source — they may be stale or deleted from Strava.`;
 
   const parts = [persona.soul];
 

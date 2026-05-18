@@ -2,20 +2,102 @@ import { StravaClient, type StravaActivity, type StravaAthlete } from "../strava
 import { EmbeddingService } from "./service.js";
 import { PineconeClient } from "./pinecone.js";
 import { ActivityTracker } from "./activity-tracker.js";
+import { analyzeActivity, type ActivityAnalysis } from "./analysis.js";
+import { parseRide, type ParsedRide } from "./analysis-parser.js";
+import { LLM } from "../llm.js";
 import type { Config } from "../config.js";
 import type { ActivityChunk, AthleteProfile } from "../reference/schemas/strava.js";
+
+export interface EnrichedActivityMetadata {
+  kind: "activity";
+
+  // Identity
+  id: number;
+  name: string;
+  sportType: string;
+  startDateLocal: string;
+
+  // Basic
+  elapsedTime: number;
+  movingTime: number;
+  distance: number;
+  totalElevationGain: number;
+  avgSpeedKmh: number;
+
+  // Power
+  avgPower?: number;
+  maxPower?: number;
+  np?: number;
+  if_?: number;
+  tss?: number;
+  kJ?: number;
+
+  // Heart rate
+  avgHeartRate?: number;
+  maxHeartRate?: number;
+  avgCadence?: number;
+
+  // Zone seconds (flattened)
+  z1_seconds: number;
+  z2_seconds: number;
+  z3_seconds: number;
+  z4_seconds: number;
+  z5_seconds: number;
+  z6_seconds: number;
+  z7_seconds: number;
+
+  // Pacing
+  firstHalfAvgPower?: number;
+  secondHalfAvgPower?: number;
+  fadePercent?: number;
+  vi?: number;
+  surgeCount?: number;
+
+  // Intervals
+  intervalCount: number;
+  intervalDetails: string;
+
+  // Classification
+  sessionType: string;
+  intensityBand: string;
+
+  // Structure
+  rideBreakup: string;
+
+  // Hard tags
+  hardTags: string[];
+
+  // Data quality
+  hasPowerData: boolean;
+  hasHrData: boolean;
+  powerDropoutSeconds: number;
+  hrDropoutSeconds: number;
+  unrealisticSpikes: number;
+
+  // LLM-generated
+  sessionTitle: string;
+  coachSummary: string;
+  loadNotes: string;
+  pacingNotes: string;
+  softTags: string[];
+
+  // Combined text for embedding
+  summary: string;
+}
 
 export class EmbeddingSync {
   private strava: StravaClient;
   private embedder: EmbeddingService;
   private pinecone: PineconeClient;
   private tracker: ActivityTracker;
+  private llm: LLM;
 
   constructor(config: Config) {
     this.strava = new StravaClient(config.strava);
     this.embedder = new EmbeddingService(config.llm);
     this.pinecone = new PineconeClient(config.pinecone);
     this.tracker = new ActivityTracker(config);
+    this.llm = new LLM(config);
   }
 
   async syncAthleteProfile(profile: AthleteProfile): Promise<void> {
@@ -29,34 +111,23 @@ export class EmbeddingSync {
         metadata: {
           kind: "profile",
           ...Object.fromEntries(Object.entries(profile)
-            .filter(([, value]) => value !== null && value !== undefined) // Filter out null/undefined values
-            .filter(([key]) => key !== 'bikes' && key !== 'clubs' && key !== 'shoes')), // Continue to filter out complex objects
+            .filter(([, value]) => value !== null && value !== undefined)
+            .filter(([key]) => key !== 'bikes' && key !== 'clubs' && key !== 'shoes')),
           summary,
         },
       },
     ]);
 
-    // Track athlete profile (though not a ride, we can track it for completeness)
-    // We'll create a mock activity chunk for tracking purposes
     const profileChunk: ActivityChunk = {
-      id: -1, // Special ID for profile
+      id: -1,
       name: "Athlete Profile",
       sportType: "profile",
-      startDateLocal: new Date().toISOString().split('T')[0], // Today's date
+      startDateLocal: new Date().toISOString().split('T')[0],
       elapsedTime: 0,
       movingTime: 0,
       distance: 0,
-      averagePower: null,
-      maxPower: null,
-      weightedAveragePower: null,
-      averageHeartRate: null,
-      maxHeartRate: null,
-      totalElevationGain: null,
-      averageCadence: null,
-      averageSpeed: null,
-      kilojoules: null,
       description: `Athlete profile for ${profile.firstname ?? ""} ${profile.lastname ?? ""}`,
-      summary: summary
+      summary: summary,
     };
 
     await this.tracker.trackActivitySync(profileChunk);
@@ -66,41 +137,189 @@ export class EmbeddingSync {
     const after = Math.floor((Date.now() - daysBack * 24 * 60 * 60 * 1000) / 1000);
     const activities = await this.strava.listActivities({ after });
 
-    const chunks: ActivityChunk[] = [];
+    let syncedCount = 0;
     for (const activity of activities) {
-      // Introduce a small delay to avoid Strava API rate limits
-      await new Promise(resolve => setTimeout(resolve, 200)); 
-      // Get detailed activity for laps and description
-      const detailed = await this.strava.getActivity(activity.id);
-      chunks.push(this.mapToChunk(detailed));
+      await new Promise(resolve => setTimeout(resolve, 300));
+
+      try {
+        const detailed = await this.strava.getActivity(activity.id);
+
+        // Fetch streams
+        await new Promise(resolve => setTimeout(resolve, 150));
+        const streams = await this.strava.getActivityStreams(activity.id);
+
+        // Get FTP from athlete profile
+        let ftp = 180;
+        try {
+          const athlete = await this.strava.getAthlete();
+          if (athlete.ftp) ftp = athlete.ftp;
+        } catch { /* use default */ }
+
+        // Step 1: Parser — deterministic computation
+        const parsed = parseRide(detailed, streams, ftp);
+
+        // Step 2: LLM — natural language (coachSummary, loadNotes, pacingNotes, etc.)
+        const analysis = await analyzeActivity(this.llm, parsed);
+
+        // Step 3: Build enriched metadata
+        const enriched = this.buildEnrichedMetadata(detailed, parsed, analysis);
+
+        // Upsert to Pinecone
+        const vector = await this.embedder.embedText(enriched.summary);
+        await this.pinecone.upsert([{
+          id: `activity_${enriched.id}`,
+          values: vector,
+          metadata: enriched as unknown as Record<string, unknown>,
+        }]);
+
+        // Track
+        const chunk = this.toActivityChunk(detailed, enriched.summary);
+        await this.tracker.trackActivitySync(chunk);
+
+        syncedCount++;
+        console.log(`Synced activity ${enriched.id}: ${enriched.name} (${enriched.sessionType})`);
+      } catch (err) {
+        console.warn(`Failed to sync activity ${activity.id} (${activity.name}):`, err);
+      }
     }
 
-    if (chunks.length === 0) return 0;
-
-    const summaries = chunks.map(c => c.summary);
-    const vectors = await this.embedder.embedTexts(summaries);
-
-    const pineconeVectors = chunks.map((chunk, i) => ({
-      id: `activity_${chunk.id}`,
-      values: vectors[i],
-      metadata: {
-        kind: "activity",
-        ...chunk,
-      },
-    }));
-
-    await this.pinecone.upsert(pineconeVectors);
-
-    // Track each activity that was successfully synced
-    for (const chunk of chunks) {
-      await this.tracker.trackActivitySync(chunk);
-    }
-
-    return chunks.length;
+    return syncedCount;
   }
 
-  private mapToChunk(activity: StravaActivity): ActivityChunk {
-    const summary = this.formatActivitySummary(activity);
+  private buildEnrichedMetadata(
+    activity: StravaActivity,
+    parsed: ParsedRide,
+    analysis: ActivityAnalysis,
+  ): EnrichedActivityMetadata {
+    const summary = this.buildSummary(parsed, analysis);
+    const opt = <T>(v: T | null | undefined): T | undefined => v ?? undefined;
+
+    return {
+      kind: "activity",
+      id: parsed.id,
+      name: parsed.name,
+      sportType: parsed.sportType,
+      startDateLocal: parsed.startDate,
+      elapsedTime: parsed.elapsedTime,
+      movingTime: parsed.movingTime,
+      distance: parsed.distance,
+      totalElevationGain: parsed.elevationGain,
+      avgSpeedKmh: parsed.avgSpeedKmh,
+      avgPower: parsed.avgPower,
+      maxPower: parsed.maxPower,
+      np: parsed.np,
+      if_: parsed.if_,
+      tss: parsed.tss,
+      kJ: parsed.kJ,
+      avgHeartRate: parsed.avgHr,
+      maxHeartRate: parsed.maxHr,
+      avgCadence: opt(activity.average_cadence),
+      z1_seconds: parsed.powerZoneSeconds.z1,
+      z2_seconds: parsed.powerZoneSeconds.z2,
+      z3_seconds: parsed.powerZoneSeconds.z3,
+      z4_seconds: parsed.powerZoneSeconds.z4,
+      z5_seconds: parsed.powerZoneSeconds.z5,
+      z6_seconds: parsed.powerZoneSeconds.z6,
+      z7_seconds: parsed.powerZoneSeconds.z7,
+      firstHalfAvgPower: parsed.firstHalfAvgPower,
+      secondHalfAvgPower: parsed.secondHalfAvgPower,
+      fadePercent: parsed.fadePercent,
+      vi: parsed.vi,
+      surgeCount: parsed.surgeCount,
+      intervalCount: parsed.intervalCount,
+      intervalDetails: parsed.intervalDetails,
+      sessionType: parsed.sessionType,
+      intensityBand: parsed.intensityBand,
+      rideBreakup: parsed.rideBreakup,
+      hardTags: parsed.hardTags,
+      hasPowerData: parsed.dataQuality.hasPowerData,
+      hasHrData: parsed.dataQuality.hasHrData,
+      powerDropoutSeconds: parsed.dataQuality.powerDropoutSeconds,
+      hrDropoutSeconds: parsed.dataQuality.hrDropoutSeconds,
+      unrealisticSpikes: parsed.dataQuality.unrealisticSpikes,
+      sessionTitle: analysis.sessionTitle,
+      coachSummary: analysis.coachSummary,
+      loadNotes: analysis.loadNotes,
+      pacingNotes: analysis.pacingNotes,
+      softTags: analysis.softTags,
+      summary,
+    };
+  }
+
+  private buildSummary(parsed: ParsedRide, analysis: ActivityAnalysis): string {
+    const date = new Date(parsed.startDate).toLocaleDateString();
+    const durationMin = Math.round(parsed.movingTime / 60);
+    const distanceKm = (parsed.distance / 1000).toFixed(1);
+    const zTotal = Object.values(parsed.powerZoneSeconds).reduce((a, b) => a + b, 0);
+
+    const parts: string[] = [
+      `Activity on ${date}: ${parsed.name}.`,
+      `Type: ${parsed.sportType}.`,
+      `Duration: ${durationMin} minutes (${Math.round(parsed.elapsedTime / 60)} min elapsed).`,
+      `Distance: ${distanceKm} km at ${parsed.avgSpeedKmh} km/h average speed.`,
+      `Elevation gain: ${parsed.elevationGain} m.`,
+      `Session type: ${parsed.sessionType}.`,
+      `Intensity band: ${parsed.intensityBand}.`,
+    ];
+
+    if (parsed.avgPower !== undefined) parts.push(`Average power: ${parsed.avgPower} W.`);
+    if (parsed.np !== undefined) parts.push(`Normalized Power (NP): ${parsed.np} W.`);
+    if (parsed.maxPower !== undefined) parts.push(`Max power: ${parsed.maxPower} W.`);
+    if (parsed.if_ !== undefined) parts.push(`Intensity Factor (IF): ${parsed.if_}.`);
+    if (parsed.tss !== undefined) parts.push(`Training Stress Score (TSS): ${parsed.tss}.`);
+    if (parsed.avgHr !== undefined) parts.push(`Average heart rate: ${parsed.avgHr} bpm.`);
+    if (parsed.maxHr !== undefined) parts.push(`Max heart rate: ${parsed.maxHr} bpm.`);
+    if (parsed.kJ !== undefined) parts.push(`Energy output: ${parsed.kJ} kJ.`);
+
+    // Zone breakdown
+    if (zTotal > 0) {
+      const pct = (s: number) => ((s / zTotal) * 100).toFixed(0);
+      const zoneDesc = [
+        `Z1(Recovery) ${Math.round(parsed.powerZoneSeconds.z1 / 60)}min (${pct(parsed.powerZoneSeconds.z1)}%)`,
+        `Z2(Endurance) ${Math.round(parsed.powerZoneSeconds.z2 / 60)}min (${pct(parsed.powerZoneSeconds.z2)}%)`,
+        `Z3(Tempo) ${Math.round(parsed.powerZoneSeconds.z3 / 60)}min (${pct(parsed.powerZoneSeconds.z3)}%)`,
+        `Z4(SweetSpot) ${Math.round(parsed.powerZoneSeconds.z4 / 60)}min (${pct(parsed.powerZoneSeconds.z4)}%)`,
+        `Z5(Threshold) ${Math.round(parsed.powerZoneSeconds.z5 / 60)}min (${pct(parsed.powerZoneSeconds.z5)}%)`,
+        `Z6(VO2Max) ${Math.round(parsed.powerZoneSeconds.z6 / 60)}min (${pct(parsed.powerZoneSeconds.z6)}%)`,
+        `Z7(Anaerobic) ${Math.round(parsed.powerZoneSeconds.z7 / 60)}min (${pct(parsed.powerZoneSeconds.z7)}%)`,
+      ].join(", ");
+      parts.push(`Time in power zones: ${zoneDesc}.`);
+    }
+
+    // Pacing
+    if (parsed.intervalCount > 0 && parsed.intervalDetails) {
+      parts.push(`Intervals: ${parsed.intervalDetails}.`);
+    }
+    if (parsed.rideBreakup) {
+      parts.push(`Ride structure: ${parsed.rideBreakup}.`);
+    }
+    if (parsed.fadePercent !== undefined) {
+      parts.push(`Power fade: ${parsed.fadePercent}% (first half ${parsed.firstHalfAvgPower ?? "?"} W → second half ${parsed.secondHalfAvgPower ?? "?"} W).`);
+    }
+    if (parsed.vi !== undefined) {
+      parts.push(`Variability Index: ${parsed.vi}.`);
+    }
+
+    // Hard tags
+    if (parsed.hardTags.length > 0) {
+      parts.push(`Tags: ${parsed.hardTags.join(", ")}.`);
+    }
+
+    // LLM sections
+    if (analysis.coachSummary) parts.push(`Coach summary: ${analysis.coachSummary}`);
+    if (analysis.loadNotes) parts.push(`Load notes: ${analysis.loadNotes}`);
+    if (analysis.pacingNotes) parts.push(`Pacing notes: ${analysis.pacingNotes}`);
+
+    // Soft tags
+    if (analysis.softTags && analysis.softTags.length > 0) {
+      parts.push(`Qualitative tags: ${analysis.softTags.join(", ")}.`);
+    }
+
+    return parts.join(" ");
+  }
+
+  private toActivityChunk(activity: StravaActivity, summary: string): ActivityChunk {
+    const opt = <T>(v: T | null | undefined): T | undefined => v ?? undefined;
     return {
       id: activity.id,
       name: activity.name,
@@ -109,46 +328,18 @@ export class EmbeddingSync {
       elapsedTime: activity.elapsed_time,
       movingTime: activity.moving_time,
       distance: activity.distance,
-      averagePower: activity.average_watts,
-      maxPower: activity.max_watts,
-      weightedAveragePower: activity.weighted_average_watts,
-      averageHeartRate: activity.average_heartrate,
-      maxHeartRate: activity.max_heartrate,
-      totalElevationGain: activity.total_elevation_gain,
-      averageCadence: activity.average_cadence,
-      averageSpeed: activity.average_speed,
-      kilojoules: activity.kilojoules,
-      description: activity.description,
+      averagePower: opt(activity.average_watts),
+      maxPower: opt(activity.max_watts),
+      weightedAveragePower: opt(activity.weighted_average_watts),
+      averageHeartRate: opt(activity.average_heartrate),
+      maxHeartRate: opt(activity.max_heartrate),
+      totalElevationGain: opt(activity.total_elevation_gain),
+      averageCadence: opt(activity.average_cadence),
+      averageSpeed: opt(activity.average_speed),
+      kilojoules: opt(activity.kilojoules),
+      description: opt(activity.description),
       summary,
     };
-  }
-
-  private formatActivitySummary(activity: StravaActivity): string {
-    const date = new Date(activity.start_date_local).toLocaleDateString();
-    const duration = Math.round(activity.moving_time / 60);
-    const distance = (activity.distance / 1000).toFixed(1);
-    
-    let parts = [
-      `Activity on ${date}: ${activity.name}.`,
-      `Type: ${activity.sport_type}.`,
-      `Duration: ${duration} minutes.`,
-      `Distance: ${distance} km.`,
-    ];
-
-    if (activity.average_watts) {
-      parts.push(`Average power: ${Math.round(activity.average_watts)}W.`);
-    }
-    if (activity.average_heartrate) {
-      parts.push(`Average heart rate: ${Math.round(activity.average_heartrate)} bpm.`);
-    }
-    if (activity.total_elevation_gain) {
-      parts.push(`Elevation gain: ${Math.round(activity.total_elevation_gain)}m.`);
-    }
-    if (activity.description) {
-      parts.push(`Notes: ${activity.description}`);
-    }
-
-    return parts.join(" ");
   }
 
   private formatAthleteProfile(profile: AthleteProfile): string {

@@ -122,4 +122,33 @@ export class StravaClient {
   async getActivity(id: number): Promise<StravaActivity> {
     return this.request<StravaActivity>(`/activities/${id}`);
   }
+
+  async getActivityStreams(
+    id: number,
+    keys: string[] = ["time", "distance", "watts", "heartrate", "cadence", "speed", "altitude"],
+  ): Promise<Record<string, number[]>> {
+    try {
+      // Strava returns array of { type, data, series_type, original_size }
+      const raw = await this.request<Array<{ type: string; data: number[] }>>(
+        `/activities/${id}/streams`,
+        { keys: keys.join(",") },
+      );
+      const result: Record<string, number[]> = {};
+      if (Array.isArray(raw)) {
+        for (const stream of raw) {
+          result[stream.type] = stream.data;
+        }
+      } else if (typeof raw === "object" && raw !== null) {
+        // Defensive: handle keyed-object response shape
+        for (const [key, val] of Object.entries(raw)) {
+          if (val && typeof val === "object" && "data" in val) {
+            result[key] = (val as { data: number[] }).data;
+          }
+        }
+      }
+      return result;
+    } catch {
+      return {};
+    }
+  }
 }
