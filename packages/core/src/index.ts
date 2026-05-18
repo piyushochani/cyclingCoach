@@ -28,6 +28,14 @@ export type {
 // constants, an empty REFERENCE_PRESERVE_TOKENS slot. Waves 2-7 extend.
 export * from "./reference/index.js";
 
+// ─── Strava ────────────────────────────────────────────────────────────
+export type { StravaActivity, StravaAthlete, AthleteProfile, Streams } from "./strava/client.js";
+export { StravaClient } from "./strava/client.js";
+
+// ─── Embeddings (Strava analysis parser) ───────────────────────────────
+export type { ParsedRide } from "./embeddings/analysis-parser.js";
+export { parseStravaActivity } from "./embeddings/analysis-parser.js";
+
 // ─── LLM ──────────────────────────────────────────────────────────────
 export { LLM } from "./llm.js";
 export type { GenerateOpts, GenerateResult } from "./llm-types.js";

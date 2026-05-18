@@ -11,3 +11,11 @@ CLAUDE.local.md
 .tests/
 .agents/
 skills-lock.json
+# Next.js
+.next/
+out/
+
+# Build manifests & cache
+*.nft.json
+BUILD_ID
+*.tsbuildinfo
