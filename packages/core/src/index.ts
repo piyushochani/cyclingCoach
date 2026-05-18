@@ -90,6 +90,14 @@ export type { IntervalsClient } from "./intervals.js";
 // ─── Strava ───────────────────────────────────────────────────────────
 export { StravaClient } from "./strava/client.js";
 
+// ─── Embeddings / Analysis ───────────────────────────────────────────
+export {
+  analyzeActivity,
+  computeTimeInZones,
+} from "./embeddings/analysis.js";
+export type { ActivityAnalysis, ZoneDistribution } from "./embeddings/analysis.js";
+export { EmbeddingSync } from "./embeddings/sync.js";
+
 // ─── Agent ────────────────────────────────────────────────────────────
 export { CoachAgent } from "./agent/coach-agent.js";
 export { ChatStore } from "./agent/chat-store.js";
