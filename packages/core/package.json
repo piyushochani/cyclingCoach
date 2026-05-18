@@ -21,6 +21,7 @@
     "@clack/prompts": "^1.2.0",
     "@mariozechner/pi-ai": "0.67.6",
     "ai": "^6.0.158",
+    "exceljs": "^4.4.0",
     "grammy": "^1.42.0",
     "intervals-icu-api": "^0.1.2",
     "yaml": "^2.8.3",

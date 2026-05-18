@@ -1,8 +1,7 @@
 import { z } from "zod";
 import {
-  createCoreToolsWithSportConfig,
   createMemoryTools,
-  createPureCoreIntervalsTools,
+  createStravaTools,
   getEffectiveSections,
   type CoreDeps,
   type MemorySectionSpec,
@@ -73,14 +72,12 @@ export const cyclingSport: Sport = {
   athleteProfileSchema,
   tools: (deps: CoreDeps): readonly ToolRegistration[] => {
     const sections = getEffectiveSections(cyclingSport);
-    // Per ADR-0004: compose four tool buckets — memory (Pure-Core),
-    // intervals Pure-Core, intervals Core-with-sport-config, and the
-    // sport-specific cycling tools.
+    // Per ADR-0004: compose tool buckets — memory (Pure-Core),
+    // strava Pure-Core, and the sport-specific cycling tools.
     const toolset = {
       ...createMemoryTools(deps.memory, sections),
-      ...createPureCoreIntervalsTools(deps.intervals, deps.tz),
-      ...createCoreToolsWithSportConfig(deps.intervals, cyclingSport.intervalsActivityTypes),
-      ...createCyclingTools(deps.memory, deps.intervals, deps.tz),
+      ...createStravaTools(deps.strava, deps.embedder, deps.pinecone),
+      ...createCyclingTools(deps.memory, deps.strava, deps.tz),
     };
     return Object.entries(toolset).map(([name, t]) => ({
       name,

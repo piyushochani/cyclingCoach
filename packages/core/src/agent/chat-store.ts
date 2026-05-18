@@ -5,6 +5,7 @@ import {
   renameSync,
   existsSync,
   mkdirSync,
+  readdirSync,
 } from "node:fs";
 import { join } from "node:path";
 import type { ModelMessage } from "ai";
@@ -22,10 +23,34 @@ export class ChatStore {
   constructor(dataDir: string) {
     this.sessionsDir = join(dataDir, "sessions");
     mkdirSync(this.sessionsDir, { recursive: true });
+    this.migrateLegacyFiles();
+  }
+
+  private sanitizeId(chatId: string): string {
+    return chatId.replace(/:/g, "-");
+  }
+
+  private migrateLegacyFiles(): void {
+    const files = readdirSync(this.sessionsDir);
+    for (const file of files) {
+      if (file.includes(":")) {
+        const oldPath = join(this.sessionsDir, file);
+        const newPath = join(this.sessionsDir, file.replace(/:/g, "-"));
+        if (!existsSync(newPath)) {
+          try {
+            renameSync(oldPath, oldPath); // Test if accessible
+            renameSync(oldPath, newPath);
+            console.log(`Migrated legacy session file: ${file} -> ${file.replace(/:/g, "-")}`);
+          } catch (err) {
+            console.warn(`Failed to migrate legacy session file ${file}:`, err);
+          }
+        }
+      }
+    }
   }
 
   private filePath(chatId: string): string {
-    return join(this.sessionsDir, `${chatId}.jsonl`);
+    return join(this.sessionsDir, `${this.sanitizeId(chatId)}.jsonl`);
   }
 
   hasSession(chatId: string): boolean {
