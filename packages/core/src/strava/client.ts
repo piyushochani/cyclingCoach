@@ -1,3 +1,11 @@
+import type { Config } from "../config.js";
+
+export interface StravaTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+}
+
 export interface StravaActivity {
   id: number;
   name: string;
@@ -65,20 +73,61 @@ export interface Streams {
 }
 
 export class StravaClient {
-  private accessToken: string;
+  private config: Config["strava"];
 
-  constructor(token: string) {
-    this.accessToken = token;
+  constructor(config: Config["strava"]) {
+    this.config = config;
   }
 
-  private async request<T>(path: string): Promise<T> {
-    const res = await fetch(`https://www.strava.com/api/v3${path}`, {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
+  private async getAccessToken(): Promise<string> {
+    const { accessToken, refreshToken, expiresAt, clientId, clientSecret } = this.config;
+
+    if (accessToken && expiresAt && expiresAt > Date.now() / 1000 + 60) {
+      return accessToken;
+    }
+
+    if (!refreshToken) {
+      throw new Error("No Strava refresh token available. Please run setup.");
+    }
+
+    const res = await fetch("https://www.strava.com/oauth/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: "refresh_token",
+      }),
     });
+
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(`Failed to refresh Strava token: ${error}`);
+    }
+
+    const data = (await res.json()) as StravaTokenResponse;
+    this.config.accessToken = data.access_token;
+    this.config.refreshToken = data.refresh_token;
+    this.config.expiresAt = data.expires_at;
+
+    return data.access_token;
+  }
+
+  private async request<T>(path: string, params: Record<string, string | number> = {}): Promise<T> {
+    const token = await this.getAccessToken();
+    const url = new URL(`https://www.strava.com/api/v3${path}`);
+    Object.entries(params).forEach(([k, v]) => url.searchParams.append(k, String(v)));
+
+    const res = await fetch(url.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
     if (!res.ok) {
       const error = await res.text();
       throw new Error(`Strava API error (${path}): ${error}`);
     }
+
     return (await res.json()) as T;
   }
 
@@ -86,34 +135,34 @@ export class StravaClient {
     return this.request<StravaAthlete>("/athlete");
   }
 
-  async getActivity(id: number): Promise<StravaActivity> {
-    return this.request<StravaActivity>(`/activities/${id}`);
+  async listActivities(params: { before?: number; after?: number; page?: number; per_page?: number } = {}): Promise<StravaActivity[]> {
+    return this.request<StravaActivity[]>("/athlete/activities", params);
   }
 
-  async listActivities(params: { after?: number; before?: number; page?: number; per_page?: number } = {}): Promise<StravaActivity[]> {
-    const qs = Object.entries(params)
-      .filter(([, v]) => v !== undefined)
-      .map(([k, v]) => `${k}=${v}`)
-      .join("&");
-    return this.request<StravaActivity[]>(`/athlete/activities${qs ? `?${qs}` : ""}`);
+  async getActivity(id: number): Promise<StravaActivity> {
+    return this.request<StravaActivity>(`/activities/${id}`);
   }
 
   async getActivityStreams(
     id: number,
     keys: string[] = ["time", "distance", "watts", "heartrate", "cadence", "speed", "altitude"],
   ): Promise<Record<string, number[]>> {
-    const qs = `keys=${keys.join(",")}&key_by_type=true`;
-    const raw: unknown = await this.request(`/activities/${id}/streams?${qs}`);
-    const out: Record<string, number[]> = {};
+    const raw = await this.request<unknown>(
+      `/activities/${id}/streams`,
+      { keys: keys.join(","), key_by_type: 1 },
+    );
+    const result: Record<string, number[]> = {};
     if (Array.isArray(raw)) {
       for (const s of raw as Array<{ type: string; data: number[] }>) {
-        out[s.type] = s.data;
+        result[s.type] = s.data;
       }
-    } else {
-      for (const s of Object.values(raw as Record<string, { type: string; data: number[] }>)) {
-        out[s.type] = s.data;
+    } else if (typeof raw === "object" && raw !== null) {
+      for (const [key, val] of Object.entries(raw)) {
+        if (val && typeof val === "object" && "data" in val) {
+          result[key] = (val as { data: number[] }).data;
+        }
       }
     }
-    return out;
+    return result;
   }
 }

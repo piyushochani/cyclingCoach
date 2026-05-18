@@ -28,14 +28,6 @@ export type {
 // constants, an empty REFERENCE_PRESERVE_TOKENS slot. Waves 2-7 extend.
 export * from "./reference/index.js";
 
-// ─── Strava ────────────────────────────────────────────────────────────
-export type { StravaActivity, StravaAthlete, AthleteProfile, Streams } from "./strava/client.js";
-export { StravaClient } from "./strava/client.js";
-
-// ─── Embeddings (Strava analysis parser) ───────────────────────────────
-export type { ParsedRide } from "./embeddings/analysis-parser.js";
-export { parseStravaActivity } from "./embeddings/analysis-parser.js";
-
 // ─── LLM ──────────────────────────────────────────────────────────────
 export { LLM } from "./llm.js";
 export type { GenerateOpts, GenerateResult } from "./llm-types.js";
@@ -95,6 +87,16 @@ export {
 // ─── Intervals ────────────────────────────────────────────────────────
 export type { IntervalsClient } from "./intervals.js";
 
+// ─── Strava ───────────────────────────────────────────────────────────
+export { StravaClient } from "./strava/client.js";
+
+// ─── Embeddings / Analysis ───────────────────────────────────────────
+export { analyzeActivity } from "./embeddings/analysis.js";
+export type { ActivityAnalysis } from "./embeddings/analysis.js";
+export { parseRide, computeTimeInZones, computeNormalizedPower, computeRideBreakup } from "./embeddings/analysis-parser.js";
+export type { ParsedRide, ZoneDistribution, DataQualityFlags } from "./embeddings/analysis-parser.js";
+export { EmbeddingSync } from "./embeddings/sync.js";
+
 // ─── Agent ────────────────────────────────────────────────────────────
 export { CoachAgent } from "./agent/coach-agent.js";
 export { ChatStore } from "./agent/chat-store.js";
@@ -139,9 +141,8 @@ export {
   createMemoryTools,
 } from "./agent/tools.js";
 export {
-  createPureCoreIntervalsTools,
-  createCoreToolsWithSportConfig,
-} from "./agent/intervals-tools.js";
+  createStravaTools,
+} from "./agent/strava-tools.js";
 export {
   appendCurrentTimeLine,
   buildCurrentTimeLine,

@@ -1,6 +1,5 @@
 import { stepCountIs } from "ai";
 import type { ModelMessage, ToolSet } from "ai";
-import { IntervalsClient } from "intervals-icu-api";
 import { getEffectiveSections } from "../memory/effective-sections.js";
 import type { CoreDeps, Sport } from "../sport.js";
 import type { SecretsResolver } from "../secrets/types.js";
@@ -27,6 +26,9 @@ import { evaluateSessionFreshness } from "./session-freshness.js";
 import { LLM } from "../llm.js";
 import { createMemorySnapshot } from "../memory/snapshot.js";
 import { resolveUserTimezone, appendCurrentTimeLine } from "./user-time.js";
+import { EmbeddingService } from "../embeddings/service.js";
+import { PineconeClient } from "../embeddings/pinecone.js";
+import { StravaClient } from "../strava/client.js";
 
 const MAX_OVERFLOW_ATTEMPTS = 3;
 const MAX_TIMEOUT_ATTEMPTS = 2;
@@ -52,6 +54,8 @@ export class CoachAgent {
   private tools: ToolSet;
   private systemPrompt: string;
   private tz: string;
+  private embedder: EmbeddingService;
+  private pinecone: PineconeClient;
 
   constructor(sport: Sport, config: Config) {
     this.sport = sport;
@@ -60,21 +64,22 @@ export class CoachAgent {
     this.tz = resolveUserTimezone(config.session.timezone);
     this.memory = new Memory(config.dataDir, this.tz);
     this.chatStore = new ChatStore(config.dataDir);
+    this.embedder = new EmbeddingService(config.llm);
+    this.pinecone = new PineconeClient(config.pinecone);
 
-    const intervals = config.intervals.apiKey
-      ? new IntervalsClient({
-          apiKey: config.intervals.apiKey,
-          athleteId: config.intervals.athleteId,
-        })
+    const strava = config.strava.clientId
+      ? new StravaClient(config.strava)
       : null;
 
     const secrets: SecretsResolver = { resolve: resolveSecretRef };
     const coreDeps: CoreDeps = {
       llm: this.llm,
-      intervals,
+      strava,
       memory: this.memory,
       secrets,
       tz: this.tz,
+      embedder: this.embedder,
+      pinecone: this.pinecone,
     };
     const registrations = sport.tools(coreDeps);
     this.tools = Object.fromEntries(registrations.map((r) => [r.name, r.tool])) as ToolSet;
@@ -100,6 +105,37 @@ export class CoachAgent {
     };
   }
 
+  private async retrieveContext(query: string): Promise<string> {
+    try {
+      const vector = await this.embedder.embedText(query);
+      const { matches } = await this.pinecone.query(vector, 5);
+
+      if (matches.length === 0) {
+        console.log("[RAG DEBUG] Pinecone returned 0 matches for query:", query);
+        return "";
+      }
+
+      const contextLines = matches.map((m) => {
+        const meta = m.metadata as any;
+        if (meta?.kind === "profile") {
+          return `[Athlete Profile] ${meta.summary}`;
+        }
+        return `[Activity] ${meta.summary}`;
+      });
+
+      console.log("[RAG DEBUG] Pinecone returned", matches.length, "matches for query:", query);
+      for (const m of matches) {
+        const meta = m.metadata as any;
+        console.log("  - match id:", m.id, "score:", m.score?.toFixed(4), "kind:", meta?.kind, "name:", meta?.name);
+      }
+
+      return "Here are some semantically relevant activities from the athlete's history (may include older activities — use strava_fetch_activities for the most recent data):\n" + contextLines.join("\n");
+    } catch (err) {
+      console.warn("Failed to retrieve context from Pinecone:", err);
+      return "";
+    }
+  }
+
   async chat(chatId: string, userMessage: string): Promise<string> {
     return withSessionLock(chatId, async () => {
       // Single file read: load history + last message time together
@@ -121,7 +157,10 @@ export class CoachAgent {
         history = [];
       }
 
-      this.systemPrompt = buildSystemPrompt(this.sport, this.memory, this.tz);
+      // RAG: Retrieve context from Pinecone based on user message
+      const retrievedContext = await this.retrieveContext(userMessage);
+
+      this.systemPrompt = buildSystemPrompt(this.sport, this.memory, this.tz, retrievedContext);
 
       const budget = computeHistoryTokenBudget({
         contextWindowTokens: this.config.contextWindowTokens,
@@ -179,6 +218,15 @@ export class CoachAgent {
         }
 
         try {
+          console.log("=== LLM PROMPT DEBUG ===");
+          console.log("--- SYSTEM PROMPT ---");
+          console.log(this.systemPrompt);
+          console.log("--- MESSAGES (" + messages.length + ") ---");
+          for (const [idx, m] of messages.entries()) {
+            console.log("Message " + idx + " [" + m.role + "]: " + (typeof m.content === "string" ? m.content.slice(0, 2000) : JSON.stringify(m.content).slice(0, 2000)));
+          }
+          console.log("=== END LLM PROMPT DEBUG ===");
+
           const { text } = await this.llm.generate({
             system: this.systemPrompt,
             messages,

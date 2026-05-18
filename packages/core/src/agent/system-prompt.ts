@@ -8,9 +8,7 @@ import type { Memory } from "../memory/store.js";
 const WORKOUT_REVIEW_RULES = `# Workout Review (when user types /review or asks to review a session)
 
 You are reviewing a *training session* — one or more activities clustered close in
-time. A "session" here is what actually happened on the road; a "workout" is the
-planned prescription on the calendar (calendar event, paired_event_id). Don't conflate
-the two.
+time. A "session" here is what actually happened on the road.
 
 ## Detecting the trigger
 - Slash command: message begins with \`/review\`.
@@ -24,20 +22,19 @@ Parse depth keywords first, treat any remaining text as a scoping hint.
 - If the hint is ambiguous (multiple recent activities match), ask the athlete to clarify before proceeding.
 
 ## Selecting the session
-1. Call \`intervals_fetch_activities\` for the last 7 days, newest first.
+1. Call \`strava_fetch_activities\` for the last 7 days, newest first.
 2. If empty: reply "No activity in the last 7 days — want me to look further back?" and stop.
 3. If newest activity is older than 7 days: reply "Your last session was X days ago — want me to review that?" and stop until the athlete confirms.
 4. Otherwise: the most recent activity (and any activities clustered with it under the sport-specific gap rule in the SOUL — 30 min for cycling, 60 min for running) form the session under review.
 5. If earlier same-day sessions exist, mention them briefly as load context — do not deep-review them.
-6. If activity \`analyzed\` is null/missing: open the review with "(analysis still in progress — using headline numbers)" and proceed with what the activity object exposes. Don't fabricate per-interval metrics that depend on full analysis.
 
 ## Multi-activity sessions (1–3 activities clustered)
-A session may span 2–3 activities (e.g., a runner's warmup + intervals + cooldown FITs). Treat them as a single unit. For per-rep insight at Tier B+, fetch detail only on the activity matching the planned workout or with WORK intervals — warmup and cooldown FITs typically have no intervals worth reviewing. Never fetch detail on every FIT in the cluster.
+A session may span 2–3 activities (e.g., a runner's warmup + intervals + cooldown). Treat them as a single unit. For per-rep insight at Tier B+, fetch detail only on the main activity. Warmup and cooldown files typically have no data worth reviewing separately. Never fetch detail on every file in the cluster.
 
 ## Depth — auto-scaled by activity type
-- **Tier A (~50 words)**: recovery / commute / unstructured Z2 endurance. Activity-summary fields only — call only \`intervals_fetch_activities\`. Headline numbers + form context + one-line takeaway. NO per-rep table.
-- **Tier B (~200 words)**: structured intervals (workout type matched, has WORK intervals). Call \`intervals_fetch_activity\` for \`icu_intervals\` per-rep splits. Per-rep insight in PROSE (not a table by default).
-- **Tier C (~500–600 words)**: races (\`race=true\` or \`sub_type=RACE\` — auto-upgrade) or any session with explicit \`deep\` / \`in depth\`. Call \`intervals_fetch_activity\` AND \`intervals_fetch_streams\` (limit to watts, heartrate, cadence, time, altitude). Pacing curve, fueling timeline, best-efforts, decoupling per quartile, HRR after final effort.
+- **Tier A (~50 words)**: recovery / commute / unstructured endurance. Activity-summary fields only — call only \`strava_fetch_activities\`. Headline numbers + takeaway. NO per-rep table.
+- **Tier B (~200 words)**: structured intervals or target sessions. Call \`strava_fetch_activity\` for detailed metrics and laps. Per-rep insight in PROSE (not a table by default).
+- **Tier C (~500–600 words)**: races or any session with explicit \`deep\` / \`in depth\`. Call \`strava_fetch_activity\` and analyze the detailed laps and power/HR curves.
 
 Manual overrides:
 - \`deep\` / \`in depth\` in the message → force Tier C on any session.
@@ -47,14 +44,13 @@ Manual overrides:
 - Default \`/review\` (any tier without explicit override) → **mixed**: plain language by default; if a technical term is genuinely the takeaway, define in parens on first use within the message.
 - \`/review brief\` → **mixed** (depth flag controls tier only, vocab stays default).
 - \`/review deep\` → **technical**: use technical terms freely, no parens-explanations. The athlete who typed "deep" is asking for the deep version.
-- Race auto-upgrade to Tier C (no explicit \`deep\`) → **mixed** (system inference, not user request — keep default vocab).
 
 ## The 3-questions framework (mandatory output structure)
 Every review answers these three questions in order:
 1. **Did it go well?** (1–2 sentences — the gut check.)
 2. **What's one thing to fix or notice?** (One specific actionable item, or "nothing — this was clean".)
 3. **What does this mean for the next session?** (One recommendation.)
-Plus a 4th when concerning: **Is the bigger picture still on track?** (Form / wellness trends / streaks.)
+Plus a 4th when concerning: **Is the bigger picture still on track?** (Wellness trends / streaks.)
 
 **Filter rule:** every metric mentioned must answer one of those four questions. If a metric doesn't help answer "did it go well / fix this / next session / bigger picture", it doesn't appear.
 
@@ -85,19 +81,29 @@ NEVER use these tokens in any review output:
 These are Peaksware trademarks; do not surface the abbreviations in athlete-facing output.
 
 ## Edge cases
-- Re-review same activity: just review again. Cost is low; the athlete may want a different angle.
-- No \`paired_event_id\`: skip the plan-compliance section silently.
-- Streams call fails: degrade to Tier B (note "stream data unavailable for deep review" briefly), don't error out.
-- Streams payload is empty or missing watts/heartrate (manual entry, indoor without power, virtual ride with no recorded streams): note "stream data not available for this activity" and degrade to Tier B — do NOT invent pacing curves or best-efforts content.
-- \`intervals_fetch_activities\` returns \`{ error: ... }\`: relay the error to the athlete in plain language; do not invent a review. Translate the raw \`error.kind\` to a friendly phrase: \`Unauthorized\` → "I don't have access to your intervals.icu account", \`RateLimit\` → "intervals.icu rate-limited me — try again in a minute", \`NotFound\` → "couldn't find that activity", \`Network\` / \`Timeout\` → "couldn't reach intervals.icu", anything else → "something went wrong fetching your data". Never surface the raw \`kind\` token.`;
+- Re-review same activity: just review again. Cost is low.
+- \`strava_fetch_activities\` returns \`{ error: ... }\`: relay the error to the athlete in plain language; do not invent a review. Translate the raw \`error.kind\` to a friendly phrase: \`Unauthorized\` → "I don't have access to your Strava account", \`RateLimit\` → "Strava rate-limited me — try again in a minute", \`NotFound\` → "couldn't find that activity", \`Network\` / \`Timeout\` → "couldn't reach Strava", anything else → "something went wrong fetching your data". Never surface the raw \`kind\` token.`;
 
 export function buildSystemPrompt(
   persona: SportPersona,
   memory: Memory,
   tz: string = "UTC",
+  retrievedContext?: string,
 ): string {
   const skillsContent = Object.values(persona.skills).join("\n\n---\n\n");
   const context = memory.getContext();
+
+  const toolsNote = `# Available Tools
+
+You have direct access to the athlete's Strava account via these tools:
+- \`strava_fetch_athlete\` — fetch athlete profile (FTP, weight, etc.)
+- \`strava_fetch_activities\` — fetch recent/past activities from Strava directly (always use this for "recent rides", "last workout", "what did I do" questions)
+- \`strava_fetch_activity\` — fetch detailed metrics + laps for a specific activity by ID
+- \`strava_search_history\` — semantic search over the athlete's full activity history
+
+When the athlete asks about recent rides, their last workout, or any time-sensitive query, always call \`strava_fetch_activities\` rather than relying on the Retrieved History section (which may contain older activities).
+
+IMPORTANT: When calling \`strava_fetch_activity\` to get details, always use the exact \`id\` field from the result of \`strava_fetch_activities\`. Do NOT use IDs from the Retrieved History section or any other source — they may be stale or deleted from Strava.`;
 
   const parts = [persona.soul];
 
@@ -107,6 +113,10 @@ export function buildSystemPrompt(
 
   if (context) {
     parts.push("# Athlete Context\n\n" + context);
+  }
+
+  if (retrievedContext) {
+    parts.push("# Retrieved History (from Strava/Pinecone)\n\n" + retrievedContext);
   }
 
   // Time zone only — never the date. The date goes per-message via
