@@ -33,7 +33,6 @@ export type { StravaActivity, StravaAthlete, AthleteProfile, Streams } from "./s
 export { StravaClient } from "./strava/client.js";
 
 // ─── Embeddings (Strava analysis parser) ───────────────────────────────
-export type { ParsedRide } from "./embeddings/analysis-parser.js";
 export { parseStravaActivity } from "./embeddings/analysis-parser.js";
 
 // ─── LLM ──────────────────────────────────────────────────────────────
@@ -94,9 +93,6 @@ export {
 
 // ─── Intervals ────────────────────────────────────────────────────────
 export type { IntervalsClient } from "./intervals.js";
-
-// ─── Strava ───────────────────────────────────────────────────────────
-export { StravaClient } from "./strava/client.js";
 
 // ─── Embeddings / Analysis ───────────────────────────────────────────
 export { analyzeActivity } from "./embeddings/analysis.js";

@@ -24,47 +24,6 @@ const POWER_ZONE_CAPS = [
 
 // z7 is anything above 1.50 × FTP
 
-// ─── Output shape ──────────────────────────────────────────────────────────
-
-export interface ParsedRide {
-  // Identifiers
-  id: number;
-  sportType: string;
-  startDateLocal: string;
-  name: string;
-
-  // Core metrics
-  distanceMeters: number;
-  movingTimeSeconds: number;
-  elapsedTimeSeconds: number;
-  totalElevationGain: number;
-  avgSpeedKmh: number;
-
-  // Power / energy
-  avgPower: number | null;
-  kJ: number | null;
-
-  // Data-quality flags
-  hasPowerData: boolean;
-  hasHrData: boolean;
-  powerDropoutSeconds: number;
-  hrDropoutSeconds: number;
-  unrealisticSpikes: number;
-
-  // Time-in-zone (power, 7-zone Coggan model)
-  z1_seconds: number;
-  z2_seconds: number;
-  z3_seconds: number;
-  z4_seconds: number;
-  z5_seconds: number;
-  z6_seconds: number;
-  z7_seconds: number;
-
-  // Classification
-  sessionType: "Endurance" | "Unknown";
-  hardTags: string[];
-}
-
 // ─── Pure parser ───────────────────────────────────────────────────────────
 
 /**
@@ -102,11 +61,39 @@ export interface ParsedRide {
  *
  * TODO: Surface per-kilometer splits.
  */
+interface _ParsedRideV1 {
+  id: number;
+  sportType: string;
+  startDateLocal: string;
+  name: string;
+  distanceMeters: number;
+  movingTimeSeconds: number;
+  elapsedTimeSeconds: number;
+  totalElevationGain: number;
+  avgSpeedKmh: number;
+  avgPower: number | null;
+  kJ: number | null;
+  hasPowerData: boolean;
+  hasHrData: boolean;
+  powerDropoutSeconds: number;
+  hrDropoutSeconds: number;
+  unrealisticSpikes: number;
+  z1_seconds: number;
+  z2_seconds: number;
+  z3_seconds: number;
+  z4_seconds: number;
+  z5_seconds: number;
+  z6_seconds: number;
+  z7_seconds: number;
+  sessionType: "Endurance" | "Unknown";
+  hardTags: string[];
+}
+
 export function parseStravaActivity(
   rawActivity: StravaActivity,
   streams: Streams,
   profile: AthleteProfile,
-): ParsedRide {
+): _ParsedRideV1 {
   const ftp = profile.ftp ?? 250; // TODO: make FTP required once the
   // reference pipeline guarantees it
 
@@ -246,8 +233,6 @@ function countUnrealisticSpikes(watts: number[], avgPower: number | null): numbe
   }
   return count;
 }
-
-import type { StravaActivity } from "../strava/client.js";
 
 // ============================================================================
 // TYPES
@@ -685,16 +670,6 @@ export function assessDataQuality(
 // ============================================================================
 // MAIN PARSE FUNCTION
 // ============================================================================
-
-export interface Streams {
-  watts?: number[];
-  heartrate?: number[];
-  cadence?: number[];
-  speed?: number[];
-  altitude?: number[];
-  time?: number[];
-  distance?: number[];
-}
 
 export function parseRide(activity: StravaActivity, streams: Streams, ftp: number): ParsedRide {
   const movingHours = activity.moving_time / 3600;
