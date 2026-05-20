@@ -38,13 +38,13 @@ export class ActivityTracker {
   /**
    * Initialize the Excel tracker - load existing file or create new one
    */
-  private initializeTracker(): void {
+  private async initializeTracker(): Promise<void> {
     try {
       if (existsSync(this.excelPath)) {
         // Load existing file
         this.workbook = new ExcelJS.Workbook();
-        this.workbook.xlsx.readFile(this.excelPath);
-        this.worksheet = this.workbook.getWorksheet("Activities");
+        await this.workbook.xlsx.readFile(this.excelPath);
+        this.worksheet = this.workbook.getWorksheet("Activities") || null;
 
         if (!this.worksheet) {
           // Create worksheet if it doesn't exist
@@ -115,6 +115,8 @@ export class ActivityTracker {
         await this.initializeTracker();
       }
 
+      if (!this.worksheet) return;
+
       // Check if we already have a record for this activity ID
       let row = this.findRowByActivityId(activity.id.toString());
       const isNew = !row;
@@ -123,6 +125,8 @@ export class ActivityTracker {
         // Add new row
         row = this.worksheet.addRow({});
       }
+
+      if (!row) return;
 
       // Update the row with activity data
       row.getCell("activityId").value = activity.id.toString();
@@ -133,14 +137,14 @@ export class ActivityTracker {
       row.getCell("timeMin").value = Math.round((activity.movingTime || 0) / 60);
       row.getCell("movingTimeMin").value = Math.round((activity.movingTime || 0) / 60);
       row.getCell("elapsedTimeMin").value = Math.round((activity.elapsedTime || 0) / 60);
-      row.getCell("avgPower").value = activity.averagePower || null;
-      row.getCell("maxPower").value = activity.maxPower || null;
-      row.getCell("avgHR").value = activity.averageHeartRate || null;
-      row.getCell("maxHR").value = activity.maxHeartRate || null;
-      row.getCell("elevationGain").value = activity.totalElevationGain || null;
-      row.getCell("avgCadence").value = activity.averageCadence || null;
+      row.getCell("avgPower").value = activity.averagePower ?? null;
+      row.getCell("maxPower").value = activity.maxPower ?? null;
+      row.getCell("avgHR").value = activity.averageHeartRate ?? null;
+      row.getCell("maxHR").value = activity.maxHeartRate ?? null;
+      row.getCell("elevationGain").value = activity.totalElevationGain ?? null;
+      row.getCell("avgCadence").value = activity.averageCadence ?? null;
       row.getCell("avgSpeed").value = ((activity.averageSpeed || 0) * 3.6).toFixed(2); // m/s to km/h
-      row.getCell("kilojoules").value = activity.kilojoules || null;
+      row.getCell("kilojoules").value = activity.kilojoules ?? null;
       row.getCell("description").value = activity.description || "";
       row.getCell("summary").value = activity.summary || "";
 
@@ -184,7 +188,10 @@ export class ActivityTracker {
   private findRowByActivityId(activityId: string): ExcelJS.Row | undefined {
     if (!this.worksheet) return undefined;
 
-    return this.worksheet.getRows().find(row => {
+    const rows: ExcelJS.Row[] = [];
+    this.worksheet.eachRow((r) => { rows.push(r); });
+
+    return rows.find(row => {
       const cellValue = row.getCell("activityId").value;
       return cellValue !== null && cellValue !== undefined && cellValue.toString() === activityId;
     });
@@ -218,7 +225,13 @@ export class ActivityTracker {
         await this.initializeTracker();
       }
 
-      const rows = this.worksheet.getRows();
+      if (!this.worksheet) {
+        return { total: 0, syncedToPinecone: 0, embeddingsCreated: 0, providedToLLM: 0 };
+      }
+
+      const rows: ExcelJS.Row[] = [];
+      this.worksheet.eachRow((r) => { rows.push(r); });
+
       const total = rows.length - 1; // Subtract header row
 
       const syncedToPinecone = rows.filter(row =>

@@ -67,8 +67,8 @@ export interface Streams {
 export class StravaClient {
   private accessToken: string;
 
-  constructor(token: string) {
-    this.accessToken = token;
+  constructor(config: string | { accessToken?: string }) {
+    this.accessToken = typeof config === "string" ? config : (config.accessToken ?? "");
   }
 
   private async request<T>(path: string): Promise<T> {

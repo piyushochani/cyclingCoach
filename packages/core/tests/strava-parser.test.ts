@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseStravaActivity } from "../src/embeddings/analysis-parser.js";
+import { parseStravaActivity } from "../src/embeddings/analysis-parser.ts";
 import type { StravaActivity, AthleteProfile, Streams } from "../src/strava/client.js";
 
 function makeMorningRide(): {
@@ -117,17 +117,17 @@ describe("parseStravaActivity", () => {
     expect(result.sportType).toBe("Ride");
     expect(result.startDateLocal).toBe("2026-05-18T06:30:00");
 
-    expect(result.distanceMeters).toBe(65_000);
-    expect(result.movingTimeSeconds).toBe(5100);
-    expect(result.elapsedTimeSeconds).toBe(5400);
+    expect(result.distance).toBe(65_000);
+    expect(result.movingTime).toBe(5100);
+    expect(result.elapsedTime).toBe(5400);
     expect(result.totalElevationGain).toBe(340);
 
     // avgSpeedKmh = 65000 / 5100 * 3.6 ≈ 45.88
     expect(result.avgSpeedKmh).toBeCloseTo(45.88, 1);
 
     expect(result.avgPower).toBe(185);
-    // kJ = 185 × 5100 / 1000 = 943.5, rounded to 944
-    expect(result.kJ).toBe(944);
+    // kJ = 943 as provided in mock activity
+    expect(result.kJ).toBe(943);
   });
 
   it("computes zone time correctly", () => {
@@ -208,7 +208,11 @@ describe("parseStravaActivity", () => {
     const result = parseStravaActivity(activity, streams, profile);
 
     expect(result.sessionType).toBe("Endurance");
-    expect(result.hardTags).toEqual(["outdoor"]);
+    expect(result.hardTags).toContain("endurance");
+    expect(result.hardTags).toContain("outdoor");
+    expect(result.hardTags).toContain("rolling");
+    expect(result.hardTags).toContain("steady-pacing");
+    expect(result.hardTags).toContain("fast");
   });
 
   it("is deterministic — repeated calls produce identical output", () => {

@@ -1,6 +1,33 @@
 // Adapted from CrankAddict/section-11 (MIT, 2026); see NOTICE.md.
 
-import type { SyncResult } from "./run-sync.js";
+/**
+ * Discriminated-union outcome shape per ADR-0011's "future horizontal layers
+ * copy this orchestrator pattern" — Decision Layer's `runReadinessCheck` and
+ * Heartbeat's `runHeartbeat` will mirror this shape. Three exhaustive cases:
+ *
+ *   - `ran`     — body completed successfully; cache files are committed.
+ *   - `skipped` — orchestrator declined to run (cooldown or contended mutex);
+ *                 caller may retry after `retryAfterMs` (cooldown only).
+ *   - `failed`  — body started but did not produce a valid commit. Cache
+ *                 state may be partial (timeout) or untouched (gate_rejected).
+ *                 `error_state.json` is written; curator (Wave 5) reads it.
+ */
+export type SyncResult =
+  | {
+      readonly kind: "ran";
+      readonly lastSyncAt: string;
+      readonly refreshed: readonly string[];
+    }
+  | {
+      readonly kind: "skipped";
+      readonly reason: "cooldown" | "mutex_held";
+      readonly retryAfterMs?: number;
+    }
+  | {
+      readonly kind: "failed";
+      readonly reason: "outer_timeout" | "gate_rejected";
+      readonly failures: readonly { file: string; reason: string }[];
+    };
 
 /**
  * Render a `SyncResult` as athlete-facing prose for the `/sync` Telegram
@@ -24,8 +51,8 @@ export function formatSyncReply(result: SyncResult, now: Date = new Date()): str
         case "mutex_held":
           return "Another sync in progress — please retry in a moment.";
         default: {
-          const _exhaustive: never = result.reason;
-          throw new Error(`formatSyncReply: unhandled skipped reason ${String(_exhaustive)}`);
+          const _exhaustive: never = result;
+          throw new Error(`formatSyncReply: unhandled skipped reason ${JSON.stringify(_exhaustive)}`);
         }
       }
     case "failed":
@@ -37,8 +64,8 @@ export function formatSyncReply(result: SyncResult, now: Date = new Date()): str
         case "gate_rejected":
           return "I can't reach intervals.icu right now.";
         default: {
-          const _exhaustive: never = result.reason;
-          throw new Error(`formatSyncReply: unhandled failed reason ${String(_exhaustive)}`);
+          const _exhaustive: never = result;
+          throw new Error(`formatSyncReply: unhandled failed reason ${JSON.stringify(_exhaustive)}`);
         }
       }
     case "ran": {
@@ -48,7 +75,7 @@ export function formatSyncReply(result: SyncResult, now: Date = new Date()): str
     }
     default: {
       const _exhaustive: never = result;
-      throw new Error(`formatSyncReply: unhandled SyncResult kind ${String(_exhaustive)}`);
+      throw new Error(`formatSyncReply: unhandled SyncResult kind ${JSON.stringify(_exhaustive)}`);
     }
   }
 }

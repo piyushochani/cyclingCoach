@@ -17,10 +17,6 @@ export default function RootLayout({
         <nav style={{ padding: '1rem', borderBottom: '1px solid var(--border)' }}>
           <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <strong style={{ fontSize: '1.2rem' }}>EndurAgent</strong>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <a href="/">Home</a>
-              <a href="/dashboard">Dashboard</a>
-            </div>
           </div>
         </nav>
         {children}
