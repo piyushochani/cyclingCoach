@@ -9,7 +9,8 @@ export { runSetup } from "./setup.js";
 export { runBinary } from "./run-binary.js";
 export type { RunBinaryHooks } from "./run-binary.js";
 
-// ─── Sport contract ───────────────────────────────────────────────────
+
+// ─── Sport contract ──────────────────────────────────────────────────
 export type {
   CoreDeps,
   IntervalsActivityType,
