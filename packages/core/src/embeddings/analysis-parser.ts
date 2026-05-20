@@ -1,15 +1,13 @@
-/**
+import type { StravaActivity, AthleteProfile, Streams } from "../strava/client.js";
 
+/**
  * Pure deterministic parser for a single Strava cycling activity.
  *
  * Takes raw activity + streams + athlete profile and produces a structured
  * ParsedRide with computed metrics, zone times, and data-quality signals.
  *
  * This module contains NO LLM calls, NO side effects, and NO network I/O.
- * It is deliberately minimal — see TODO comments for planned enhancements.
  */
-
-import type { StravaActivity, AthleteProfile, Streams } from "../strava/client.js";
 
 // ─── Power zone thresholds (Coggan 7-zone model, fraction of FTP) ─────────
 
@@ -24,6 +22,7 @@ const POWER_ZONE_CAPS = [
 
 // z7 is anything above 1.50 × FTP
 
+<<<<<<< HEAD
 // ─── Pure parser ───────────────────────────────────────────────────────────
 
 /**
@@ -237,6 +236,9 @@ function countUnrealisticSpikes(watts: number[], avgPower: number | null): numbe
 // ============================================================================
 // TYPES
 // ============================================================================
+=======
+// ─── Output shape ──────────────────────────────────────────────────────────
+>>>>>>> 68160bb52544f831cf74506bd2a3212ea3b51870
 
 export interface ZoneDistribution {
   z1: number; z2: number; z3: number; z4: number;
@@ -254,57 +256,219 @@ export interface DataQualityFlags {
 }
 
 export interface ParsedRide {
-  // Identity
+  // Identifiers
   id: number;
-  name: string;
   sportType: string;
-  startDate: string;
+  startDateLocal: string;
+  startDate: string; // for backward compatibility
+  name: string;
 
-  // Basic metrics
+  // Core metrics
+  distance: number;      // meters
   movingTime: number;    // seconds
   elapsedTime: number;
-  distance: number;      // meters
-  elevationGain: number;
+  totalElevationGain: number;
+  elevationGain: number; // for backward compatibility
   avgSpeedKmh: number;
 
-  // Power
-  avgPower?: number;
+  // Power / energy
+  avgPower: number | null;
   maxPower?: number;
-  np?: number;           // Normalized Power (30s rolling)
-  if_?: number;          // Intensity Factor = NP / FTP
+  np?: number;           // Normalized Power
+  if_?: number;          // Intensity Factor
   tss?: number;          // Training Stress Score
-  kJ?: number;
+  kJ: number | null;
 
   // Heart rate
   avgHr?: number;
   maxHr?: number;
 
-  // Zone seconds
+  // Data-quality flags
+  hasPowerData: boolean;
+  hasHrData: boolean;
+  powerDropoutSeconds: number;
+  hrDropoutSeconds: number;
+  unrealisticSpikes: number;
+  dataQuality: DataQualityFlags;
+
+  // Time-in-zone (power, 7-zone Coggan model)
+  z1_seconds: number;
+  z2_seconds: number;
+  z3_seconds: number;
+  z4_seconds: number;
+  z5_seconds: number;
+  z6_seconds: number;
+  z7_seconds: number;
   powerZoneSeconds: ZoneDistribution;
 
-  // Pacing
+  // Pacing & Structure
   firstHalfAvgPower?: number;
   secondHalfAvgPower?: number;
-  fadePercent?: number;  // positive means faded
-  vi?: number;           // Variability Index = NP / AvgPower
+  fadePercent?: number;
+  vi?: number;           // Variability Index
   surgeCount?: number;
+  rideBreakup: string;
 
   // Intervals
   intervalCount: number;
-  intervalDetails: string; // human-readable e.g. "3×10min Z4, 2×5min Z5"
+  intervalDetails: string;
 
   // Classification
-  sessionType: string;   // Endurance / Sweet Spot / Threshold / VO2Max / Anaerobic / Recovery / Race / Mixed
+  sessionType: string;
   intensityBand: "Low" | "Moderate" | "High" | "Very High";
-
-  // Structure
-  rideBreakup: string;   // computed from power stream
-
-  // Hard tags
   hardTags: string[];
+}
 
-  // Data quality
-  dataQuality: DataQualityFlags;
+// ─── Pure parser ───────────────────────────────────────────────────────────
+
+/**
+ * Produce a structured ParsedRide from the three inputs that are always
+ * available before any LLM call.
+ */
+export function parseStravaActivity(
+  rawActivity: StravaActivity,
+  streams: Streams,
+  profile: AthleteProfile,
+): ParsedRide {
+  const ftp = profile.ftp ?? 250;
+
+  // ── 1. Core fields ────────────────────────────────────────────────────
+
+  const id = rawActivity.id;
+  const sportType = rawActivity.sport_type ?? rawActivity.type;
+  const startDateLocal = rawActivity.start_date_local;
+  const name = rawActivity.name;
+
+  const distance = rawActivity.distance;
+  const movingTime = rawActivity.moving_time;
+  const elapsedTime = rawActivity.elapsed_time;
+  const totalElevationGain = rawActivity.total_elevation_gain ?? 0;
+
+  const avgSpeedKmh =
+    movingTime > 0 ? round1((distance / movingTime) * 3.6) : 0;
+
+  const avgPower = rawActivity.average_watts ?? null;
+  const maxPower = rawActivity.max_watts ?? undefined;
+  const kJ = rawActivity.kilojoules ?? (avgPower !== null && movingTime > 0
+    ? Math.round((avgPower * movingTime) / 1000)
+    : null);
+
+  // ── 2. Advanced Metrics (NP, IF, TSS) ─────────────────────────────────
+
+  const np = computeNormalizedPower(streams.watts);
+  const if_ = computeIntensityFactor(np, ftp);
+  const tss = computeTrainingStressScore(movingTime, np, if_, ftp);
+  const vi = computeVariabilityIndex(np, avgPower ?? undefined);
+
+  // ── 3. Data quality ───────────────────────────────────────────────────
+
+  const dataQuality = assessDataQuality(
+    streams.watts,
+    streams.heartrate,
+    streams.cadence,
+    streams.speed,
+  );
+
+  // ── 4. Zone time (power, 7-zone Coggan) ───────────────────────────────
+
+  const powerZoneSeconds = computeTimeInZones(streams.watts, ftp);
+
+  // ── 5. Pacing & Structure ─────────────────────────────────────────────
+
+  const pacing = computePacingStats(streams.watts);
+  const rideBreakup = computeRideBreakup(streams.watts, ftp);
+  const intervals = detectIntervals(streams.watts, ftp);
+
+  // ── 6. Classification ─────────────────────────────────────────────────
+
+  const session = classifySession(
+    powerZoneSeconds,
+    np,
+    ftp,
+    intervals.intervalCount > 0,
+  );
+
+  // ── 7. Assemble result ────────────────────────────────────────────────
+
+  const result: ParsedRide = {
+    id,
+    sportType,
+    startDateLocal,
+    startDate: startDateLocal,
+    name,
+    distance,
+    movingTime,
+    elapsedTime,
+    totalElevationGain,
+    elevationGain: totalElevationGain,
+    avgSpeedKmh,
+    avgPower,
+    maxPower,
+    np,
+    if_,
+    tss,
+    kJ,
+    avgHr: rawActivity.average_heartrate ?? undefined,
+    maxHr: rawActivity.max_heartrate ?? undefined,
+    hasPowerData: dataQuality.hasPowerData,
+    hasHrData: dataQuality.hasHrData,
+    powerDropoutSeconds: dataQuality.powerDropoutSeconds,
+    hrDropoutSeconds: dataQuality.hrDropoutSeconds,
+    unrealisticSpikes: dataQuality.unrealisticSpikes,
+    dataQuality,
+    z1_seconds: powerZoneSeconds.z1,
+    z2_seconds: powerZoneSeconds.z2,
+    z3_seconds: powerZoneSeconds.z3,
+    z4_seconds: powerZoneSeconds.z4,
+    z5_seconds: powerZoneSeconds.z5,
+    z6_seconds: powerZoneSeconds.z6,
+    z7_seconds: powerZoneSeconds.z7,
+    powerZoneSeconds,
+    firstHalfAvgPower: pacing.firstHalfAvgPower,
+    secondHalfAvgPower: pacing.secondHalfAvgPower,
+    fadePercent: pacing.fadePercent,
+    vi,
+    surgeCount: pacing.surgeCount,
+    rideBreakup,
+    intervalCount: intervals.intervalCount,
+    intervalDetails: intervals.intervalDetails,
+    sessionType: session.sessionType,
+    intensityBand: session.intensityBand,
+    hardTags: [],
+  };
+
+  result.hardTags = generateHardTags(result);
+  return result;
+}
+
+// ─── Internal helpers ──────────────────────────────────────────────────────
+
+/** Count seconds where the signal drops to zero or invalid. */
+function countDropouts(data: number[]): number {
+  let count = 0;
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i];
+    if (v == null || v <= 0 || !isFinite(v)) count++;
+  }
+  return count;
+}
+
+/**
+ * Count data points that appear to be sensor spikes rather than real effort.
+ */
+function countUnrealisticSpikes(watts: number[], avgPower: number | null): number {
+  if (watts.length === 0) return 0;
+  const ABSOLUTE_CEILING = 2000;
+  const RELATIVE_FACTOR = 3;
+  const cap = avgPower != null && avgPower > 0 ? avgPower * RELATIVE_FACTOR : Infinity;
+
+  let count = 0;
+  for (let i = 0; i < watts.length; i++) {
+    const w = watts[i];
+    if (w == null || !isFinite(w)) continue;
+    if (w > ABSOLUTE_CEILING && w > cap) count++;
+  }
+  return count;
 }
 
 // ============================================================================
@@ -314,16 +478,6 @@ export interface ParsedRide {
 const ZONE_LABELS = [
   "Z1(Recovery)", "Z2(Endurance)", "Z3(Tempo)", "Z4(SweetSpot)",
   "Z5(Threshold)", "Z6(VO2Max)", "Z7(Anaerobic)",
-];
-
-const ZONE_BOUNDARIES = [
-  { zone: 1, min: 0, max: 0.55 },
-  { zone: 2, min: 0.56, max: 0.75 },
-  { zone: 3, min: 0.76, max: 0.87 },
-  { zone: 4, min: 0.88, max: 0.94 },
-  { zone: 5, min: 0.95, max: 1.05 },
-  { zone: 6, min: 1.06, max: 1.20 },
-  { zone: 7, min: 1.21, max: Infinity },
 ];
 
 // ============================================================================
@@ -352,6 +506,7 @@ export function computeTimeInZones(powerStream: number[] | undefined, ftp: numbe
   const zones: ZoneDistribution = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0, z6: 0, z7: 0 };
   if (!powerStream || powerStream.length === 0 || !ftp) return zones;
   for (const watts of powerStream) {
+    if (watts <= 0) continue;
     const ratio = watts / ftp;
     if (ratio <= 0.55) zones.z1++;
     else if (ratio <= 0.75) zones.z2++;
@@ -511,8 +666,6 @@ export function detectIntervals(powerStream: number[] | undefined, ftp: number):
   let currentZone = 0;
   let currentCount = 0;
   for (const ratio of zones) {
-    const z = ratio >= workThreshold ? Math.ceil(ratio / 0.1 + 2) : 0;
-    // Normalize to Z1-Z7
     let effectiveZone = 0;
     if (ratio > 1.20) effectiveZone = 7;
     else if (ratio > 1.05) effectiveZone = 6;
@@ -650,17 +803,17 @@ export function assessDataQuality(
   if (hasPowerData && powerStream) {
     let dropout = 0;
     let spikes = 0;
-    for (let i = 1; i < powerStream.length; i++) {
-      if (powerStream[i] === 0 && powerStream[i - 1] > 0) dropout++;
-      if (powerStream[i] > powerStream[i - 1] * 3 && powerStream[i] > 1500) spikes++;
+    for (let i = 0; i < powerStream.length; i++) {
+      if (powerStream[i] === 0) dropout++;
+      if (i > 0 && powerStream[i] > powerStream[i - 1] * 3 && powerStream[i] > 1500) spikes++;
     }
     flags.powerDropoutSeconds = dropout;
     flags.unrealisticSpikes = spikes;
   }
   if (hasHrData && hrStream) {
     let dropout = 0;
-    for (let i = 1; i < hrStream.length; i++) {
-      if (hrStream[i] === 0 && hrStream[i - 1] > 0) dropout++;
+    for (let i = 0; i < hrStream.length; i++) {
+      if (hrStream[i] === 0) dropout++;
     }
     flags.hrDropoutSeconds = dropout;
   }
@@ -672,67 +825,5 @@ export function assessDataQuality(
 // ============================================================================
 
 export function parseRide(activity: StravaActivity, streams: Streams, ftp: number): ParsedRide {
-  const movingHours = activity.moving_time / 3600;
-  const avgSpeedKmh = movingHours > 0 ? round1((activity.distance / 1000) / movingHours) : 0;
-
-  // Power zones
-  const powerZoneSeconds = computeTimeInZones(streams.watts, ftp);
-
-  // NP, IF, TSS
-  const np = computeNormalizedPower(streams.watts);
-  const if_ = computeIntensityFactor(np, ftp);
-  const tss = computeTrainingStressScore(activity.moving_time, np, if_, ftp);
-
-  // Pacing
-  const pacing = computePacingStats(streams.watts);
-  const vi = computeVariabilityIndex(np, activity.average_watts ?? undefined);
-
-  // Ride breakup
-  const rideBreakup = computeRideBreakup(streams.watts, ftp);
-
-  // Intervals
-  const intervals = detectIntervals(streams.watts, ftp);
-
-  // Classification
-  const session = classifySession(powerZoneSeconds, np, ftp, intervals.intervalCount > 0);
-
-  // Data quality
-  const dataQuality = assessDataQuality(streams.watts, streams.heartrate, streams.cadence, streams.speed);
-
-  // Build parsed ride
-  const parsed: ParsedRide = {
-    id: activity.id,
-    name: activity.name,
-    sportType: activity.sport_type,
-    startDate: activity.start_date_local,
-    movingTime: activity.moving_time,
-    elapsedTime: activity.elapsed_time,
-    distance: activity.distance,
-    elevationGain: activity.total_elevation_gain ?? 0,
-    avgSpeedKmh,
-    avgPower: activity.average_watts ?? undefined,
-    maxPower: activity.max_watts ?? undefined,
-    np,
-    if_,
-    tss,
-    kJ: activity.kilojoules ?? undefined,
-    avgHr: activity.average_heartrate ?? undefined,
-    maxHr: activity.max_heartrate ?? undefined,
-    powerZoneSeconds,
-    firstHalfAvgPower: pacing.firstHalfAvgPower,
-    secondHalfAvgPower: pacing.secondHalfAvgPower,
-    fadePercent: pacing.fadePercent,
-    vi,
-    surgeCount: pacing.surgeCount,
-    intervalCount: intervals.intervalCount,
-    intervalDetails: intervals.intervalDetails,
-    sessionType: session.sessionType,
-    intensityBand: session.intensityBand,
-    rideBreakup,
-    hardTags: [],
-    dataQuality,
-  };
-
-  parsed.hardTags = generateHardTags(parsed);
-  return parsed;
+  return parseStravaActivity(activity, streams, { ftp });
 }

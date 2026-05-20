@@ -19,3 +19,21 @@ out/
 *.nft.json
 BUILD_ID
 *.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# IDE
+.vscode/
+
+# OS
+Thumbs.db
+
+# Logs
+*.log
+
+# Non-cycling sport packages (stubs)
+packages/running-coach/
+packages/duathlon-coach/
+packages/sport-running/
+packages/sport-duathlon/

@@ -32,9 +32,12 @@ export * from "./reference/index.js";
 export type { StravaActivity, StravaAthlete, AthleteProfile, Streams } from "./strava/client.js";
 export { StravaClient } from "./strava/client.js";
 
+<<<<<<< HEAD
 // ─── Embeddings (Strava analysis parser) ───────────────────────────────
 export { parseStravaActivity } from "./embeddings/analysis-parser.js";
 
+=======
+>>>>>>> 68160bb52544f831cf74506bd2a3212ea3b51870
 // ─── LLM ──────────────────────────────────────────────────────────────
 export { LLM } from "./llm.js";
 export type { GenerateOpts, GenerateResult } from "./llm-types.js";
@@ -97,8 +100,18 @@ export type { IntervalsClient } from "./intervals.js";
 // ─── Embeddings / Analysis ───────────────────────────────────────────
 export { analyzeActivity } from "./embeddings/analysis.js";
 export type { ActivityAnalysis } from "./embeddings/analysis.js";
-export { parseRide, computeTimeInZones, computeNormalizedPower, computeRideBreakup } from "./embeddings/analysis-parser.js";
-export type { ParsedRide, ZoneDistribution, DataQualityFlags } from "./embeddings/analysis-parser.js";
+export {
+  parseStravaActivity,
+  parseRide,
+  computeTimeInZones,
+  computeNormalizedPower,
+  computeRideBreakup,
+} from "./embeddings/analysis-parser.js";
+export type {
+  ParsedRide,
+  ZoneDistribution,
+  DataQualityFlags,
+} from "./embeddings/analysis-parser.js";
 export { EmbeddingSync } from "./embeddings/sync.js";
 
 // ─── Agent ────────────────────────────────────────────────────────────

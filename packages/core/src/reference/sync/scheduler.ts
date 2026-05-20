@@ -54,11 +54,11 @@ export class Scheduler {
     if (this.stopped) return;
     if (this.timerHandle !== null) return;
 
-    const state = safeReadJson(
+    const state = safeReadJson<any>(
       join(this.deps.dataDir, ".scheduler.json"),
       SchedulerStateSchema,
     );
-    if (state !== null && state.next_sync_at !== null) {
+    if (state?.next_sync_at) {
       this.nextDelay = Math.max(
         0,
         new Date(state.next_sync_at).getTime() - this.nowFn().getTime(),
