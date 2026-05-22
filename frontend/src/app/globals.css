@@ -1,0 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;700&family=Bebas+Neue&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* Color Palette */
+  --bg-dark: #000000;
+  --surface-cards: #111318;
+  --accent-orange: #FF6B00;
+  --text-primary: #E0E6EF;
+  --text-secondary: #8F9BB3;
+  --text-muted: #4A5568;
+  --border-subtle: rgba(255, 255, 255, 0.06);
+
+  /* Fonts */
+  --font-barlow-condensed: 'Barlow Condensed', sans-serif;
+  --font-dm-sans: 'DM Sans', sans-serif;
+  --font-jetbrains-mono: 'JetBrains Mono', monospace;
+  --font-bebas-neue: 'Bebas Neue', sans-serif;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-primary);
+  font-family: var(--font-dm-sans);
+}
+
+@keyframes flagWave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}

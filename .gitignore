@@ -37,3 +37,4 @@ packages/running-coach/
 packages/duathlon-coach/
 packages/sport-running/
 packages/sport-duathlon/
+.env

@@ -60,4 +60,20 @@ export class PineconeClient {
       namespace: this.config.namespace,
     });
   }
+
+  async list(limit: number = 100, paginationToken?: string): Promise<{ vectors: { id: string }[]; pagination?: { next: string } }> {
+    return this.request("/vectors/list", {
+      namespace: this.config.namespace,
+      limit,
+      paginationToken,
+    });
+  }
+
+  async fetch(ids: string[]): Promise<Record<string, PineconeVector>> {
+    const res = await this.request<{ vectors: Record<string, PineconeVector> }>("/vectors/fetch", {
+      ids,
+      namespace: this.config.namespace,
+    });
+    return res.vectors;
+  }
 }

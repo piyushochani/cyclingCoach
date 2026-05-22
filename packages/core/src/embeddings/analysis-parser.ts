@@ -22,7 +22,6 @@ const POWER_ZONE_CAPS = [
 
 // z7 is anything above 1.50 × FTP
 
-<<<<<<< HEAD
 // ─── Pure parser ───────────────────────────────────────────────────────────
 
 /**
@@ -236,9 +235,6 @@ function countUnrealisticSpikes(watts: number[], avgPower: number | null): numbe
 // ============================================================================
 // TYPES
 // ============================================================================
-=======
-// ─── Output shape ──────────────────────────────────────────────────────────
->>>>>>> 68160bb52544f831cf74506bd2a3212ea3b51870
 
 export interface ZoneDistribution {
   z1: number; z2: number; z3: number; z4: number;

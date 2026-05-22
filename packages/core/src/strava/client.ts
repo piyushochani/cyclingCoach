@@ -75,7 +75,6 @@ export class StravaClient {
   private expiresAt: number;
   private refreshPromise: Promise<void> | null = null;
 
-<<<<<<< HEAD
   constructor(config: string | {
     accessToken?: string;
     refreshToken?: string;
@@ -175,10 +174,6 @@ export class StravaClient {
       return baseStr + "  ";
     }
     return "  ";
-=======
-  constructor(config: string | { accessToken?: string }) {
-    this.accessToken = typeof config === "string" ? config : (config.accessToken ?? "");
->>>>>>> 68160bb52544f831cf74506bd2a3212ea3b51870
   }
 
   private async request<T>(path: string): Promise<T> {
