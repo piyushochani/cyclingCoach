@@ -35,6 +35,30 @@ export class User extends Document {
 
   @Prop({ default: null })
   ftp: number;
+
+  @Prop({ default: '' })
+  description: string;
+
+  @Prop({ default: null })
+  profileImage: string;
+
+  @Prop({ default: [] })
+  coaches: any[];
+
+  @Prop({ default: 0 })
+  totalDistance: number;
+
+  @Prop({ default: 0 })
+  totalMovingTime: number;
+
+  @Prop({ default: 0 })
+  totalElevation: number;
+
+  @Prop({ default: 0 })
+  totalCalories: number;
+
+  @Prop({ default: null })
+  lastSyncAt: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import CyclistLoader from '../animations/CyclistLoader';
+import { api } from '../../lib/api';
 
 const AddRaceResultModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
@@ -15,26 +16,33 @@ const AddRaceResultModal = ({ isOpen, onClose }) => {
     totalRiders: '',
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setIsLoading(true);
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += 0.1;
-      setProgress(currentProgress);
-      if (currentProgress >= 1) {
-        clearInterval(interval);
-        setIsLoading(false);
-        onClose();
-      }
-    }, 100);
+    try {
+      await api.post('/races', {
+        name: formData.raceName,
+        type: formData.type,
+        date: formData.date,
+        time: formData.time,
+        position: formData.position ? parseInt(formData.position, 10) : null,
+        totalRiders: formData.totalRiders ? parseInt(formData.totalRiders, 10) : null,
+        completed: true,
+      });
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to save result');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -56,8 +64,11 @@ const AddRaceResultModal = ({ isOpen, onClose }) => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <input type="text" name="raceName" placeholder="Race Name" value={formData.raceName} onChange={handleChange} className="w-full p-3 bg-bg-dark border border-chain-link-grey rounded" required />
               <input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-3 bg-bg-dark border border-chain-link-grey rounded" required />
+              <input type="text" name="time" placeholder="Finish Time (e.g. 4:12:00)" value={formData.time} onChange={handleChange} className="w-full p-3 bg-bg-dark border border-chain-link-grey rounded" />
               <input type="number" name="position" placeholder="Finishing Position" value={formData.position} onChange={handleChange} className="w-full p-3 bg-bg-dark border border-chain-link-grey rounded" required />
-              <button type="submit" className="w-full py-3 bg-accent-orange text-white font-bebasNeue rounded">Save Result</button>
+              <input type="number" name="totalRiders" placeholder="Total Riders" value={formData.totalRiders} onChange={handleChange} className="w-full p-3 bg-bg-dark border border-chain-link-grey rounded" />
+              {error && <p className="text-red-400 text-sm">{error}</p>}
+              <button type="submit" disabled={isLoading} className="w-full py-3 bg-accent-orange text-white font-bebasNeue rounded disabled:opacity-50">{isLoading ? 'Saving...' : 'Save Result'}</button>
             </form>
             <button onClick={onClose} className="mt-4 text-text-secondary">Cancel</button>
           </motion.div>

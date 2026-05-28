@@ -1,0 +1,152 @@
+CYCLOAI — FEATURES LIST
+========================
+
+1. LANDING PAGE
+   - Hero section with headline "Train smarter. Race harder."
+   - Animated gradient background (orange-black theme)
+   - Stats bar: 685+ Activities, 53K+ KM Analyzed, 12 Race Podiums, 4.9 Avg Rating
+   - Feature cards: Adaptive Weekly Plans, Race-Day Readiness, Progress Economy
+   - How It Works: 3-step explanation (Connect -> AI builds plan -> Ride refine repeat)
+   - Testimonials section with ratings and quotes
+   - CTA section with "Start Free" button
+   - Footer with links
+   - Note: Currently static content, does NOT re-render on data changes. Needs backend integration for dynamic updates.
+
+2. USER AUTHENTICATION
+   - Signup with OTP email verification
+   - Login with email/password
+   - Password change (authenticated)
+   - Forgot password flow with OTP reset
+   - Session management
+
+3. DASHBOARD
+   - Profile card with user info
+   - Weekly training schedule
+   - Stats year card
+   - 34-day training consistency heatmap
+   - Weekly distance/time graph
+   - Recent activity list
+   - Strava sync status
+   - Weather widget
+
+4. ACTIVITIES
+   - Activity log / training history table
+   - Filters: date range, activity type, search
+   - Single activity detail with map (Leaflet/OpenStreetMap)
+   - Stats grid: distance, duration, elevation, speed, HR, calories
+   - Elevation profile chart (Recharts)
+   - Power/HR chart
+   - Splits table and segments
+   - Performance score
+   - Load-more pagination
+
+5. CALENDAR
+   - Monthly calendar grid with activity icons
+   - Day-by-day training detail view
+   - Weekly schedule
+   - Custom SVG ride breakup zone chart
+   - Weather preview
+   - Monthly snapshot stats
+   - AI analysis buttons
+
+6. STATISTICS / ANALYTICS
+   - KPI strip: total distance, time, elevation, activities, longest ride, biggest climb
+   - Period filter (all/year/month/week) and sport filter
+   - AI review buttons (daily/weekly/monthly)
+   - Trend charts: distance, time, elevation over time
+   - Best efforts panel
+   - Activity frequency bar chart
+   - Avg speed trend
+   - Sport split pie chart
+   - Day-of-week distribution
+   - Longest rides table
+   - Recent activities table
+
+7. RACE RESULTS
+   - Race table with filters and sort
+   - Upcoming race highlight banner
+   - Season stats: total races, best finish, total km/elev, podiums
+   - Add/edit race form modal
+   - Race chat modal
+   - Delete race
+
+8. BEST EFFORTS
+   - Fastest times at distances: 5k, 10k, 20k, 50k, 100k
+   - Longest rides
+   - Strava segment analysis: KOMs, Top 10, All
+   - Segment effort cards
+
+9. AI TRAINING
+   - Schedule race button/modal
+   - Nutrition plan drawer
+   - AI periodization component
+   - Upcoming races table
+   - Quick links
+
+10. GEAR / EQUIPMENT
+    - Bike fleet management: add, set active, delete, track total km
+    - Other equipment tracking: tyres, chains, cassettes, etc.
+    - Type categorization
+
+11. EXPENSES
+    - Add/edit/delete cycling-related expenses
+    - Monthly breakdown table by year
+    - Year total calculation
+
+12. PROFILE
+    - Avatar with cropping and zoom
+    - Personal info display/edit
+    - Coach selection (real pro cyclists or custom)
+    - Gear list
+    - Profile image upload (Cloudinary)
+
+13. SETTINGS
+    - Edit profile: name, height, weight
+    - Cycling profile: main sport, experience level, years, FTP
+    - Goals and bio
+    - Link to change password
+    - App version info
+
+14. STRAVA INTEGRATION
+    - OAuth 2.0 authorization flow
+    - How-to-connect guide (4 steps)
+    - FAQ about Strava sync
+    - Data and privacy policy
+    - Manual incremental sync
+    - Full refresh sync
+    - Activity import from Strava
+
+15. NOTIFICATIONS
+    - Achievement alerts
+    - Activity upload confirmations
+    - Race reminders
+    - Weekly summaries
+    - Unread/read separation
+
+16. BACKEND API
+    - NestJS server on localhost:3001
+    - MongoDB Atlas database
+    - Auth endpoints: login, signup, password management
+    - CRUD endpoints: activities, races, expenses, gear
+    - Stats aggregation
+    - Training context management (month, week, pre-race plans)
+    - Strava token management and sync
+    - AI analysis endpoint
+    - User management
+    - Email service via Nodemailer
+
+17. PACKAGES (Monorepo)
+    - @enduragent/core: AI coaching infrastructure (CoachAgent, memory, LLM transport, Pinecone RAG)
+    - @enduragent/sport-cycling: Cycling domain logic (FTP zones, periodization, plan builder)
+    - cycling-coach: Published CLI binary (npx cycling-coach)
+
+18. AI COACHING (CLI)
+    - Conversational AI coach via Telegram or CLI
+    - Memory system: person, schedule, goals, preferences, notes, medical history
+    - Multi-LLM support: OpenAI, Anthropic Claude, Google Gemini
+    - Tool-calling for Strava, intervals.icu, memory operations
+    - FTP-based power zones (7 zones)
+    - Periodization models: Build, Base, Peak, Taper, Recovery
+    - Goal feasibility assessment
+    - Structured workout planning
+    - intervals.icu integration

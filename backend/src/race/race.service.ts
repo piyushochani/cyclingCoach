@@ -17,8 +17,24 @@ export class RaceService {
     return this.raceModel.find({ user: userId as any }).lean().exec();
   }
 
+  findById(id: string): Promise<Race | null> {
+    return this.raceModel.findById(id).populate('racePlan dietPlan raceNutrition aiSuggestions raceChat').exec();
+  }
+
   create(race: Partial<Race>): Promise<Race> {
     const newRace = new this.raceModel(race);
     return newRace.save();
+  }
+
+  update(id: string, race: Partial<Race>, userId?: any): Promise<Race | null> {
+    const filter: any = { _id: id };
+    if (userId) filter.user = userId as any;
+    return this.raceModel.findOneAndUpdate(filter, race, { new: true }).exec();
+  }
+
+  delete(id: string, userId?: any): Promise<Race | null> {
+    const filter: any = { _id: id };
+    if (userId) filter.user = userId as any;
+    return this.raceModel.findOneAndDelete(filter).exec();
   }
 }

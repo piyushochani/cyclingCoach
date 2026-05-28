@@ -61,7 +61,7 @@ function buildWeeklyData(activities) {
       const monthLabel = d.toLocaleString("en", { month: "short" }).toUpperCase();
       weeks[key] = {
         week: key,
-        km: 0, hrs: 0, elev: 0, coins: 0,
+        km: 0, hrs: 0, elev: 0,
         month: monthLabel,
         dateRange: {
           days: DAY_NAMES,

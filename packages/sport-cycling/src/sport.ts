@@ -10,6 +10,13 @@ import {
   type ToolRegistration,
 } from "@enduragent/core";
 import soul from "../SOUL.md";
+import dailyReview from "../DAILY_REVIEW.md";
+import weeklyReview from "../WEEKLY_REVIEW.md";
+import monthlyReview from "../MONTHLY_REVIEW.md";
+import weeklyPlanInstructions from "../WEEKLY_PLAN_INSTRUCTIONS.md";
+import preRacePlanInstructions from "../PRE_RACE_PLAN_INSTRUCTIONS.md";
+import trainingContextSummary from "../TRAINING_CONTEXT_SUMMARY.md";
+import nutritionPlanInstructions from "../NUTRITION_PLAN_INSTRUCTIONS.md";
 import { skills as skillEntries } from "./skills.generated.js";
 import { createCyclingTools } from "./tools.js";
 import { athleteProfileSchema } from "./schemas.js";
@@ -47,6 +54,23 @@ const memorySections: readonly MemorySectionSpec[] = [
       "Chronic conditions belong in `medical-history`, not here.",
   },
 ];
+
+export const ANALYSIS_PROMPTS = {
+  daily: dailyReview,
+  weekly: weeklyReview,
+  monthly: monthlyReview,
+} as const;
+
+export type AnalysisType = keyof typeof ANALYSIS_PROMPTS;
+
+export const PLAN_INSTRUCTIONS = {
+  weeklyPlan: weeklyPlanInstructions,
+  preRacePlan: preRacePlanInstructions,
+  trainingContext: trainingContextSummary,
+  nutritionPlan: nutritionPlanInstructions,
+} as const;
+
+export type PlanInstructionType = keyof typeof PLAN_INSTRUCTIONS;
 
 export const cyclingSport: Sport = {
   id: "cycling",

@@ -3,7 +3,8 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import CyclistLoader from '../animations/CyclistLoader'; // Adjust path if necessary
+import CyclistLoader from '../animations/CyclistLoader';
+import { api } from '../../lib/api';
 
 const ScheduleRaceModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
@@ -19,28 +20,35 @@ const ScheduleRaceModal = ({ isOpen, onClose }) => {
     goal: '',
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setIsLoading(true);
-    let currentProgress = 0;
-    const interval = setInterval(() => {
-      currentProgress += 0.1;
-      setProgress(currentProgress);
-      if (currentProgress >= 1) {
-        clearInterval(interval);
-        setIsLoading(false);
-        onClose(); // Close modal after simulation
-        // In a real app, you'd send data to backend here
-      }
-    }, 100);
-    console.log('Scheduling Race:', formData);
+    try {
+      await api.post('/races', {
+        name: formData.raceName,
+        type: formData.raceType,
+        date: formData.date,
+        location: formData.location,
+        distance: parseFloat(formData.distance) || 0,
+        elevationGain: parseFloat(formData.elevation) || 0,
+        priority: formData.priority === 'A-Race' ? 'A' : formData.priority.charAt(0),
+        weather: formData.conditions,
+        description: formData.description,
+      });
+      onClose();
+    } catch (err) {
+      setError(err.message || 'Failed to schedule race');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -148,6 +156,8 @@ const ScheduleRaceModal = ({ isOpen, onClose }) => {
                           className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none"></textarea>
               </div>
 
+              {error && <p className="md:col-span-2 text-red-400 text-sm text-center">{error}</p>}
+
               {/* Submit Button */}
               <div className="md:col-span-2 flex justify-center mt-4">
                 <motion.button
@@ -158,7 +168,7 @@ const ScheduleRaceModal = ({ isOpen, onClose }) => {
                   disabled={isLoading}
                 >
                   <span className="block skew-x-[15deg] group-hover:skew-x-0 transition-transform duration-300">
-                    LOCK IN TARGET &rarr;
+                    {isLoading ? 'Saving...' : 'LOCK IN TARGET'} &rarr;
                   </span>
                 </motion.button>
               </div>

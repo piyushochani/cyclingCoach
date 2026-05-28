@@ -4,7 +4,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { TypewriterText } from '../../src/app/ai-training/page'; // Reusing from AI Training page
+import { TypewriterText } from '../../components/ui/TypewriterText';
 
 const periodizationData = [
   { name: 'Base', duration: 8, fill: '#3498DB' }, // Info blue

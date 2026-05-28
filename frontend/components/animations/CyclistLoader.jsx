@@ -1,3 +1,5 @@
+"use client";
+
 // frontend/components/animations/CyclistLoader.jsx
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';

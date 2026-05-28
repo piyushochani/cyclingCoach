@@ -31,6 +31,7 @@ export default function LoginPage() {
       const user = await api.post("/auth/login", { email, password });
       localStorage.setItem("cycloai_signed_in", "true");
       localStorage.setItem("cycloai_user", JSON.stringify(user));
+      localStorage.setItem("cycloai_session_ts", String(Date.now()));
       router.replace("/dashboard");
     } catch (err) {
       setError(err.message || "Invalid email or password");

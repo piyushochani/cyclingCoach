@@ -42,7 +42,9 @@ export class PineconeClient {
       throw new Error(`Pinecone API error (${path}): ${error}`);
     }
 
-    return (await res.json()) as T;
+    const text = await res.text();
+    if (!text) return {} as T;
+    return JSON.parse(text) as T;
   }
 
   async upsert(vectors: PineconeVector[]): Promise<void> {
@@ -62,18 +64,39 @@ export class PineconeClient {
   }
 
   async list(limit: number = 100, paginationToken?: string): Promise<{ vectors: { id: string }[]; pagination?: { next: string } }> {
-    return this.request("/vectors/list", {
-      namespace: this.config.namespace,
-      limit,
-      paginationToken,
+    const { apiKey, host, namespace } = this.config;
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (namespace) params.set("namespace", namespace);
+    if (paginationToken) params.set("paginationToken", paginationToken);
+    const res = await fetch(`${host}/vectors/list?${params}`, {
+      method: "GET",
+      headers: { "Api-Key": apiKey },
     });
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(`Pinecone API error (list): ${error}`);
+    }
+    const text = await res.text();
+    if (!text) return { vectors: [], pagination: undefined };
+    return JSON.parse(text) as { vectors: { id: string }[]; pagination?: { next: string } };
   }
 
   async fetch(ids: string[]): Promise<Record<string, PineconeVector>> {
-    const res = await this.request<{ vectors: Record<string, PineconeVector> }>("/vectors/fetch", {
-      ids,
-      namespace: this.config.namespace,
+    const { apiKey, host, namespace } = this.config;
+    const params = new URLSearchParams();
+    for (const id of ids) params.append("ids", id);
+    if (namespace) params.set("namespace", namespace);
+    const res = await fetch(`${host}/vectors/fetch?${params}`, {
+      method: "GET",
+      headers: { "Api-Key": apiKey },
     });
-    return res.vectors;
+    if (!res.ok) {
+      const error = await res.text();
+      throw new Error(`Pinecone API error (fetch): ${error}`);
+    }
+    const text = await res.text();
+    if (!text) return {};
+    const data = JSON.parse(text) as { vectors: Record<string, PineconeVector> };
+    return data?.vectors ?? {};
   }
 }

@@ -31,5 +31,6 @@ export type { IntervalsWorkoutInput } from "./intervals-serializer.js";
 
 export * from "./schemas.js";
 
-export { cyclingSport, CYCLING_VOCABULARY } from "./sport.js";
+export { cyclingSport, CYCLING_VOCABULARY, ANALYSIS_PROMPTS } from "./sport.js";
+export type { AnalysisType } from "./sport.js";
 export { migrateCyclingLegacySections } from "./migrate.js";

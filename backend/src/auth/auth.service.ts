@@ -35,7 +35,7 @@ export class AuthService {
     const code = this.generateOtpCode();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await this.otpModel.create({ email, code, type, expiresAt });
-    await this.emailService.sendOtpEmail(email, code, type).catch((err) => {
+    this.emailService.sendOtpEmail(email, code, type).catch((err) => {
       console.error(`Failed to send OTP email to ${email}:`, err.message);
     });
     return code;

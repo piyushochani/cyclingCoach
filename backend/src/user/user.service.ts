@@ -25,4 +25,14 @@ export class UserService {
     const newUser = new this.userModel(user);
     return newUser.save();
   }
+
+  async update(email: string, data: Partial<User>): Promise<User | null> {
+    const allowed = ['firstName', 'lastName', 'mainSport', 'experienceLevel', 'heightCm', 'weightKg', 'goal', 'cyclingYears', 'ftp', 'profileImage', 'description', 'coaches'];
+    const update: Record<string, any> = {};
+    const d = data as Record<string, any>;
+    for (const key of allowed) {
+      if (d[key] !== undefined) update[key] = d[key];
+    }
+    return this.userModel.findOneAndUpdate({ email }, update, { new: true }).exec();
+  }
 }

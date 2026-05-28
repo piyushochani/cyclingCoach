@@ -8,13 +8,29 @@ class ApiError extends Error {
   }
 }
 
+function getUserHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('cycloai_user');
+    if (!raw) return {};
+    const user = JSON.parse(raw);
+    const id = user._id || user.id;
+    return id ? { 'X-User-Id': id } : {};
+  } catch {
+    return {};
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers = { 'Content-Type': 'application/json', ...getUserHeaders(), ...options?.headers };
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers,
   });
   if (!res.ok) {
-    throw new ApiError(`API error: ${res.statusText}`, res.status);
+    let msg = `API error: ${res.statusText}`;
+    try { const b = await res.json(); if (b.message) msg = b.message; } catch {}
+    throw new ApiError(msg, res.status);
   }
   return res.json();
 }

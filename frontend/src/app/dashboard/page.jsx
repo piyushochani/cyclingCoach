@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { api } from "../../../lib/api";
+import { useAutoSync } from "../../../lib/useAutoSync";
 import ProfileContainer from "../../../components/layout/ProfileContainer";
 import WeeklyScheduleCard from "../../../components/layout/WeekScheduleCard";
 import StatsYearCard from "../../../components/layout/StatsYearCard";
@@ -69,13 +70,14 @@ const DashboardPage = () => {
   const [races, setRaces] = useState([]);
   const [plans, setPlans] = useState([]);
   const [user, setUser] = useState(null);
+  const { status: syncStatus, lastSynced } = useAutoSync();
 
   useEffect(() => {
     const stored = localStorage.getItem("cycloai_user");
     if (stored) {
       try {
         const u = JSON.parse(stored);
-        setUser({ firstName: u.firstName || u.name || "", lastName: u.lastName || "", email: u.email || "", goal: u.goal || "" });
+        setUser({ firstName: u.firstName || u.name || "", lastName: u.lastName || "", email: u.email || "", goal: u.goal || "", profileImage: u.profileImage || "", description: u.description || "" });
       } catch {}
     }
     Promise.all([
@@ -139,6 +141,28 @@ const DashboardPage = () => {
                 2026 Season Active
               </span>
             </div>
+            {syncStatus !== "idle" && (
+              <div className={`flex items-center gap-2 self-start rounded-full border px-3 py-1.5 md:self-auto ${
+                syncStatus === "syncing" ? "border-[#FF5500]/30 bg-[#FF5500]/10" :
+                syncStatus === "success" ? "border-green-500/30 bg-green-500/10" :
+                "border-red-500/30 bg-red-500/10"
+              }`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${
+                  syncStatus === "syncing" ? "bg-[#FF5500] animate-pulse" :
+                  syncStatus === "success" ? "bg-green-500" :
+                  "bg-red-500"
+                }`} />
+                <span className={`font-dmSans text-[10px] uppercase tracking-[0.14em] ${
+                  syncStatus === "syncing" ? "text-[#FF5500]" :
+                  syncStatus === "success" ? "text-green-400" :
+                  "text-red-400"
+                }`}>
+                  {syncStatus === "syncing" ? "Syncing..." :
+                   syncStatus === "success" ? "Synced" :
+                   "Sync Failed"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

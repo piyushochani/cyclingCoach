@@ -63,6 +63,7 @@ export default function SignupPage() {
       });
       localStorage.setItem("cycloai_signed_in", "true");
       localStorage.setItem("cycloai_user", JSON.stringify({ firstName, lastName: lastName || "", email, goal }));
+      localStorage.setItem("cycloai_session_ts", String(Date.now()));
       router.replace("/dashboard");
     } catch (err) {
       setError(err.message || "Verification failed");

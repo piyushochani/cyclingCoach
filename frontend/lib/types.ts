@@ -39,3 +39,16 @@ export interface Stats {
   totalElevation: number;
   activityCount: number;
 }
+
+export interface BestEffort {
+  id: string;
+  name: string;
+  time: number;
+  date: string;
+  distance: number;
+  avgSpeed: number;
+  rank: number;
+}
+
+export type BestEffortsData = Record<string, BestEffort[]>;
+

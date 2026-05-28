@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, UnauthorizedException } from '@nestjs/common';
+import { UserId } from '../common/user-id.decorator';
 import { PlanService } from './plan.service';
 
 @Controller('plans')
@@ -6,12 +7,14 @@ export class PlanController {
   constructor(private readonly planService: PlanService) {}
 
   @Get()
-  findAll() {
-    return this.planService.findAll();
+  findAll(@UserId() userId: string) {
+    if (!userId) throw new UnauthorizedException('User ID required');
+    return this.planService.findAllByUserId(userId);
   }
 
   @Post()
-  create(@Body() planData: any) {
-    return this.planService.create(planData);
+  create(@Body() planData: any, @UserId() userId: string) {
+    if (!userId) throw new UnauthorizedException('User ID required');
+    return this.planService.create({ ...planData, user: userId });
   }
 }

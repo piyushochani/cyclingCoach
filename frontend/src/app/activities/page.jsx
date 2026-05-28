@@ -1,194 +1,376 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import Link from 'next/link';
-import { api } from '../../../lib/api';
+import React, { useEffect, useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { api } from "../../../lib/api";
 
-const ActivityCard = ({ activity, index }) => {
-  const cardVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0, transition: { delay: index * 0.1 } },
-  };
+const DATE_RANGE_OPTIONS = ["All Time", "Last 30 Days", "Last 7 Days", "This Year"];
+const SORT_OPTIONS = [
+  { label: "Date", value: "date" },
+  { label: "Distance", value: "distance" },
+  { label: "Time", value: "time" },
+];
+const ACTIVITY_OPTIONS = ["All", "Bike", "Run", "Walk"];
+
+const stagger = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.04 } },
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+};
+
+const formatDate = (raw) => {
+  if (!raw) return "—";
+  const d = new Date(raw);
+  if (isNaN(d)) return raw;
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const formatDuration = (seconds) => {
+  if (!seconds && seconds !== 0) return "—";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}h`;
+  if (m > 0) return `${m}:${String(s).padStart(2, "0")}m`;
+  return `${s}s`;
+};
+
+const formatDistance = (val) => {
+  if (val === undefined || val === null || Number.isNaN(parseFloat(val))) return "—";
+  return parseFloat(val).toFixed(1);
+};
+
+const formatPace = (distance, seconds) => {
+  if (!distance || !seconds) return "—";
+  const paceMin = (seconds / 60) / distance;
+  const m = Math.floor(paceMin);
+  const sec = Math.round((paceMin - m) * 60);
+  return `${m}:${String(sec).padStart(2, "0")}/km`;
+};
+
+const sportMeta = {
+  Cycling: { icon: "🚴", label: "RIDE", color: "#FF5500" },
+  Bike: { icon: "🚴", label: "RIDE", color: "#FF5500" },
+  cycling: { icon: "🚴", label: "RIDE", color: "#FF5500" },
+  Running: { icon: "🏃", label: "RUN", color: "#60A5FA" },
+  Run: { icon: "🏃", label: "RUN", color: "#60A5FA" },
+  running: { icon: "🏃", label: "RUN", color: "#60A5FA" },
+  Walking: { icon: "🚶", label: "WALK", color: "#4ADE80" },
+  Walk: { icon: "🚶", label: "WALK", color: "#4ADE80" },
+  walking: { icon: "🚶", label: "WALK", color: "#4ADE80" },
+  workout: { icon: "🏋️", label: "WORKOUT", color: "#A78BFA" },
+  Workout: { icon: "🏋️", label: "WORKOUT", color: "#A78BFA" },
+  hiking: { icon: "🥾", label: "HIKE", color: "#D4A574" },
+  Hiking: { icon: "🥾", label: "HIKE", color: "#D4A574" },
+};
+
+const getSportMeta = (sport = "") =>
+  sportMeta[sport] || { icon: "⚡", label: (sport || "").toUpperCase(), color: "rgba(255,255,255,0.35)" };
+
+function FilterSelect({ label, value, onChange, options }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="font-dmSans text-[10px] font-bold uppercase tracking-[0.12em] text-white/35 whitespace-nowrap">
+        {label}
+      </span>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={onChange}
+          className="appearance-none rounded-xl border border-white/[0.10] bg-[#0D0D0D] px-3.5 py-2.5 pr-9 text-sm font-medium text-white outline-none transition-all duration-200 hover:border-white/20 focus:border-[#FF5500]/50 min-w-[140px]"
+        >
+          {options.map((o) => {
+            const option = typeof o === "string" ? { label: o, value: o } : o;
+            return (
+              <option key={option.value} value={option.value} className="bg-[#0D0D0D] text-white">
+                {option.label}
+              </option>
+            );
+          })}
+        </select>
+        <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs text-white/50">▼</span>
+      </div>
+    </div>
+  );
+}
+
+function ActivityRow({ activity, index }) {
+  const meta = getSportMeta(activity.sport);
+  const [hovered, setHovered] = useState(false);
 
   return (
     <motion.div
-      variants={cardVariants}
+      variants={fadeUp}
       initial="hidden"
-      animate="visible"
-      className="bg-surface-cards rounded-lg p-4 shadow-lg border border-elevation-highlight
-                 flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4
-                 group hover:border-accent-orange transition-all duration-300"
+      animate="show"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="grid cursor-pointer grid-cols-[56px_minmax(0,1.5fr)_100px_105px_85px_100px] gap-3 border-b border-white/[0.03] px-4 py-3.5 transition-all duration-200 md:grid-cols-[72px_minmax(0,1.5fr)_110px_120px_100px_110px]"
+      style={{ background: hovered ? "rgba(255,85,0,0.03)" : "transparent" }}
     >
-      {/* Sport Icon (Placeholder) */}
-      <div className="flex-shrink-0 w-12 h-12 bg-bg-dark rounded-full flex items-center justify-center text-text-primary text-2xl">
-        🚲
+      <div className="flex flex-col gap-1">
+        <span className="text-lg leading-none">{meta.icon}</span>
+        <span
+          className="text-[8px] font-extrabold uppercase tracking-[0.14em] md:text-[9px]"
+          style={{ color: meta.color }}
+        >
+          {meta.label}
+        </span>
       </div>
 
-      <div className="flex-1 text-center md:text-left">
-        <Link href={`/activities/${activity.id}`}>
-          <h3 className="font-bebasNeue text-xl text-text-primary hover:text-accent-orange cursor-pointer">
-            {activity.title || activity.name}
-          </h3>
+      <div className="min-w-0">
+        <Link href={`/activities/${activity._id || activity.id}`} className="no-underline">
+          <p className="truncate text-sm font-semibold text-white leading-tight hover:text-[#FF5500] transition-colors duration-200">
+            {activity.title || activity.name || "Untitled Activity"}
+          </p>
         </Link>
-        <p className="font-dmSans text-sm text-text-secondary">{activity.date} - {activity.sport}</p>
-        <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
-          <span className="bg-bg-dark text-text-muted text-xs px-2 py-1 rounded-full">{activity.distance} km</span>
-          <span className="bg-bg-dark text-text-muted text-xs px-2 py-1 rounded-full">{activity.duration || `${Math.floor(activity.durationSeconds / 3600)}h ${Math.floor((activity.durationSeconds % 3600) / 60)}m`}</span>
-          <span className="bg-bg-dark text-text-muted text-xs px-2 py-1 rounded-full">{activity.elevation || activity.elevationGain} m</span>
-        </div>
+        <p className="mt-1 text-[11px] text-white/20">{formatDate(activity.date)}</p>
       </div>
 
-      {/* Mini Elevation Profile (Placeholder SVG) */}
-      <div className="flex-shrink-0 w-24 h-12">
-        <svg viewBox="0 0 100 50" fill="none" stroke="currentColor" strokeWidth="2" className="w-full h-full text-accent-orange">
-          <path d="M0 40 L20 20 L40 30 L60 10 L80 25 L100 15" />
-        </svg>
-      </div>
+      <span className="font-jetbrainsMono text-sm font-bold text-white/90">
+        {formatDistance(activity.distance)} km
+      </span>
 
-      {/* Action Buttons (Placeholder) */}
-      <div className="flex-shrink-0 flex space-x-2">
-        <button className="text-text-secondary hover:text-info-blue transition-colors">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-        </button>
-        <button className="text-text-secondary hover:text-success-green transition-colors">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.013 9.726 11 10.819 11h2.362c1.092 0 1.933 1.013 2.135 2.342m-4.27 0v2.793m0 0a.944.944 0 00-.945.945.945.945 0 00.945.945.945.945 0 00.945-.945.945.945 0 00-.945-.945zm0-2.793V3m-5 4h.01M17 7h.01M5 12h.01M19 12h.01M5 17h.01M19 17h.01M21 12c0 4.418-4.03 8-9 8s-9-3.582-9-8 4.03-8 9-8 9 3.582 9 8z"></path></svg>
-        </button>
-      </div>
+      <span className="font-jetbrainsMono text-[13px] text-white/70">
+        {formatDuration(activity.durationSeconds)}
+      </span>
+
+      <span className="font-jetbrainsMono text-[13px] text-white/35">
+        {activity.elevation ?? activity.elevationGain ?? "—"} m
+      </span>
+
+      <span className="flex items-center gap-1.5 text-xs text-white/20">
+        <span className="hidden md:inline">{formatDate(activity.date)}</span>
+        <span className="inline md:hidden text-white/15">
+          {formatPace(activity.distance, activity.durationSeconds)}
+        </span>
+      </span>
     </motion.div>
   );
-};
-const ActivitiesPage = () => {
+}
+
+function SkeletonRows() {
+  return (
+    <div>
+      {[1, 2, 3, 4].map((i) => (
+        <div
+          key={i}
+          className="my-px animate-pulse"
+          style={{
+            height: 58,
+            background: "rgba(255,255,255,0.03)",
+            animationDelay: `${i * 0.1}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+export default function ActivitiesPage() {
   const [activities, setActivities] = useState([]);
-  const [filterSport, setFilterSport] = useState('All');
-  const [filterDateRange, setFilterDateRange] = useState('All Time');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState('Newest');
+  const [sortBy, setSortBy] = useState("date");
+  const [activityFilter, setActivityFilter] = useState("All");
+  const [dateRange, setDateRange] = useState("All Time");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(12);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.get('/activities')
-      .then(setActivities)
-      .catch((err) => console.error('Failed to load activities:', err));
+    api
+      .get("/activities")
+      .then((data) => setActivities(data || []))
+      .catch((err) => console.error("Failed to load activities:", err))
+      .finally(() => setLoading(false));
   }, []);
 
-  const filteredActivities = activities.filter(activity => {
-    return (filterSport === 'All' || activity.sport === filterSport) &&
-           (activity.name?.toLowerCase().includes(searchQuery.toLowerCase()));
-  }).sort((a, b) => {
-    if (sortOrder === 'Newest') return new Date(b.date) - new Date(a.date);
-    if (sortOrder === 'Oldest') return new Date(a.date) - new Date(b.date);
-    return 0;
-  });
+  const sorted = useMemo(() => {
+    const now = new Date();
+
+    const filtered = activities.filter((a) => {
+      const sportNorm = (a.sport || "").toLowerCase();
+
+      if (activityFilter === "Bike" && !["cycling", "bike"].includes(sportNorm)) return false;
+      if (activityFilter === "Run" && !["running", "run"].includes(sportNorm)) return false;
+      if (activityFilter === "Walk" && !["walking", "walk"].includes(sportNorm)) return false;
+
+      if (dateRange !== "All Time") {
+        const d = new Date(a.date);
+        if (isNaN(d)) return false;
+        const diffDays = (now - d) / (1000 * 60 * 60 * 24);
+        if (dateRange === "Last 7 Days" && diffDays > 7) return false;
+        if (dateRange === "Last 30 Days" && diffDays > 30) return false;
+        if (dateRange === "This Year" && d.getFullYear() !== now.getFullYear()) return false;
+      }
+
+      const title = (a.title || a.name || "").toLowerCase();
+      if (searchQuery && !title.includes(searchQuery.toLowerCase())) return false;
+
+      return true;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === "date") return new Date(b.date) - new Date(a.date);
+      if (sortBy === "distance") return (parseFloat(b.distance) || 0) - (parseFloat(a.distance) || 0);
+      if (sortBy === "time") return (b.durationSeconds || 0) - (a.durationSeconds || 0);
+      return 0;
+    });
+  }, [activities, sortBy, activityFilter, dateRange, searchQuery]);
+
+  const visible = sorted.slice(0, visibleCount);
+  const hasMore = sorted.length > visibleCount;
+
+  const summaryStats = useMemo(() => {
+    const total = activities.length;
+    const totalDist = activities.reduce((s, a) => s + (parseFloat(a.distance) || 0), 0);
+    const totalElev = activities.reduce((s, a) => s + (a.elevationGain || 0), 0);
+    const totalTime = activities.reduce((s, a) => s + (a.durationSeconds || 0), 0);
+    return { total, totalDist, totalElev, totalTime };
+  }, [activities]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: "easeOut" }}
-      className="container mx-auto p-4 md:p-8"
-    >
-      <h1 className="font-bebasNeue text-4xl text-text-primary mb-8 relative">
-        YOUR <span className="text-accent-orange">STAGES</span>
-        {/* Bicycle wheel SVG watermark */}
-        <svg
-          className="absolute top-1/2 left-0 -translate-y-1/2 w-48 h-48 text-surface-cards opacity-10"
-          viewBox="0 0 100 100"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <circle cx="50" cy="50" r="45" stroke="currentColor" strokeWidth="1" />
-          {/* Spokes - simplified */}
-          {Array.from({ length: 8 }).map((_, i) => (
-            <line
-              key={i}
-              x1="50"
-              y1="50"
-              x2={50 + 45 * Math.cos(i * Math.PI / 4)}
-              y2={50 + 45 * Math.sin(i * Math.PI / 4)}
-              stroke="currentColor"
-              strokeWidth="0.5"
-            />
-          ))}
-        </svg>
-      </h1>
-
-      {/* Filter Bar */}
-      <div className="bg-surface-cards p-4 rounded-lg shadow-md mb-8 flex flex-wrap gap-4 items-center">
-        {/* Sport Dropdown */}
-        <select
-          className="bg-bg-dark text-text-primary border border-chain-link-grey rounded-md p-2"
-          value={filterSport}
-          onChange={(e) => setFilterSport(e.target.value)}
-        >
-          <option>All</option>
-          <option>Cycling</option>
-          <option>Running</option>
-          <option>Swimming</option>
-        </select>
-        {/* Date Range Dropdown */}
-        <select
-          className="bg-bg-dark text-text-primary border border-chain-link-grey rounded-md p-2"
-          value={filterDateRange}
-          onChange={(e) => setFilterDateRange(e.target.value)}
-        >
-          <option>All Time</option>
-          <option>Last 30 Days</option>
-          <option>This Year</option>
-        </select>
-        {/* Search Input */}
-        <input
-          type="text"
-          placeholder="Search activities..."
-          className="bg-bg-dark text-text-primary border border-chain-link-grey rounded-md p-2 flex-grow"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
+    <div className="min-h-screen bg-[#080808]">
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute left-[60%] top-[-8%] h-[450px] w-[450px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.04)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-12%] left-[-5%] h-[350px] w-[350px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.03)_0%,transparent_72%)]" />
       </div>
 
-      {/* Sort Tabs */}
-      <div className="flex space-x-4 mb-8">
-        {['Newest', 'Oldest', 'Distance'].map((option) => (
-          <button
-            key={option}
-            onClick={() => setSortOrder(option)}
-            className={`px-4 py-2 rounded-full font-dmSans text-sm transition-colors
-              ${sortOrder === option ? 'bg-accent-orange text-white' : 'bg-bg-dark text-text-secondary hover:text-accent-orange'}`}
+      <div className="relative z-[1] mx-auto max-w-[1120px] px-4 pb-20 pt-10 md:px-6">
+        <motion.div
+          initial={{ opacity: 0, y: -14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-8"
+        >
+          <p className="font-dmSans mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#FF5500]/70">
+            Training Log
+          </p>
+          <h1 className="font-bebasNeue text-[clamp(3rem,7vw,5rem)] font-normal leading-none tracking-wide text-white">
+            YOUR <span className="text-[#FF5500]">ACTIVITIES</span>
+          </h1>
+          <div className="mt-3 h-[2px] w-9 rounded-full bg-[#FF5500]" />
+          <p className="font-dmSans mt-3 text-sm text-white/25">
+            Every ride, run, and walk — filtered like a performance board.
+          </p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4"
+        >
+          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+            <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total Activities</p>
+            <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{summaryStats.total}</p>
+          </div>
+          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+            <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total Distance</p>
+            <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{Math.round(summaryStats.totalDist)} km</p>
+          </div>
+          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+            <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total Elevation</p>
+            <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{Math.round(summaryStats.totalElev)} m</p>
+          </div>
+          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+            <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total Time</p>
+            <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{formatDuration(summaryStats.totalTime)}</p>
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.15 }}
+          className="mb-4 flex flex-wrap items-center gap-3"
+        >
+          <FilterSelect label="Sort by" value={sortBy} onChange={(e) => setSortBy(e.target.value)} options={SORT_OPTIONS} />
+          <FilterSelect
+            label="Activity"
+            value={activityFilter}
+            onChange={(e) => setActivityFilter(e.target.value)}
+            options={ACTIVITY_OPTIONS.map((o) => ({ label: o === "All" ? "All Activities" : o, value: o }))}
+          />
+          <input
+            type="text"
+            placeholder="Search activities..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="min-w-[200px] flex-1 rounded-xl border border-white/[0.10] bg-[#0D0D0D] px-3.5 py-2.5 text-sm font-medium text-white outline-none transition-all duration-200 placeholder:text-white/20 focus:border-[#FF5500]/50"
+          />
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.18 }}
+          className="mb-5 flex flex-wrap gap-2"
+        >
+          {DATE_RANGE_OPTIONS.map((opt) => {
+            const active = dateRange === opt;
+            return (
+              <button
+                key={opt}
+                onClick={() => setDateRange(opt)}
+                className={`rounded-full border px-4 py-1.5 text-xs font-semibold tracking-wide transition-all duration-200 ${
+                  active
+                    ? "border-[#FF5500] bg-[#FF5500] text-white"
+                    : "border-white/[0.10] bg-transparent text-white/50 hover:border-white/20"
+                }`}
+              >
+                {opt}
+              </button>
+            );
+          })}
+        </motion.div>
+
+        <p className="font-dmSans mb-4 text-[11px] text-white/20">
+          Showing {visible.length} of {sorted.length} activities
+        </p>
+
+        <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] overflow-hidden">
+          <div className="grid grid-cols-[56px_minmax(0,1.5fr)_100px_105px_85px_100px] gap-3 border-b border-white/[0.06] px-4 py-2.5 md:grid-cols-[72px_minmax(0,1.5fr)_110px_120px_100px_110px]">
+            {["Type", "Activity", "Distance", "Time", "Elev", "Date"].map((h) => (
+              <span
+                key={h}
+                className="font-dmSans text-[10px] font-bold uppercase tracking-[0.12em] text-white/20"
+              >
+                {h}
+              </span>
+            ))}
+          </div>
+
+          {loading ? (
+            <SkeletonRows />
+          ) : visible.length === 0 ? (
+            <div className="px-4 py-10 text-center">
+              <p className="font-dmSans text-sm text-white/20">No activities found.</p>
+            </div>
+          ) : (
+            <motion.div variants={stagger} initial="hidden" animate="show">
+              {visible.map((activity, index) => (
+                <ActivityRow key={activity._id || activity.id || index} activity={activity} index={index} />
+              ))}
+            </motion.div>
+          )}
+        </div>
+
+        {hasMore && (
+          <motion.button
+            onClick={() => setVisibleCount((c) => c + 12)}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#FF5500] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.08em] text-white transition-all duration-200 hover:bg-[#FF5500]/90 hover:shadow-[0_0_20px_rgba(255,85,0,0.15)]"
           >
-            {option}
-            {/* Chainring tooth icon placeholder */}
-            {sortOrder === option && <span className="ml-2">⚙️</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* Activity Count Chip */}
-      <p className="font-dmSans text-text-secondary text-lg mb-6">
-        Showing {filteredActivities.length} activities
-      </p>
-
-      {/* Activities List */}
-      <div className="grid grid-cols-1 gap-6">
-        {filteredActivities.length > 0 ? (
-          filteredActivities.map((activity, index) => (
-            <ActivityCard key={activity.id} activity={activity} index={index} />
-          ))
-        ) : (
-          <p className="text-text-secondary text-center">No activities found.</p>
+            Load More
+          </motion.button>
         )}
       </div>
-
-      {/* Load More Button (Placeholder) */}
-      {filteredActivities.length > 0 && (
-        <motion.button
-          className="mt-8 mx-auto block px-6 py-3 bg-accent-orange text-white rounded-md font-dmSans text-lg"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          Load More Stages
-        </motion.button>
-      )}
-    </motion.div>
+    </div>
   );
-};
-
-export default ActivitiesPage;
+}

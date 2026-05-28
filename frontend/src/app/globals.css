@@ -2,10 +2,13 @@
 @import "tailwindcss";
 
 :root {
-  /* Color Palette */
+  /* Color Palette — Orange-Black */
   --bg-dark: #000000;
   --surface-cards: #111318;
   --accent-orange: #FF6B00;
+  --accent-orange-light: #FF8C00;
+  --accent-orange-deep: #FF4500;
+  --accent-glow: rgba(255, 107, 0, 0.15);
   --text-primary: #E0E6EF;
   --text-secondary: #8F9BB3;
   --text-muted: #4A5568;

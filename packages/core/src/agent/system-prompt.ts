@@ -28,6 +28,12 @@ Parse depth keywords first, treat any remaining text as a scoping hint.
 4. Otherwise: the most recent activity (and any activities clustered with it under the sport-specific gap rule in the SOUL — 30 min for cycling, 60 min for running) form the session under review.
 5. If earlier same-day sessions exist, mention them briefly as load context — do not deep-review them.
 
+## Fallback when Strava API is unavailable
+If \`strava_fetch_activities\` returns an error (auth issue, rate limit, network error), do NOT immediately give up:
+1. If the athlete's query mentions a specific date, time, or named activity, try \`strava_search_history\` with the details they provided — the knowledge base may contain the synced activity data despite the Strava API being down.
+2. If the query is general (e.g., "review my last ride") and the Strava API fails, call \`strava_search_history\` with a query like "most recent ride" or "latest training session" to find the activity in the synced knowledge base.
+3. If \`strava_search_history\` also returns no results or an error, then report the Strava issue to the athlete with the appropriate friendly error message.
+
 ## Multi-activity sessions (1–3 activities clustered)
 A session may span 2–3 activities (e.g., a runner's warmup + intervals + cooldown). Treat them as a single unit. For per-rep insight at Tier B+, fetch detail only on the main activity. Warmup and cooldown files typically have no data worth reviewing separately. Never fetch detail on every file in the cluster.
 
@@ -82,7 +88,7 @@ These are Peaksware trademarks; do not surface the abbreviations in athlete-faci
 
 ## Edge cases
 - Re-review same activity: just review again. Cost is low.
-- \`strava_fetch_activities\` returns \`{ error: ... }\`: relay the error to the athlete in plain language; do not invent a review. Translate the raw \`error.kind\` to a friendly phrase: \`Unauthorized\` → "I don't have access to your Strava account", \`RateLimit\` → "Strava rate-limited me — try again in a minute", \`NotFound\` → "couldn't find that activity", \`Network\` / \`Timeout\` → "couldn't reach Strava", anything else → "something went wrong fetching your data". Never surface the raw \`kind\` token.`;
+- \`strava_fetch_activities\` returns \`{ error: ... }\`: first try the fallback (use \`strava_search_history\` to find the activity in the knowledge base). Only relay the error to the athlete if \`strava_search_history\` also fails. When relaying, translate the raw \`error.kind\` to a friendly phrase: \`Unauthorized\` → "I don't have access to your Strava account", \`RateLimit\` → "Strava rate-limited me — try again in a minute", \`NotFound\` → "couldn't find that activity", \`Network\` / \`Timeout\` → "couldn't reach Strava", anything else → "something went wrong fetching your data". Never surface the raw \`kind\` token.`;
 
 export function buildSystemPrompt(
   persona: SportPersona,
@@ -99,11 +105,11 @@ You have direct access to the athlete's Strava account via these tools:
 - \`strava_fetch_athlete\` — fetch athlete profile (FTP, weight, etc.)
 - \`strava_fetch_activities\` — fetch recent/past activities from Strava directly (always use this for "recent rides", "last workout", "what did I do" questions)
 - \`strava_fetch_activity\` — fetch detailed metrics + laps for a specific activity by ID
-- \`strava_search_history\` — semantic search over the athlete's full activity history
+- \`strava_search_history\` — semantic search over the athlete's full activity history stored in the knowledge base (Pinecone). This contains synced activity data and works even when the Strava API is down.
 
-When the athlete asks about recent rides, their last workout, or any time-sensitive query, always call \`strava_fetch_activities\` rather than relying on the Retrieved History section (which may contain older activities).
+When the athlete asks about recent rides, their last workout, or any time-sensitive query, always call \`strava_fetch_activities\` rather than relying on the Retrieved History section (which may contain older activities). If \`strava_fetch_activities\` fails, use \`strava_search_history\` as a fallback — the knowledge base has the athlete's synced activities.
 
-IMPORTANT: When calling \`strava_fetch_activity\` to get details, always use the exact \`id\` field from the result of \`strava_fetch_activities\`. Do NOT use IDs from the Retrieved History section or any other source — they may be stale or deleted from Strava.`;
+IMPORTANT: When calling \`strava_fetch_activity\` to get details, always use the exact \`id\` field from the result of \`strava_fetch_activities\`. Do NOT use IDs from the Retrieved History section or \`strava_search_history\` results — they may be stale or deleted from Strava. IDs from \`strava_search_history\` are MongoDB IDs, not Strava IDs, so they cannot be used with \`strava_fetch_activity\`.`;
 
   const parts = [persona.soul];
 

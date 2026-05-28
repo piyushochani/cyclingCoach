@@ -23,8 +23,12 @@ const ProfileContainer = ({ user }) => {
       <div className="flex flex-col items-center text-center">
         <div className="relative mb-4 h-[92px] w-[92px]">
           <div className="absolute inset-0 rounded-full bg-[conic-gradient(#FF7A1A_60%,rgba(255,122,26,0.15)_60%)]" />
-          <div className="absolute inset-[4px] flex items-center justify-center rounded-full border-4 border-black bg-[#111111]">
-            <span className="text-2xl font-bold text-[#FF7A1A]">{initials}</span>
+          <div className="absolute inset-[4px] flex items-center justify-center overflow-hidden rounded-full border-4 border-black bg-[#111111]">
+            {user?.profileImage ? (
+              <img src={user.profileImage} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-2xl font-bold text-[#FF7A1A]">{initials}</span>
+            )}
           </div>
         </div>
 

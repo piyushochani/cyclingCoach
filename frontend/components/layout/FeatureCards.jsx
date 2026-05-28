@@ -26,13 +26,12 @@ const featureCardData = [
     ),
   },
   {
-    title: "Performance Coins",
+    title: "Performance Analytics",
     description:
-      "Earn rewards for every hard effort, milestone, and breakthrough, turning consistency into visible momentum.",
+      "Deep insights into power, endurance, and form with precision charts and trend analysis across every training block.",
     icon: (
       <svg className="h-11 w-11 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="9" strokeWidth="1.8" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9.5 14.5c.7.9 1.8 1.4 3.1 1.4 1.6 0 2.9-.8 2.9-2 0-1.3-1.1-1.8-3.1-2.3-1.7-.5-2.8-.9-2.8-2.2 0-1.2 1.1-2 2.7-2 1.1 0 2.1.4 2.8 1.1M12 6.5v11" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2Zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2Z" />
       </svg>
     ),
   },

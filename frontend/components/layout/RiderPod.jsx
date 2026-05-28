@@ -16,12 +16,6 @@ const RiderPod = ({ activities = [], stats = null }) => {
     .reduce((sum, a) => sum + a.distance, 0)
     .toFixed(0);
 
-  const coins = Math.floor(
-    (stats?.totalDistance || 0) * 10 +
-    (stats?.totalElevation || 0) * 0.5 +
-    (stats?.activityCount || 0) * 50
-  );
-
   const achievements = Math.min(stats?.activityCount || 0, 50);
 
   return (
@@ -71,8 +65,8 @@ const RiderPod = ({ activities = [], stats = null }) => {
         {/* Stats Grid */}
         <div className="col-span-2 grid grid-cols-2 gap-4">
           <div className="bg-bg-dark p-4 rounded-md text-center">
-            <p className="font-bebasNeue text-3xl text-accent-orange">{coins.toLocaleString()}</p>
-            <p className="font-dmSans text-sm text-text-secondary">Coins</p>
+            <p className="font-bebasNeue text-3xl text-accent-orange">{stats ? Math.round(stats.totalDistance).toLocaleString() : '--'}</p>
+            <p className="font-dmSans text-sm text-text-secondary">Total KM</p>
           </div>
           <div className="bg-bg-dark p-4 rounded-md text-center">
             <p className="font-bebasNeue text-3xl text-text-primary">{monthlyKm} KM</p>

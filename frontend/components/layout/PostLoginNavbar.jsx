@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
+import { getSyncStatus, getLastSyncTimeFormatted, triggerGlobalSync } from '../../lib/useAutoSync';
 
 const navLinks = [
   { name: 'Dashboard', href: '/dashboard' },
@@ -19,12 +20,14 @@ const navLinks = [
 
 const dropdownItems = [
   { type: 'link', name: 'Profile', href: '/profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+  { type: 'link', name: 'Notifications', href: '/notifications', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
   { type: 'link', name: 'Settings', href: '/settings', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
   { type: 'link', name: 'Help', href: '/help', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
   { type: 'link', name: 'Gears', href: '/gears', icon: 'M9 3v2m6-2v2M9 21v2m6-2v2M5 7h14M5 17h14M3 9h2m14 0h2M3 15h2m14 0h2M7 5h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2z' },
   { type: 'link', name: 'Expenses', href: '/expenses', icon: 'M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6' },
   { type: 'link', name: 'Change Password', href: '/change-password', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
   { type: 'action', name: 'Refresh', icon: 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15', action: 'refresh' },
+  { type: 'action', name: 'Re-authorize Strava', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', action: 'reauth' },
 ];
 
 const PostLoginNavbar = () => {
@@ -32,11 +35,13 @@ const PostLoginNavbar = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [userName, setUserName] = useState("User");
   const [userInitials, setUserInitials] = useState("U");
+  const [userProfileImage, setUserProfileImage] = useState(null);
+  const [notifCount, setNotifCount] = useState(0);
   const dropdownRef = useRef(null);
   const pathname = usePathname();
   const router = useRouter();
 
-  useEffect(() => {
+  const loadFromStorage = useCallback(() => {
     const stored = localStorage.getItem("cycloai_user");
     if (stored) {
       try {
@@ -45,9 +50,34 @@ const PostLoginNavbar = () => {
         setUserName(name);
         const full = u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : name;
         setUserInitials(full.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2));
+        setUserProfileImage(u.profileImage || null);
       } catch {}
     }
   }, []);
+
+  const loadNotifCount = useCallback(() => {
+    try {
+      const stored = localStorage.getItem("cycloai_notifications");
+      if (stored) {
+        const list = JSON.parse(stored);
+        setNotifCount(list.filter(n => !n.read).length);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
+
+  useEffect(() => { loadNotifCount(); }, [loadNotifCount]);
+
+  useEffect(() => {
+    const handler = () => loadFromStorage();
+    window.addEventListener("storage", handler);
+    window.addEventListener("notifications-updated", loadNotifCount);
+    return () => {
+      window.removeEventListener("storage", handler);
+      window.removeEventListener("notifications-updated", loadNotifCount);
+    };
+  }, [loadFromStorage, loadNotifCount]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -59,17 +89,30 @@ const PostLoginNavbar = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const [syncing, setSyncing] = useState(false);
+  const [syncing, setSyncing] = useState(() => getSyncStatus() === "syncing");
+
+  useEffect(() => {
+    const onStatus = (e) => {
+      setSyncing(e.detail === "syncing");
+    };
+    window.addEventListener("sync-status-change", onStatus);
+    return () => window.removeEventListener("sync-status-change", onStatus);
+  }, []);
 
   const handleRefresh = async () => {
     if (syncing) return;
-    setSyncing(true);
+    setIsDropdownOpen(false);
+    const ok = await triggerGlobalSync();
+    if (ok) setTimeout(() => window.location.reload(), 2000);
+  };
+
+  const handleReauth = async () => {
     setIsDropdownOpen(false);
     try {
-      await api.post('/sync/refresh', {});
-      window.location.reload();
+      const { url } = await api.get('/strava/auth-url');
+      window.open(url, '_blank');
     } catch {
-      window.location.reload();
+      alert('Failed to get Strava authorization URL.');
     }
   };
 
@@ -80,24 +123,17 @@ const PostLoginNavbar = () => {
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 flex h-20 items-center justify-between border-b border-[#FF4C00]/20 bg-[#0A0A0A] px-8 shadow-[0_0_20px_rgba(255,76,0,0.08)] md:px-16">
-      {/* CycloAI Logo */}
+      {/* Logo */}
       <Link href="/dashboard">
         <motion.div
           className="flex items-center cursor-pointer"
           whileHover={{ scale: 1.05 }}
         >
-          <motion.svg
-            className="w-8 h-8 text-[#FF4C00] mr-2"
-            viewBox="0 0 100 100"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-          >
-            <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" fill="none" />
-            <path d="M50 10 L50 90 M15 50 L85 50" stroke="currentColor" strokeWidth="4" />
-          </motion.svg>
-          <span className="font-barlowCondensed text-2xl text-white uppercase tracking-wide">
-            Cyclo<span className="text-[#FF4C00]">AI</span>
-          </span>
+          <img
+            src="/images/cyclogen_logo.png"
+            alt="Cyclogen"
+            className="h-15 w-40"
+          />
         </motion.div>
       </Link>
 
@@ -127,17 +163,26 @@ const PostLoginNavbar = () => {
 
       {/* Right side: Notifications, Profile Dropdown, Mobile Toggle */}
       <div className="flex items-center space-x-3">
-        <button className="rounded-lg p-2 text-white/50 transition-colors hover:bg-white/5 hover:text-[#FF4C00]">
+        <Link href="/notifications" className="relative rounded-lg p-2 text-white/50 transition-colors hover:bg-white/5 hover:text-[#FF4C00]">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-        </button>
+          {notifCount > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-[#FF5500] px-1 py-0.5 font-dmSans text-[10px] font-bold leading-none text-white">
+              {notifCount > 9 ? "9+" : notifCount}
+            </span>
+          )}
+        </Link>
 
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="flex items-center space-x-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 transition hover:border-white/20 hover:bg-white/[0.06]"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#FF4C00]/20 text-xs font-semibold text-[#FF4C00]">
-              {userInitials}
+            <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[#FF4C00]/20 text-xs font-semibold text-[#FF4C00]">
+              {userProfileImage ? (
+                <img src={userProfileImage} alt="" className="h-full w-full object-cover" />
+              ) : (
+                userInitials
+              )}
             </div>
             <span className="hidden text-sm text-white/70 md:inline">{userName}</span>
             <motion.svg
@@ -174,13 +219,13 @@ const PostLoginNavbar = () => {
                   ) : (
                     <button
                       key={item.name}
-                      onClick={handleRefresh}
+                      onClick={item.action === 'reauth' ? handleReauth : handleRefresh}
                       className="flex w-full items-center gap-3 px-4 py-2.5 font-dmSans text-sm text-white/70 transition hover:bg-white/5 hover:text-white"
                     >
                       <svg className="h-4 w-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} />
                       </svg>
-                      {syncing ? "Syncing..." : item.name}
+                      {item.action === 'refresh' && syncing ? "Syncing..." : item.name}
                     </button>
                   )
                 )}
@@ -255,13 +300,13 @@ const PostLoginNavbar = () => {
                 ) : (
                   <button
                     key={item.name}
-                    onClick={() => { setIsMobileMenuOpen(false); handleRefresh(); }}
+                    onClick={() => { setIsMobileMenuOpen(false); item.action === 'reauth' ? handleReauth() : handleRefresh(); }}
                     className="flex items-center gap-3 rounded-lg px-4 py-3 font-dmSans text-white/60 transition hover:bg-white/5 hover:text-white"
                   >
                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} />
                     </svg>
-                    {syncing ? "Syncing..." : item.name}
+                    {item.action === 'refresh' && syncing ? "Syncing..." : item.name}
                   </button>
                 )
               )}
