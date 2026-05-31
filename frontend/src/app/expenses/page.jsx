@@ -158,30 +158,11 @@ export default function ExpensesPage() {
           transition={{ duration: 0.5 }}
           style={{ marginBottom: "2.5rem" }}
         >
-          <p
-            style={{
-              margin: "0 0 10px",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: "#FF5500",
-            }}
-          >
+          <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Finance
           </p>
 
-          <h1
-            style={{
-              fontFamily: "'Bebas Neue', 'Impact', sans-serif",
-              fontSize: "clamp(3rem, 7vw, 5rem)",
-              fontWeight: 400,
-              letterSpacing: "0.04em",
-              lineHeight: 0.95,
-              margin: "0 0 14px",
-              color: "#fff",
-            }}
-          >
+          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
             YOUR <span style={{ color: "#FF5500" }}>EXPENSES</span>
           </h1>
 

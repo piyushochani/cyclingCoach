@@ -14,7 +14,7 @@ const RiderPod = ({ activities = [], stats = null }) => {
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     })
     .reduce((sum, a) => sum + a.distance, 0)
-    .toFixed(0);
+    .toFixed(2);
 
   const achievements = Math.min(stats?.activityCount || 0, 50);
 
@@ -65,7 +65,7 @@ const RiderPod = ({ activities = [], stats = null }) => {
         {/* Stats Grid */}
         <div className="col-span-2 grid grid-cols-2 gap-4">
           <div className="bg-bg-dark p-4 rounded-md text-center">
-            <p className="font-bebasNeue text-3xl text-accent-orange">{stats ? Math.round(stats.totalDistance).toLocaleString() : '--'}</p>
+            <p className="font-bebasNeue text-3xl text-accent-orange">{stats ? stats.totalDistance.toFixed(2) : '--'}</p>
             <p className="font-dmSans text-sm text-text-secondary">Total KM</p>
           </div>
           <div className="bg-bg-dark p-4 rounded-md text-center">
@@ -74,7 +74,7 @@ const RiderPod = ({ activities = [], stats = null }) => {
           </div>
           <div className="bg-bg-dark p-4 rounded-md text-center">
             <p className="font-bebasNeue text-3xl text-text-primary">
-              {stats ? Math.min(100, Math.round((stats.totalDistance / 5000) * 100)) : '--'}
+              {stats ? Math.min(100, ((stats.totalDistance / 5000) * 100).toFixed(2)) : '--'}
             </p>
             <p className="font-dmSans text-sm text-text-secondary">Performance</p>
           </div>

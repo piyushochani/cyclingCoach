@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../../lib/api";
 
@@ -45,12 +45,22 @@ const publicPaths = ["/", "/login", "/signup", "/forgot-password", "/connect", "
 
 export default function StravaConnectOverlay({ children }: { children: React.ReactNode }) {
   const [stravaConnected, setStravaConnected] = useState<boolean | null>(null);
+  const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const [authError, setAuthError] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     api.get("/strava/status")
-      .then((res: any) => setStravaConnected(res?.connected === true))
+      .then((res: any) => {
+        const connected = res?.connected === true;
+        setStravaConnected(connected);
+        if (!connected) {
+          api.get("/strava/auth-url")
+            .then((r: any) => setAuthUrl(r?.url ?? null))
+            .catch(() => setAuthError(true));
+        }
+      })
       .catch(() => setStravaConnected(false));
   }, []);
 
@@ -61,8 +71,17 @@ export default function StravaConnectOverlay({ children }: { children: React.Rea
     []
   );
 
+  const hasPrevSync = useMemo(() => {
+    try {
+      const stored = localStorage.getItem("cycloai_user");
+      if (!stored) return false;
+      const u = JSON.parse(stored);
+      return !!(u.stravaUpdatedAt || u.isStravaUpToDate);
+    } catch { return false; }
+  }, []);
+
   if (stravaConnected === null) return <>{children}</>;
-  if (stravaConnected || isPublic) return <>{children}</>;
+  if (hasPrevSync || stravaConnected || isPublic) return <>{children}</>;
 
   return (
     <div className="relative min-h-screen">
@@ -79,7 +98,7 @@ export default function StravaConnectOverlay({ children }: { children: React.Rea
           initial={{ opacity: 0, scale: 0.92, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.4, ease: "easeOut" }}
-          className="relative w-full max-w-md rounded-3xl border border-white/[0.08] bg-[#0D0D0D]/95 p-8 shadow-2xl backdrop-blur-xl"
+          className="relative w-full max-w-md rounded-3xl border border-white/[0.08] bg-surface-cards/95 p-8 shadow-2xl backdrop-blur-xl"
         >
           <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#FF5500]/10 blur-3xl" />
           <div className="absolute -bottom-16 -left-16 h-32 w-32 rounded-full bg-[#FF5500]/5 blur-3xl" />
@@ -99,15 +118,30 @@ export default function StravaConnectOverlay({ children }: { children: React.Rea
               Connect with Strava to get started with personalised training
             </p>
 
-            <button
-              onClick={() => router.push("/connect")}
-              className="mt-6 inline-flex items-center gap-2.5 rounded-xl bg-[#FF5500] px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white transition-all duration-200 hover:bg-[#FF5500]/90 hover:shadow-[0_0_30px_rgba(255,85,0,0.2)]"
-            >
-              <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172H17.48l-2.093 4.116zM8.614 17.944l2.089-4.116h3.065L8.614 24l-5.15-10.172h2.058l2.093 4.116z" />
-              </svg>
-              Connect with Strava
-            </button>
+            {authError ? (
+              <button
+                onClick={() => router.push("/connect")}
+                className="mt-6 inline-flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white/50 transition-all duration-200 hover:bg-white/10"
+              >
+                Open Connect Page
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  if (authUrl) {
+                    window.open(authUrl, "_blank");
+                  } else {
+                    router.push("/connect");
+                  }
+                }}
+                className="mt-6 inline-flex items-center gap-2.5 rounded-xl bg-[#FF5500] px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white transition-all duration-200 hover:bg-[#FF5500]/90 hover:shadow-[0_0_30px_rgba(255,85,0,0.2)]"
+              >
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172H17.48l-2.093 4.116zM8.614 17.944l2.089-4.116h3.065L8.614 24l-5.15-10.172h2.058l2.093 4.116z" />
+                </svg>
+                Connect with Strava
+              </button>
+            )}
           </div>
         </motion.div>
       </div>

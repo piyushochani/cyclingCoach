@@ -30,6 +30,12 @@ export class BestEffortRecord extends Document {
   @Prop({ default: 'fastest' })
   category: string;
 
+  @Prop()
+  previousBest: number;
+
+  @Prop({ default: false })
+  isNew: boolean;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   user: MongooseSchema.Types.ObjectId;
 }

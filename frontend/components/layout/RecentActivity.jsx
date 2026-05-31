@@ -22,7 +22,7 @@ function formatDate(value) {
 
 function formatDistance(value) {
   if (value === null || value === undefined || Number.isNaN(Number(value))) return "—";
-  return `${Number(value).toFixed(1)} km`;
+  return `${(Number(value) / 1000).toFixed(2)} km`;
 }
 
 function formatDuration(durationSeconds, fallbackDuration) {
@@ -88,7 +88,7 @@ export default function RecentActivity({ activities = [] }) {
                     animate="rest"
                     variants={rowMotion}
                     transition={{ duration: 0.18, ease: "easeOut" }}
-                    className="grid grid-cols-4 gap-3 border-b border-white/6 px-4 py-3 transition-colors duration-200 hover:bg-[#FF4C00]/10 md:px-5"
+                    className="grid grid-cols-4 gap-3 border-b border-white/6 px-4 py-3 transition-colors duration-200 hover:bg-[#FF5500]/10 md:px-5"
                   >
                     <div className="font-dmSans text-sm text-white/55">
                       {formatDate(activity?.date)}
@@ -120,7 +120,7 @@ export default function RecentActivity({ activities = [] }) {
       <div className="mt-5 flex justify-center">
         <Link
           href="/activities"
-          className="inline-flex items-center justify-center rounded-full border border-[#FF4C00]/30 bg-[#FF4C00]/10 px-5 py-2.5 font-dmSans text-sm font-medium text-[#FF4C00] transition-all duration-200 hover:bg-[#FF4C00]/20 hover:text-white"
+          className="inline-flex items-center justify-center rounded-full border border-[#FF5500]/30 bg-[#FF5500]/10 px-5 py-2.5 font-dmSans text-sm font-medium text-[#FF5500] transition-all duration-200 hover:bg-[#FF5500]/20 hover:text-white"
         >
           See More
         </Link>

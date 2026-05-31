@@ -44,7 +44,7 @@ function buildDayData(start, dayOffset, dayActivities) {
     const totalSec = a.durationSeconds || 0;
     const dist = a.distance || 0;
     const timeStr = `${Math.floor(totalSec / 3600)}h ${Math.floor((totalSec % 3600) / 60)}m`;
-    return { day: dayName, date: dateStr, activity: a.name || "Activity", time: timeStr, distance: dist ? `${dist.toFixed(1)} km` : "—" };
+    return { day: dayName, date: dateStr, activity: a.name || "Activity", time: timeStr, distance: dist ? `${(dist / 1000).toFixed(2)} km` : "—" };
   }
   return { day: dayName, date: dateStr, activity: "Rest", time: "—", distance: "—" };
 }
@@ -75,7 +75,7 @@ function buildWeeklyData(activities) {
         dayBuckets: {},
       };
     }
-    weeks[key].km += a.distance || 0;
+    weeks[key].km += (a.distance || 0) / 1000;
     weeks[key].hrs += (a.durationSeconds || 0) / 3600;
     weeks[key].elev += a.elevationGain || 0;
     const dayName = DAY_NAMES[(d.getDay() + 6) % 7];
@@ -139,7 +139,7 @@ const controlButtonStyle = (variant = "default", disabled = false) => ({
     disabled
       ? "#374151"
       : variant === "accent"
-      ? "#FF4C00"
+      ? "#FF5500"
       : "#D1D5DB",
   fontFamily: "'DM Sans', sans-serif",
   fontSize: 12,
@@ -247,7 +247,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
             margin: 0,
           }}
         >
-          WEEKLY <span style={{ color: "#FF4C00" }}>STATISTICS</span>
+          WEEKLY <span style={{ color: "#FF5500" }}>STATISTICS</span>
         </h2>
 
         <div
@@ -270,6 +270,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
           <button
             type="button"
             style={controlButtonStyle("default")}
+            onClick={() => window.dispatchEvent(new CustomEvent("openai-chat", { detail: { command: "/week" } }))}
           >
             <span>✨</span>
             <span>AI Review</span>
@@ -323,14 +324,14 @@ export default function WeeklyGraph({ activities: apiActivities }) {
       <div style={{ paddingTop: 12, paddingBottom: 12 }}>
         <div style={{ display: "flex", gap: 40, flexWrap: "wrap", justifyContent: "center" }}>
           {[
-            { label: "Distance", val: activeWeek ? activeWeek.km : 0, unit: "km", decimals: 1, color: "white" },
+            { label: "Distance", val: activeWeek ? activeWeek.km : 0, unit: "km", decimals: 2, color: "white" },
             {
               label: "Time",
               val: null,
               display: activeWeek ? `${Math.floor(activeWeek.hrs)}h ${Math.round((activeWeek.hrs % 1) * 60)}m` : "—",
               color: "white"
             },
-            { label: "Elevation Gain", val: activeWeek ? activeWeek.elev : 0, unit: "m", decimals: 0, color: "white" },
+            { label: "Elevation Gain", val: activeWeek ? activeWeek.elev : 0, unit: "m", decimals: 2, color: "white" },
             { label: "Activities", val: activeWeek ? activeWeek.activities.length : 0, unit: "", decimals: 0, color: "white" },
           ].map((s, i) => (
             <motion.div
@@ -352,7 +353,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
               }}>
                 {s.display ? s.display : (
                   <>
-                    <span>{s.val}</span>
+                    <span>{(typeof s.val === 'number' ? s.val.toFixed(s.decimals ?? 0) : s.val)}</span>
                     <span style={{ fontSize: 22 }}> {s.unit}</span>
                   </>
                 )}
@@ -422,7 +423,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
           <motion.path
             d={linePath}
             fill="none"
-            stroke="#FF4C00"
+            stroke="#FF5500"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -459,7 +460,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                   cx={p.x}
                   cy={p.y}
                   r={r}
-                  fill="#FF4C00"
+                  fill="#FF5500"
                   stroke={isActive ? "white" : "transparent"}
                   strokeWidth={isActive ? 2 : 0}
                   style={{ transition: "r 0.12s" }}
@@ -509,7 +510,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                     x={tx + tipW / 2}
                     y={ty + 14}
                     textAnchor="middle"
-                    fill="#FF4C00"
+                    fill="#FF5500"
                     style={{
                       fontFamily: "'DM Sans',sans-serif",
                       fontSize: 10,
@@ -672,7 +673,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                       fontFamily: "'DM Sans',sans-serif",
                       fontSize: 13,
                       letterSpacing: 1.5,
-                      color: "#FF4C00",
+                      color: "#FF5500",
                       textAlign: "center",
                       marginBottom: 6,
                     }}
@@ -728,7 +729,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                       fontFamily: "'DM Sans',sans-serif",
                       fontSize: 13,
                       letterSpacing: 1.5,
-                      color: "#FF4C00",
+                      color: "#FF5500",
                       textAlign: "center",
                       marginBottom: 6,
                     }}
@@ -799,7 +800,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                     fontFamily: "'DM Sans',sans-serif",
                     fontSize: 13,
                     letterSpacing: 1.5,
-                    color: "#FF4C00",
+                    color: "#FF5500",
                     textAlign: "center",
                   }}
                 >

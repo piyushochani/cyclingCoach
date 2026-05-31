@@ -80,7 +80,7 @@ const PaceBotChat = () => {
     if (isOpen && pendingCommandRef.current) {
       const cmd = pendingCommandRef.current;
       pendingCommandRef.current = null;
-      sendAnalysis(cmd);
+      sendToAgent(cmd);
     }
   }, [isOpen]);
 
@@ -92,31 +92,16 @@ const PaceBotChat = () => {
     scrollToBottom();
   }, [messages, loading]);
 
-  const sendAnalysis = async (cmd) => {
-    const trimmed = cmd.trim();
+  const sendToAgent = async (msg) => {
+    const trimmed = msg.trim();
     if (!trimmed) return;
 
     setMessages((prev) => [...prev, { id: Date.now(), sender: 'user', text: trimmed }]);
     setLoading(true);
 
-    const activityType = trimmed.startsWith('/month') ? 'monthly'
-      : trimmed.startsWith('/week') ? 'weekly'
-      : trimmed.startsWith('/day') ? 'daily'
-      : 'chat';
-
     try {
-      let activities = [];
-      try {
-        const data = await api.get('/activities');
-        activities = (data || []).slice(0, 50);
-      } catch {}
-
-      const res = await api.post('/analysis', {
-        type: activityType,
-        activities,
-        message: trimmed,
-      });
-      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: res?.analysis || 'No response.' }]);
+      const res = await api.post('/agent/chat', { message: trimmed });
+      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: res?.text || 'No response.' }]);
     } catch {
       setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: 'Sorry, I encountered an error processing your request.' }]);
     } finally {
@@ -128,7 +113,7 @@ const PaceBotChat = () => {
     if (!inputMessage.trim() || loading) return;
     const msg = inputMessage.trim();
     setInputMessage('');
-    sendAnalysis(msg);
+    sendToAgent(msg);
   };
 
   return (

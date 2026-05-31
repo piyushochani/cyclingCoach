@@ -1,9 +1,15 @@
 import { Controller, Post, Body, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { SyncService } from '../sync/sync.service';
+
+const SYNC_MONTHS = parseInt(process.env.STRAVA_SYNC_MONTHS || '6', 10);
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly syncService: SyncService,
+  ) {}
 
   @Post('signup-request')
   async signupRequest(@Body() body: { email: string }) {
@@ -46,6 +52,34 @@ export class AuthController {
     if (!body.email || !body.password) throw new BadRequestException('Email and password are required');
     const user = await this.authService.login(body.email, body.password);
     if (!user) throw new UnauthorizedException('Invalid email or password');
+
+    // Auto-sync on login
+    if (user.stravaUpdatedAt) {
+      const cutoff = new Date(Date.now() - SYNC_MONTHS * 30 * 24 * 3600 * 1000);
+      const lastActivity = await this.syncService.getLatestActivityDate(user._id as any);
+      const isUpToDate = user.isStravaUpToDate && lastActivity && lastActivity >= cutoff;
+      console.log(`\n  ╔══════════════════════════════════════════╗`);
+      console.log(`  ║         Strava Sync Status               ║`);
+      console.log(`  ╠══════════════════════════════════════════╣`);
+      console.log(`  ║  Last synced : ${(user.stravaUpdatedAt?.toISOString().slice(0, 19) || 'never').padEnd(25)}║`);
+      console.log(`  ║  Up to date  : ${String(isUpToDate).padEnd(25)}║`);
+      console.log(`  ║  Window      : ${`${SYNC_MONTHS} months`.padEnd(25)}║`);
+      console.log(`  ╚══════════════════════════════════════════╝\n`);
+
+      if (!isUpToDate) {
+        console.log('  → Auto-triggering incremental sync...');
+        this.syncService.incrementalSync(user._id as any).then((r) => {
+          console.log(`  → Sync complete: ${r.newActivities} new activities`);
+        }).catch(() => {});
+      }
+    } else {
+      console.log(`\n  ╔══════════════════════════════════════════╗`);
+      console.log(`  ║         Strava Sync Status               ║`);
+      console.log(`  ╠══════════════════════════════════════════╣`);
+      console.log(`  ║  Never synced                            ║`);
+      console.log(`  ╚══════════════════════════════════════════╝\n`);
+    }
+
     return {
       id: user._id,
       firstName: user.firstName || (user as any).name || '',
@@ -58,6 +92,8 @@ export class AuthController {
       goal: user.goal,
       cyclingYears: user.cyclingYears,
       ftp: user.ftp,
+      stravaUpdatedAt: user.stravaUpdatedAt,
+      isStravaUpToDate: user.isStravaUpToDate,
     };
   }
 

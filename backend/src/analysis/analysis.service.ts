@@ -1,4 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { join } from 'path';
+import { homedir } from 'os';
+import { existsSync, readFileSync } from 'fs';
+import { parse as parseYaml } from 'yaml';
+import { ContextBuilderService } from './context-builder.service';
+import { DataProcessorService, computeHRZoneBoundaries } from './data-processor.service';
+import { User } from '../user/user.schema';
+import { logKeyHealth } from '../common/gemini-key-validator';
 
 const DAILY_PROMPT = `# Daily Review
 
@@ -12,14 +22,16 @@ You are reviewing a single day of training for a cyclist. The athlete did one or
 ## What to cover
 1. **Session summary** — what the athlete did, total volume (distance, time, elevation)
 2. **Quality assessment** — did the session hit its likely intent? (endurance, intervals, recovery, race)
-3. **Key metrics** — distance, duration, avg speed, elevation, any notable power/HR data if available
-4. **One actionable insight** — what to carry forward or adjust tomorrow
+3. **Key metrics** — distance, duration, avg speed, pace, elevation, cadence rate if available, gradient, terrain classification, power/HR data if available, session type classification
+4. **Weather & terrain context** — note indoor/outdoor, terrain profile, any weather data
+5. **One actionable insight** — what to carry forward or adjust tomorrow, for this check the week schedule as well
 
 ## Output style
 - 3–5 concise bullet points or a short paragraph
 - Focus on actionable takeaways, not raw numbers
-- Use cycling terminology naturally (FTP, Z2, sweet spot, threshold, VO2, endurance, recovery)
-- If the data includes power/HR metrics, reference zones and decoupling
+- Don't highlight the distance, time and calories as the user is already aware of that, just mention it.
+- Use cycling terminology naturally (FTP, Z2, sweet spot, threshold, VO2, endurance, recovery, intervals, sprint session)
+- If the data includes power/HR metrics, cadence rate, elevation reference zones and decoupling
 
 ## Edge cases
 - **Rest day** (no activities): acknowledge the rest and its role in the training cycle
@@ -38,13 +50,24 @@ You are reviewing a full week of training for a cyclist. Look at the week holist
 ## What to cover
 1. **Weekly totals** — distance, time, elevation, activity count, days ridden
 2. **Consistency** — how many active days, any back-to-back hard days, rest day placement
-3. **Intensity distribution** — what fraction was endurance (Z1–Z2), tempo (Z3), sweet spot (Z4), threshold (Z5+)
-4. **Load trend** — how this week compares to the previous 2–3 weeks (rising, holding, declining)
-5. **Recovery signal** — are there signs of fatigue (declining performance, skipped sessions, higher HR at same power)?
-6. **One recommendation** — what to adjust for next week
+3. **Intensity distribution** — what fraction was endurance/recovery, tempo, sweet spot, threshold/VO2, race
+4. **Terrain & weather patterns** — indoor vs outdoor split, terrain types encountered
+5. **Load trend** — how this week compares to the previous 2–3 weeks (rising, holding, declining)
+6. **Recovery signal** — are there signs of fatigue (declining performance, skipped sessions, higher HR at same power)?
+7. **One recommendation** — what to adjust for next week
+8. **What was intended in this week and why is it helpful for you.
 
 ## Output style
 - Short paragraph summary (2–3 sentences) followed by 4–6 bullet points
+- The exact format is:
+  (Title of the ride)
+  Date
+  Distance
+  Average speed
+  Calories
+  Ride type(endurance, intervals, recovery, race, mixed, VO2 max, FTP test, etc)
+  Zone Split if HR data is there(Eg: 30 mins Z2 + 10mins Z4 + 5mins Z2 + 10mins Z4 + 30 mins Z2 recovery)
+  Summary
 - Lead with the big picture — was this a productive, maintenance, or recovery week?
 - Reference the previous week for context when available
 - Use cycling terminology naturally
@@ -68,11 +91,12 @@ You are reviewing a full month of training for a cyclist. Evaluate trends, progr
 1. **Monthly totals** — distance, time, elevation, activity count, days ridden
 2. **Volume trend** — how total distance and time compare to the previous month (+, -, or flat)
 3. **Frequency & consistency** — active days, longest streak, rest day cadence
-4. **Intensity breakdown** — estimated distribution across endurance, tempo, threshold, VO2, race efforts
-5. **Progression signal** — are distances getting longer, speeds improving, elevation tolerance increasing?
-6. **Fatigue check** — any red flags (declining frequency, shorter rides, erratic pacing, long gaps)
-7. **Goal alignment** — does this month's work align with the athlete's stated goals (e.g., gran fondo, racing, weight loss)?
-8. **Next month recommendation** — what to continue, start, or stop
+4. **Intensity breakdown** — session type distribution across the month
+5. **Terrain diversity** — flat vs rolling vs hilly vs climbing ride distribution
+6. **Progression signal** — are distances getting longer, speeds improving, elevation tolerance increasing?
+7. **Fatigue check** — any red flags (declining frequency, shorter rides, erratic pacing, long gaps)
+8. **Goal alignment** — does this month's work align with the athlete's stated goals (e.g., gran fondo, racing, weight loss)?
+9. **Next month recommendation** — what to continue, start, or stop
 
 ## Output style
 - Executive summary (2–3 sentences) followed by 5–8 bullet points
@@ -113,7 +137,7 @@ Match response length to question complexity:
 - Use bullet points and short vertical lists, not paragraphs or wide tables
 - Use cycling terminology (FTP, load, intensity, fitness, fatigue, form, sweet spot, threshold)
 - Format workouts as structured intervals (warmup → main → cooldown)
-- Answer the athlete's question first, then add caveats briefly`;
+- Answer the athlete's question first, then add caveats briefly if required`;
 
 const PROMPTS = {
   daily: DAILY_PROMPT,
@@ -130,6 +154,13 @@ interface ActivityData {
   durationSeconds?: number;
   elevationGain?: number;
   calories?: number;
+  averageWatts?: number;
+  maxWatts?: number;
+  weightedAverageWatts?: number;
+  kilojoules?: number;
+  averageHeartrate?: number;
+  maxHeartrate?: number;
+  trainer?: boolean;
 }
 
 interface AnalysisRequest {
@@ -143,15 +174,78 @@ interface AnalysisRequest {
 export class AnalysisService {
   private readonly logger = new Logger(AnalysisService.name);
 
-  async analyze(req: AnalysisRequest): Promise<{ analysis: string }> {
+  constructor(
+    private readonly contextBuilder: ContextBuilderService,
+    private readonly dataProcessor: DataProcessorService,
+    @InjectModel(User.name) private userModel: Model<User>,
+  ) {
+    logKeyHealth(this.logger, 'sync').catch(() => {});
+  }
+
+  private async resolveUser(userId?: string): Promise<any> {
+    if (!userId) return {};
+    try {
+      return await this.userModel.findById(userId).lean().exec() || {};
+    } catch {
+      return {};
+    }
+  }
+
+  async analyze(req: AnalysisRequest, userId?: string): Promise<{ analysis: string }> {
     const persona = PROMPTS[req.type] || PROMPTS.chat;
 
-    const activitiesJson = JSON.stringify(req.activities, null, 2);
-    const previousJson = req.previousActivities
-      ? JSON.stringify(req.previousActivities, null, 2)
-      : 'None available';
+    if (!req.activities || req.activities.length === 0) {
+      const result = await this.callLLM(`${persona}\n\nThe athlete has no activities recorded for this period.\n\n${req.message || 'Please review my training.'}`);
+      return { analysis: result };
+    }
+
+    const user = await this.resolveUser(userId);
+    const context = await this.contextBuilder.buildContext(
+      user,
+      req.activities,
+      req.previousActivities,
+    );
 
     const userMessage = req.message || 'Please review my training.';
+
+    const activitiesFormatted = context.activities.map((a, i) => {
+      const gradientMPerKm = a.distanceKm > 0 ? a.elevationGain / a.distanceKm : 0;
+      const lines = [
+        `Activity ${i + 1}: ${a.name || 'Unnamed'} (${a.date || 'unknown date'})`,
+        `  Type: ${a.sport || 'Ride'} | ${a.trainer ? 'Indoor' : 'Outdoor'}`,
+        `  Distance: ${a.distanceKm.toFixed(2)} km`,
+        `  Duration: ${(a.movingTimeMin / 60).toFixed(2)} hours`,
+        `  Avg Speed: ${a.avgSpeedKph.toFixed(2)} km/h`,
+        `  Elevation: ${a.elevationGain.toFixed(2)} m`,
+        `  Gradient: ${gradientMPerKm.toFixed(2)} m/km`,
+        `  Terrain: ${a.terrainClass}`,
+        `  Session Type: ${a.sessionType}`,
+      ];
+
+      if (a.avgWatts != null) lines.push(`  Avg Power: ${a.avgWatts.toFixed(2)} W` + (a.maxWatts != null ? ` (Max: ${a.maxWatts.toFixed(2)} W)` : ''));
+      if (a.normalizedPower != null) lines.push(`  Normalized Power (NP): ${a.normalizedPower.toFixed(2)} W`);
+      if (a.kilojoules != null) lines.push(`  Energy: ${a.kilojoules.toFixed(2)} kJ`);
+      if (a.avgHeartrate != null) lines.push(`  Avg HR: ${a.avgHeartrate.toFixed(2)} bpm` + (a.maxHeartrate != null ? ` (Max: ${a.maxHeartrate.toFixed(2)} bpm)` : ''));
+
+      return lines.join('\n');
+    }).join('\n\n');
+
+    const previousFormatted = req.previousActivities?.length
+      ? `\n\n## Previous Period Activities\n${req.previousActivities.map((a, i) => {
+          const p = this.dataProcessor.process(a);
+          return `  Prev ${i + 1}: ${p.distanceKm.toFixed(2)} km, ${p.elevationGain.toFixed(2)} m elev, ${p.avgSpeedKph.toFixed(2)} km/h avg`;
+        }).join('\n')}`
+      : '\n\n## Previous Period Activities\nNone available.';
+
+    const effectiveMaxHr = context.athlete.maxHeartrate || (context.athlete.age ? Math.round(220 - context.athlete.age) : null);
+    const hrZones = effectiveMaxHr ? computeHRZoneBoundaries(effectiveMaxHr) : null;
+    const hrZoneLines = hrZones
+      ? hrZones.map((z) => `  ${z.zone} (${z.label}): ${z.minBpm}-${z.maxBpm} bpm (${z.minPercent}-${z.maxPercent}% max HR)`).join('\n')
+      : null;
+
+    const athleteSection = context.athlete.ftp || effectiveMaxHr || context.athlete.onboardingSummary
+      ? `## Athlete Profile\n${context.athlete.ftp ? `  FTP: ${context.athlete.ftp} W\n` : ''}${context.athlete.weightKg ? `  Weight: ${context.athlete.weightKg} kg\n` : ''}${effectiveMaxHr ? `  Max HR: ${effectiveMaxHr} bpm\n${hrZoneLines ? `  HR Zones:\n${hrZoneLines}` : ''}` : ''}${context.athlete.onboardingSummary ? `  Athlete Background:\n  ${context.athlete.onboardingSummary}\n` : ''}  Experience: ${context.athlete.experienceLevel}\n  Goal: ${context.athlete.goal || 'Not specified'}`
+      : '';
 
     const prompt = `${persona}
 
@@ -159,16 +253,22 @@ export class AnalysisService {
 
 # Athlete Data
 
+${athleteSection ? athleteSection + '\n' : ''}
+## Period Summary
+  ${context.summary}
+
+## Training Phase
+  ${context.trainingPhaseNote}
+
+## Weather Context
+  ${context.weatherNote}
+
+${context.historicalContext ? context.historicalContext + '\n' : ''}
 ## Activities for review
-\`\`\`json
-${activitiesJson}
 \`\`\`
-
-## Previous period activities (for comparison)
-\`\`\`json
-${previousJson}
+${activitiesFormatted}
 \`\`\`
-
+${previousFormatted}
 ---
 
 ${userMessage}`;
@@ -177,40 +277,194 @@ ${userMessage}`;
     return { analysis: result };
   }
 
-  private async callLLM(prompt: string): Promise<string> {
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-    if (!apiKey) {
-      return 'AI analysis is not configured. Please set GOOGLE_GENERATIVE_AI_API_KEY in your environment.';
+  async generateNextWeekPlan(activities: any[], userId?: string): Promise<{ workouts: any[]; coachNotes: string }> {
+    if (!activities || activities.length === 0) {
+      return { workouts: [], coachNotes: 'No recent activities to base the plan on.' };
+    }
+
+    const user = await this.resolveUser(userId);
+    const context = await this.contextBuilder.buildContext(user, activities, []);
+
+    const effectiveMaxHr = context.athlete.maxHeartrate || (context.athlete.age ? Math.round(220 - context.athlete.age) : null);
+    const hrZones = effectiveMaxHr ? computeHRZoneBoundaries(effectiveMaxHr) : null;
+    const hrZoneLines = hrZones
+      ? hrZones.map((z) => `  ${z.zone} (${z.label}): ${z.minBpm}-${z.maxBpm} bpm`).join('\n')
+      : null;
+
+    const activitiesFormatted = context.activities
+      .map((a, i) => {
+        const lines = [
+          `${a.name || 'Unnamed'} | ${a.date || '?'}`,
+          `  ${a.distanceKm.toFixed(1)} km, ${a.movingTimeMin.toFixed(0)} min, ${a.elevationGain.toFixed(0)} m elev`,
+          `  ${a.sessionType} | ${a.terrainClass}`,
+        ];
+        if (a.avgWatts != null) lines.push(`  ${a.avgWatts} W avg`);
+        if (a.avgHeartrate != null) lines.push(`  ${a.avgHeartrate} bpm avg`);
+        return lines.join('\n');
+      })
+      .join('\n\n');
+
+    const prompt = `You are a cycling coach generating a next-week training plan as JSON.
+
+## Athlete Context
+${context.athlete.ftp ? `FTP: ${context.athlete.ftp} W` : ''}
+${context.athlete.weightKg ? `Weight: ${context.athlete.weightKg} kg` : ''}
+${effectiveMaxHr ? `Max HR: ${effectiveMaxHr} bpm\nHR Zones:\n${hrZoneLines}` : ''}
+${context.athlete.onboardingSummary ? `Athlete Background: ${context.athlete.onboardingSummary}` : ''}
+Goal: ${context.athlete.goal || 'Not specified'}
+
+## Recent Activity Summary
+${context.summary}
+
+## Recent Activities
+${activitiesFormatted}
+
+## Instructions
+Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON matching this schema:
+{
+  "workouts": [
+    {
+      "dayOfWeek": 0,
+      "type": "rest|recovery|endurance|tempo|threshold|intervals|vo2max|race|long",
+      "distance": <number in km>,
+      "zoneBreakdown": "<zone description>",
+      "terrain": "<flat|rolling|hilly|mixed>",
+      "notes": "<brief workout description>"
+    }
+  ],
+  "coachNotes": "<2-3 sentence plan overview>"
+}
+
+- dayOfWeek: 0=Monday through 6=Sunday
+- Include 1-2 rest days, 1 long ride, and appropriate intensity distribution
+- Distance in kilometers (not meters)
+- Match the athlete's recent training volume and goals
+- Output ONLY the JSON object, no markdown or commentary`;
+
+    const raw = await this.callLLM(prompt, { temperature: 0.2 });
+
+    if (raw.startsWith('Sorry,') || raw.startsWith('AI analysis is not configured') || raw.startsWith('No analysis')) {
+      return { workouts: [], coachNotes: raw };
     }
 
     try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 2048,
-            },
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        const errText = await response.text();
-        this.logger.error(`Gemini API error: ${response.status} ${errText}`);
-        return 'Sorry, the AI analysis service encountered an error. Please try again later.';
-      }
-
-      const data = await response.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      return text || 'No analysis could be generated.';
-    } catch (err) {
-      this.logger.error(`LLM call failed: ${err}`);
-      return 'Sorry, the AI analysis service is currently unavailable.';
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found in LLM response');
+      const parsed = JSON.parse(jsonMatch[0]);
+      return {
+        workouts: parsed.workouts || [],
+        coachNotes: parsed.coachNotes || 'Plan generated for next week.',
+      };
+    } catch {
+      return {
+        workouts: [],
+        coachNotes: 'Could not generate a plan. Please try again.',
+      };
     }
+  }
+
+  private async callLLM(prompt: string, opts?: { temperature?: number; maxTokens?: number }): Promise<string> {
+    let apiKeys: string[] = [];
+    let model = process.env.GOOGLE_LLM_MODEL || 'gemini-2.0-flash-lite';
+
+    // 1. Try sync-specific keys first (background ops use separate pool)
+    const rawKeys = process.env.GOOGLE_GENERATIVE_AI_SYNC_API_KEYS || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '';
+    if (rawKeys) {
+      apiKeys = rawKeys.split(',').map((k) => k.trim()).filter(Boolean);
+    }
+
+    // 2. Fallback to config.yaml if env keys are missing
+    if (apiKeys.length === 0) {
+      const configPaths = [
+        join(homedir(), '.cycling-coach', 'config.yaml'),
+        join(homedir(), '.config', 'cycling-coach', 'config.yaml'),
+        join(homedir(), '.enduragent', 'cycling-coach', 'config.yaml'),
+      ];
+      for (const p of configPaths) {
+        if (existsSync(p)) {
+          try {
+            const raw = readFileSync(p, 'utf-8');
+            const c = parseYaml(raw) as any;
+            if (c?.llm?.sync_api_key) {
+              apiKeys = String(c.llm.sync_api_key).split(',').map((k: string) => k.trim()).filter(Boolean);
+              if (c.llm.model) model = c.llm.model;
+              break;
+            }
+            if (c?.llm?.api_key) {
+              apiKeys = String(c.llm.api_key).split(',').map((k: string) => k.trim()).filter(Boolean);
+              if (c.llm.model) model = c.llm.model;
+              break;
+            }
+          } catch {}
+        }
+      }
+    }
+
+    if (apiKeys.length === 0) {
+      return 'AI analysis is not configured. Please set GOOGLE_GENERATIVE_AI_SYNC_API_KEYS in your environment.';
+    }
+
+    const temperature = opts?.temperature ?? 0.7;
+    const maxTokens = opts?.maxTokens ?? 2048;
+
+    const maxAttempts = apiKeys.length * 2;
+    const fallbackModel = 'gemini-2.0-flash-lite';
+    let usedFallback = false;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const key = apiKeys[attempt % apiKeys.length];
+      const currentModel = usedFallback ? fallbackModel : model;
+      try {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${key}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: prompt }] }],
+              generationConfig: {
+                temperature,
+                maxOutputTokens: maxTokens,
+              },
+            }),
+          },
+        );
+
+        if (response.status === 429) {
+          this.logger.warn(`LLM rate limited — quota likely exhausted for key`);
+          if (!usedFallback) {
+            usedFallback = true;
+            this.logger.warn(`Falling back to ${fallbackModel} with different key`);
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+          return 'Sorry, the AI analysis service is currently unavailable due to API quota limits. Please try again later or add more API keys.';
+        }
+
+        if (response.status === 503) {
+          this.logger.warn(`LLM temporarily unavailable (attempt ${attempt + 1}), retrying...`);
+          await new Promise((r) => setTimeout(r, 3000));
+          continue;
+        }
+
+        if (!response.ok) {
+          const errText = await response.text();
+          this.logger.error(`Gemini API error: ${response.status} ${errText}`);
+          return 'Sorry, the AI analysis service encountered an error. Please try again later.';
+        }
+
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        return text || 'No analysis could be generated.';
+      } catch (err) {
+        this.logger.error(`LLM call failed (attempt ${attempt + 1}): ${err}`);
+        if (attempt === maxAttempts - 1) {
+          return 'Sorry, the AI analysis service is currently unavailable.';
+        }
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+    }
+
+    return 'Sorry, the AI analysis service is currently unavailable.';
   }
 }

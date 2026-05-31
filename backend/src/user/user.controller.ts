@@ -29,6 +29,22 @@ export class UserController {
     return this.userService.update(email, userData);
   }
 
+  @Post(':email/training-start')
+  setTrainingStart(@Param('email') email: string) {
+    return this.userService.update(email, { trainingStart: new Date() });
+  }
+
+  @Post(':email/onboarding-summary')
+  setOnboardingSummary(@Param('email') email: string, @Body() body: { summary: string }) {
+    return this.userService.update(email, { onboardingSummary: body.summary || '' });
+  }
+
+  @Post(':email/link-telegram')
+  linkTelegram(@Param('email') email: string, @Body() body: { chatId: string }) {
+    if (!body.chatId) throw new HttpException('chatId is required', HttpStatus.BAD_REQUEST);
+    return this.userService.update(email, { telegramChatId: body.chatId });
+  }
+
   @Post(':email/upload-image')
   async uploadImage(@Param('email') email: string, @Body() body: { image: string }) {
     try {

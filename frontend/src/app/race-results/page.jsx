@@ -275,29 +275,10 @@ export default function RacesPage() {
           transition={{ duration: 0.5 }}
           style={{ marginBottom: "2.5rem" }}
         >
-          <p
-            style={{
-              margin: "0 0 10px",
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: "0.14em",
-              textTransform: "uppercase",
-              color: "#FF5500",
-            }}
-          >
+          <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Competition
           </p>
-          <h1
-            style={{
-              fontFamily: "'Bebas Neue', 'Impact', sans-serif",
-              fontSize: "clamp(3rem, 7vw, 5rem)",
-              fontWeight: 400,
-              letterSpacing: "0.04em",
-              lineHeight: 0.95,
-              margin: "0 0 14px",
-              color: "#fff",
-            }}
-          >
+          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
             YOUR <span style={{ color: "#FF5500" }}>RACES</span>
           </h1>
           <div style={{ width: 36, height: 2, background: "#FF5500", marginBottom: 14, borderRadius: 2 }} />
@@ -352,7 +333,7 @@ export default function RacesPage() {
                   color: "rgba(255,255,255,0.55)",
                 }}
               >
-                {parseFloat(upcoming.distance || 0).toFixed(0)} km
+                {parseFloat(upcoming.distance || 0).toFixed(2)} km
               </span>
               {upcoming.elevationGain > 0 && (
                 <p
@@ -389,8 +370,8 @@ export default function RacesPage() {
           {[
             { label: "Total Races", value: stats.total },
             { label: "Best Finish", value: stats.best ? `${stats.best}${stats.best === 1 ? "st" : stats.best === 2 ? "nd" : stats.best === 3 ? "rd" : "th"}` : "\u2014" },
-            { label: "Total km", value: `${stats.totalDist.toFixed(0)} km` },
-            { label: "Total Elev", value: `${stats.totalElev.toFixed(0)} m` },
+            { label: "Total km", value: `${stats.totalDist.toFixed(2)} km` },
+            { label: "Total Elev", value: `${stats.totalElev.toFixed(2)} m` },
             { label: "Podiums", value: stats.podiums },
           ].map((s) => (
             <div key={s.label} style={{ textAlign: "center" }}>
@@ -749,7 +730,7 @@ export default function RacesPage() {
                     {formatDate(race.date)}
                   </span>
                   <span style={{ fontSize: 13, color: "#fff", textAlign: "right", fontFamily: "'JetBrains Mono', monospace" }}>
-                    {race.distance ? `${parseFloat(race.distance).toFixed(0)}k` : "\u2014"}
+                    {race.distance ? `${parseFloat(race.distance).toFixed(2)}k` : "\u2014"}
                   </span>
                   <span style={{ fontSize: 12, color: "rgba(255,255,255,0.72)", textAlign: "right", fontFamily: "'JetBrains Mono', monospace" }}>
                     {race.time || "\u2014"}
@@ -758,7 +739,7 @@ export default function RacesPage() {
                     {race.position ? `${race.position}${race.position === 1 ? "st" : race.position === 2 ? "nd" : race.position === 3 ? "rd" : "th"}` : "\u2014"}
                   </span>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", textAlign: "right", fontFamily: "'JetBrains Mono', monospace" }}>
-                    {race.elevationGain > 0 ? `${parseFloat(race.elevationGain).toFixed(0)}m` : "\u2014"}
+                    {race.elevationGain > 0 ? `${parseFloat(race.elevationGain).toFixed(2)}m` : "\u2014"}
                   </span>
                   <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                     <button

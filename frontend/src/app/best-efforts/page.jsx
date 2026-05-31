@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
 
-const DISTANCE_TABS = ["5 km", "10 km", "20 km", "50 km", "100 km"];
 const SEGMENT_FILTERS = ["KOMs", "Top 10", "All"];
 
 function formatTime(secs) {
@@ -18,12 +17,12 @@ function formatTime(secs) {
 
 function formatSpeed(ms) {
   if (!ms) return "—";
-  return `${(ms * 3.6).toFixed(1)} km/h`;
+  return `${(ms * 3.6).toFixed(2)} km/h`;
 }
 
 function formatDistance(meters) {
   if (!meters) return "—";
-  return `${(meters / 1000).toFixed(1)} km`;
+  return `${(meters / 1000).toFixed(2)} km`;
 }
 
 function formatDate(iso) {
@@ -63,6 +62,11 @@ function EffortRow({ effort, i, efforts }) {
       <div className="min-w-0">
         <p className={`truncate text-sm font-semibold leading-tight ${isPR ? "text-white" : "text-white/75"}`}>
           {effort.name ?? `Ride · ${formatDate(effort.date)}`}
+          {effort.isNew && (
+            <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 font-dmSans text-[9px] font-bold uppercase tracking-[0.08em] text-emerald-400">
+              NEW
+            </span>
+          )}
         </p>
         <p className="mt-0.5 text-[11px] text-white/25">{formatDistance(effort.distance)}</p>
       </div>
@@ -102,6 +106,11 @@ function LongestRideRow({ effort, isFirst }) {
       <div className="min-w-0">
         <p className={`truncate text-sm font-semibold leading-tight ${isFirst ? "text-white" : "text-white/75"}`}>
           {effort.name}
+          {effort.isNew && (
+            <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 font-dmSans text-[9px] font-bold uppercase tracking-[0.08em] text-emerald-400">
+              NEW
+            </span>
+          )}
         </p>
         <p className="mt-0.5 text-[11px] text-white/25">{effort.label}</p>
       </div>
@@ -117,7 +126,7 @@ function LongestRideRow({ effort, isFirst }) {
 
 function SegmentEffortCard({ effort }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3 transition-all hover:border-white/15">
+    <div className="flex items-center justify-between rounded-xl border border-white/[0.05] bg-surface-cards px-4 py-3 transition-all hover:border-white/15">
       <div className="flex items-center gap-3 min-w-0">
         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
           effort.isKom ? "bg-yellow-500/15" : (effort.komRank && effort.komRank <= 10) ? "bg-blue-500/15" : "bg-white/[0.04]"
@@ -170,16 +179,30 @@ function SkeletonRows() {
 }
 
 export default function BestEffortsPage() {
-  const [activeTab, setActiveTab] = useState("20 km");
+  const [activeTab, setActiveTab] = useState(null);
+  const [distanceTabs, setDistanceTabs] = useState([]);
   const [segmentFilter, setSegmentFilter] = useState("KOMs");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expandedFastest, setExpandedFastest] = useState(false);
+  const [expandedLongest, setExpandedLongest] = useState(false);
+  const [expandedSegments, setExpandedSegments] = useState(false);
 
   useEffect(() => {
     setLoading(true);
+    api.post("/sync/refresh", {}).catch(() => {});
     api.get("/best-efforts")
       .then((d) => {
-        if (d) setData(d);
+        if (d) {
+          setData(d);
+          const keys = Object.keys(d.fastest || {}).sort((a, b) => {
+            const numA = parseFloat(a);
+            const numB = parseFloat(b);
+            return numA - numB;
+          });
+          setDistanceTabs(keys);
+          if (keys.length > 0 && !activeTab) setActiveTab(keys[0]);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -216,17 +239,17 @@ export default function BestEffortsPage() {
         <div className="absolute bottom-[-8%] right-[-5%] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.03)_0%,transparent_70%)]" />
       </div>
 
-      <div className="relative z-[1] mx-auto max-w-[1000px] px-4 pb-16 pt-10 md:px-8">
+      <div className="relative z-[1] mx-auto max-w-[1200px] px-4 pb-16 pt-10 md:px-8">
         <motion.div
           initial={{ opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="mb-8"
         >
-          <p className="font-dmSans mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#FF5500]/70">
+          <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Strava · Cycling
           </p>
-          <h1 className="font-bebasNeue text-6xl uppercase leading-none tracking-wide text-white md:text-7xl">
+          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
             Best <span className="text-[#FF5500]">Efforts</span>
           </h1>
           <div className="mt-3 h-[2px] w-9 rounded-full bg-[#FF5500]" />
@@ -241,19 +264,19 @@ export default function BestEffortsPage() {
           transition={{ delay: 0.1 }}
           className="mb-8 grid grid-cols-4 gap-3"
         >
-          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+          <div className="rounded-2xl border border-white/[0.05] bg-surface-cards px-4 py-3.5">
             <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total Efforts</p>
             <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{summaryStats.totalEfforts}</p>
           </div>
-          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+          <div className="rounded-2xl border border-white/[0.05] bg-surface-cards px-4 py-3.5">
             <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Personal Bests</p>
             <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{summaryStats.prs}</p>
           </div>
-          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+          <div className="rounded-2xl border border-white/[0.05] bg-surface-cards px-4 py-3.5">
             <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">KOMs / QOMs</p>
             <p className="font-jetbrainsMono mt-1 text-xl font-bold text-yellow-400">{summaryStats.komCount}</p>
           </div>
-          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+          <div className="rounded-2xl border border-white/[0.05] bg-surface-cards px-4 py-3.5">
             <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Longest Rides</p>
             <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{summaryStats.longest}</p>
           </div>
@@ -292,16 +315,16 @@ export default function BestEffortsPage() {
               </div>
 
               <div className="mb-4 flex flex-wrap gap-2">
-                {DISTANCE_TABS.map((d) => {
+                {distanceTabs.map((d) => {
                   const active = activeTab === d;
                   return (
                     <button
                       key={d}
                       onClick={() => setActiveTab(d)}
-                      className={`rounded-lg px-4 py-1.5 text-xs font-semibold tracking-wide transition-all duration-200 ${
+                      className={`rounded-lg px-4 py-1.5 text-xs font-semibold ${
                         active
-                          ? "bg-[#FF5500] text-white"
-                          : "border border-white/[0.08] text-white/35 hover:border-white/20 hover:text-white/60"
+                          ? "bg-[#FF5500] text-white border border-[#FF5500]"
+                          : "border border-white/10 text-white/60 hover:border-white/20 hover:text-white transition-all"
                       }`}
                     >
                       {d}
@@ -315,7 +338,7 @@ export default function BestEffortsPage() {
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.28 }}
-                className="mb-10 rounded-2xl border border-white/[0.05] bg-[#0D0D0D] overflow-hidden"
+                className="mb-10 rounded-2xl border border-white/[0.05] bg-surface-cards overflow-hidden"
               >
                 <div className="grid grid-cols-[40px_1fr_100px_95px_90px_70px] gap-2 border-b border-white/[0.06] px-4 py-2.5 md:grid-cols-[40px_1fr_110px_110px_105px_80px]">
                   {["#", "Activity", "Speed", "Time", "Date", "Δ Best"].map((h) => (
@@ -344,21 +367,34 @@ export default function BestEffortsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.25 }}
               >
-                <div className="mb-4 flex items-center gap-3">
-                  <h2 className="font-barlowCondensed text-xl uppercase tracking-wide text-white">
-                    <span className="text-[#FF5500]">Longest</span> Rides
-                  </h2>
-                  <div className="h-[1px] flex-1 bg-gradient-to-r from-white/[0.06] to-transparent" />
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <h2 className="font-barlowCondensed text-xl uppercase tracking-wide text-white">
+                      <span className="text-[#FF5500]">Longest</span> Rides
+                    </h2>
+                    <div className="h-[1px] w-12 bg-gradient-to-r from-white/[0.06] to-transparent" />
+                  </div>
+                  {longestRides.length > 5 && (
+                    <button
+                      onClick={() => setExpandedLongest(!expandedLongest)}
+                      className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] px-3 py-1 text-[11px] font-semibold tracking-wide text-white/40 transition hover:border-white/20 hover:text-white/70"
+                    >
+                      {expandedLongest ? "Show Less" : `Show All (${longestRides.length})`}
+                      <svg className={`h-3 w-3 transition ${expandedLongest ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
 
-                <div className="mb-10 rounded-2xl border border-white/[0.05] bg-[#0D0D0D] overflow-hidden">
+                <div className="mb-10 rounded-2xl border border-white/[0.05] bg-surface-cards overflow-hidden">
                   <div className="grid grid-cols-[40px_1fr_100px_95px_90px] gap-2 border-b border-white/[0.06] px-4 py-2.5 md:grid-cols-[40px_1fr_110px_110px_105px]">
                     {["#", "Activity", "Distance", "Time", "Date"].map((h) => (
                       <span key={h} className="font-dmSans text-[10px] font-bold uppercase tracking-[0.1em] text-white/20">{h}</span>
                     ))}
                   </div>
                   <motion.div variants={stagger} initial="hidden" animate="show">
-                    {longestRides.map((ride, i) => (
+                    {(expandedLongest ? longestRides : longestRides.slice(0, 5)).map((ride, i) => (
                       <LongestRideRow key={ride.id ?? i} effort={ride} isFirst={i === 0} />
                     ))}
                   </motion.div>
@@ -373,11 +409,24 @@ export default function BestEffortsPage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.35 }}
               >
-                <div className="mb-4 flex items-center gap-3">
-                  <h2 className="font-barlowCondensed text-xl uppercase tracking-wide text-white">
-                    <span className="text-[#FF5500]">Segments</span>
-                  </h2>
-                  <div className="h-[1px] flex-1 bg-gradient-to-r from-white/[0.06] to-transparent" />
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <h2 className="font-barlowCondensed text-xl uppercase tracking-wide text-white">
+                      <span className="text-[#FF5500]">Segments</span>
+                    </h2>
+                    <div className="h-[1px] w-12 bg-gradient-to-r from-white/[0.06] to-transparent" />
+                  </div>
+                  {filteredSegmentEfforts.length > 5 && (
+                    <button
+                      onClick={() => setExpandedSegments(!expandedSegments)}
+                      className="flex items-center gap-1.5 rounded-lg border border-white/[0.08] px-3 py-1 text-[11px] font-semibold tracking-wide text-white/40 transition hover:border-white/20 hover:text-white/70"
+                    >
+                      {expandedSegments ? "Show Less" : `Show All (${filteredSegmentEfforts.length})`}
+                      <svg className={`h-3 w-3 transition ${expandedSegments ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
 
                 <div className="mb-4 flex flex-wrap gap-2">
@@ -386,11 +435,11 @@ export default function BestEffortsPage() {
                     return (
                       <button
                         key={f}
-                        onClick={() => setSegmentFilter(f)}
-                        className={`rounded-lg px-4 py-1.5 text-xs font-semibold tracking-wide transition-all duration-200 ${
+                        onClick={() => { setSegmentFilter(f); setExpandedSegments(false); }}
+                        className={`rounded-lg px-4 py-1.5 text-xs font-semibold ${
                           active
-                            ? "bg-[#FF5500] text-white"
-                            : "border border-white/[0.08] text-white/35 hover:border-white/20 hover:text-white/60"
+                            ? "bg-[#FF5500] text-white border border-[#FF5500]"
+                            : "border border-white/10 text-white/60 hover:border-white/20 hover:text-white transition-all"
                         }`}
                       >
                         {f}
@@ -403,7 +452,7 @@ export default function BestEffortsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  {filteredSegmentEfforts.map((effort) => (
+                  {(expandedSegments ? filteredSegmentEfforts : filteredSegmentEfforts.slice(0, 5)).map((effort) => (
                     <SegmentEffortCard key={effort.id ?? effort.stravaId} effort={effort} />
                   ))}
                 </div>

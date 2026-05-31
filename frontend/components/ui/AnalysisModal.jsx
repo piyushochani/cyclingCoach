@@ -84,7 +84,7 @@ export default function AnalysisModal({ isOpen, onClose, type, activities, previ
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 10 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="relative w-full max-w-2xl max-h-[85vh] rounded-2xl border border-white/[0.08] bg-[#0D0D0D] shadow-2xl flex flex-col overflow-hidden"
+            className="relative w-full max-w-2xl max-h-[85vh] rounded-2xl border border-white/[0.08] bg-surface-cards shadow-2xl flex flex-col overflow-hidden"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-white/[0.06] px-6 py-4">

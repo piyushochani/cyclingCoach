@@ -22,6 +22,40 @@ export type { SampleWorkout, WorkoutType } from "./templates.js";
 
 export { buildPlanSkeleton } from "./plan-builder.js";
 
+export { scoreModels, getModelRecommendation } from "./model-scorer.js";
+export type { TrainingHistory, ModelScore, ModelRecommendation } from "./model-scorer.js";
+
+export {
+  buildConstraints,
+  checkConstraints,
+  suggestAdjustedDays,
+} from "./constraints.js";
+export type { AthleteConstraints, ConstraintViolation } from "./constraints.js";
+
+export { buildProgression } from "./load-progressor.js";
+export type { WeeklyProgression, ProgressionConfig } from "./load-progressor.js";
+
+export {
+  buildTaperSchedule,
+  isInTaperWindow,
+  shouldReduceIntensity,
+} from "./taper.js";
+export type { TaperSchedule } from "./taper.js";
+
+export { buildWeekSkeleton, slotWorkouts } from "./workout-slotter.js";
+export type { WeekSkeleton, WorkoutSlot, SlottingConfig } from "./workout-slotter.js";
+
+export {
+  validateWeekSkeleton,
+  validateProgression,
+  validateBuildRecovery,
+  validateIntensityDistribution,
+} from "./plan-validator.js";
+export type { ValidationResult, ValidationError, ValidationWarning } from "./plan-validator.js";
+
+export { adjustForMissedSession, suggestFallbackWorkout } from "./plan-adjuster.js";
+export type { MissedSession, AdjustmentResult } from "./plan-adjuster.js";
+
 export {
   serializeIntervalsWorkout,
   intervalsWorkoutInputSchema,

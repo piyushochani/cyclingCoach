@@ -76,7 +76,7 @@ const SingleActivityPage = ({ params }) => {
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
         <div className="bg-surface-cards rounded-lg p-4 text-center border border-elevation-highlight">
-          <p className="font-bebasNeue text-2xl text-accent-orange">{activity.distance}</p>
+          <p className="font-bebasNeue text-2xl text-accent-orange">{typeof activity.distance === 'number' ? (activity.distance).toFixed(2) : activity.distance}</p>
           <p className="font-dmSans text-xs text-text-secondary">KM</p>
         </div>
         <div className="bg-surface-cards rounded-lg p-4 text-center border border-elevation-highlight">
@@ -84,11 +84,11 @@ const SingleActivityPage = ({ params }) => {
           <p className="font-dmSans text-xs text-text-secondary">Duration</p>
         </div>
         <div className="bg-surface-cards rounded-lg p-4 text-center border border-elevation-highlight">
-          <p className="font-bebasNeue text-2xl text-text-primary">{activity.elevationGain}</p>
+          <p className="font-bebasNeue text-2xl text-text-primary">{typeof activity.elevationGain === 'number' ? (activity.elevationGain).toFixed(2) : activity.elevationGain}</p>
           <p className="font-dmSans text-xs text-text-secondary">Elevation</p>
         </div>
         <div className="bg-surface-cards rounded-lg p-4 text-center border border-elevation-highlight">
-          <p className="font-bebasNeue text-2xl text-text-primary">{activity.avgSpeed}</p>
+          <p className="font-bebasNeue text-2xl text-text-primary">{typeof activity.avgSpeed === 'number' ? (activity.avgSpeed).toFixed(2) : activity.avgSpeed}</p>
           <p className="font-dmSans text-xs text-text-secondary">Avg Speed</p>
         </div>
         <div className="bg-surface-cards rounded-lg p-4 text-center border border-elevation-highlight">
@@ -96,7 +96,7 @@ const SingleActivityPage = ({ params }) => {
           <p className="font-dmSans text-xs text-text-secondary">Avg HR</p>
         </div>
         <div className="bg-surface-cards rounded-lg p-4 text-center border border-elevation-highlight">
-          <p className="font-bebasNeue text-2xl text-text-primary">{activity.calories}</p>
+          <p className="font-bebasNeue text-2xl text-text-primary">{typeof activity.calories === 'number' ? (activity.calories).toFixed(2) : activity.calories}</p>
           <p className="font-dmSans text-xs text-text-secondary">Calories</p>
         </div>
       </div>
@@ -130,7 +130,7 @@ const SingleActivityPage = ({ params }) => {
 
           <div className="bg-surface-cards rounded-lg p-6 border border-elevation-highlight h-[300px]">
             <h2 className="font-bebasNeue text-xl text-text-primary mb-4">Elevation Profile</h2>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={activity.elevationProfile}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#3B414B" />
                 <XAxis dataKey="distance" stroke="#8F9BB3" label={{ value: 'Distance (KM)', position: 'insideBottomRight', offset: -10, fill: '#8F9BB3' }} />
@@ -182,7 +182,7 @@ const SingleActivityPage = ({ params }) => {
 
           <div className="bg-surface-cards rounded-lg p-6 border border-elevation-highlight h-[300px]">
             <h2 className="font-bebasNeue text-xl text-text-primary mb-4">Power / Heart Rate</h2>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={activity.elevationProfile || []}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#3B414B" />
                 <XAxis dataKey="distance" hide />

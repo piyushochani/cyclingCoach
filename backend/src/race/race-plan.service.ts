@@ -31,7 +31,7 @@ export class RacePlanService {
     return this.racePlanModel.findOneAndUpdate(
       { race: raceId as any, user: userId as any },
       { days },
-      { new: true },
+      { returnDocument: 'after' },
     ).exec();
   }
 

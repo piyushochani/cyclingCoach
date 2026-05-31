@@ -13,10 +13,15 @@ import { BestEffortsModule } from './best-efforts/best-efforts.module';
 import { ExpenseModule } from './expense/expense.module';
 import { GearModule } from './gear/gear.module';
 import { AnalysisModule } from './analysis/analysis.module';
+import { ChatQueryModule } from './chat-query/chat-query.module';
 import { TrainingContextModule } from './training-context/training-context.module';
+import { SubscriptionModule } from './subscription/subscription.module';
+import { NotificationModule } from './notification/notification.module';
+import { AgentModule } from './agent/agent.module';
+import { GeminiStatusModule } from './gemini-status/gemini-status.module';
 
 @Module({
-  imports: [DatabaseModule, UserModule, ActivityModule, RaceModule, StatsModule, PlanModule, AuthModule, EmailModule, SyncModule, StravaAuthModule, BestEffortsModule, ExpenseModule, GearModule, AnalysisModule, TrainingContextModule],
+  imports: [DatabaseModule, UserModule, ActivityModule, RaceModule, StatsModule, PlanModule, AuthModule, EmailModule, SyncModule, StravaAuthModule, BestEffortsModule, ExpenseModule, GearModule, AnalysisModule, TrainingContextModule, SubscriptionModule, ChatQueryModule, NotificationModule, AgentModule, GeminiStatusModule],
   controllers: [],
   providers: [],
 })

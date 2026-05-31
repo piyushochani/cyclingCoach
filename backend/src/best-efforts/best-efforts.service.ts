@@ -137,6 +137,12 @@ export class BestEffortsService {
   }
 
   private async storeFastestEfforts(activities: any[], userId: any) {
+    const oldRecords = await this.bestEffortModel.find({ user: userId, category: 'fastest' }).exec();
+    const oldMap = new Map<string, any>();
+    for (const r of oldRecords) {
+      oldMap.set(`${r.label}-${r.rank}`, r);
+    }
+
     await this.bestEffortModel.deleteMany({ user: userId, category: 'fastest' }).exec();
 
     for (const bucket of DISTANCE_BUCKETS) {
@@ -160,18 +166,29 @@ export class BestEffortsService {
         .slice(0, 5);
 
       for (let i = 0; i < matches.length; i++) {
+        const key = `${bucket.label}-${i + 1}`;
+        const old = oldMap.get(key);
+        const isNew = old ? matches[i].time < old.time : false;
         await this.bestEffortModel.create({
           ...matches[i],
           label: bucket.label,
           rank: i + 1,
           category: 'fastest',
           user: userId,
+          previousBest: old ? old.time : undefined,
+          isNew,
         });
       }
     }
   }
 
   private async storeLongestRides(activities: any[], userId: any) {
+    const oldRecords = await this.bestEffortModel.find({ user: userId, category: 'longest' }).exec();
+    const oldMap = new Map<number, any>();
+    for (const r of oldRecords) {
+      oldMap.set(r.rank, r);
+    }
+
     await this.bestEffortModel.deleteMany({ user: userId, category: 'longest' }).exec();
 
     const sorted = [...activities]
@@ -181,6 +198,8 @@ export class BestEffortsService {
 
     for (let i = 0; i < sorted.length; i++) {
       const a = sorted[i];
+      const old = oldMap.get(i + 1);
+      const isNew = old ? (a.distance || 0) > old.distance : false;
       await this.bestEffortModel.create({
         label: `${((a.distance || 0) / 1000).toFixed(1)} km`,
         time: a.moving_time || a.elapsed_time || 0,
@@ -194,6 +213,8 @@ export class BestEffortsService {
         rank: i + 1,
         category: 'longest',
         user: userId,
+        previousBest: old ? old.distance : undefined,
+        isNew,
       });
     }
   }
@@ -270,6 +291,8 @@ export class BestEffortsService {
           distance: r.distance,
           avgSpeed: r.avgSpeed,
           rank: r.rank,
+          isNew: r.isNew || false,
+          previousBest: r.previousBest || null,
         }));
     }
 
@@ -283,6 +306,8 @@ export class BestEffortsService {
       avgSpeed: r.avgSpeed,
       rank: r.rank,
       label: r.label,
+      isNew: r.isNew || false,
+      previousBest: r.previousBest || null,
     }));
 
     const allEfforts = await this.segmentEffortModel.find(filter).sort({ komRank: 1, prRank: 1 }).limit(100).exec();

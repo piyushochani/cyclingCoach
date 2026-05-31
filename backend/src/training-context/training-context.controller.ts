@@ -77,38 +77,40 @@ export class TrainingContextController {
 
   @Get('weekly-plan')
   getWeeklyPlan(
-    @Query('year') year: string,
-    @Query('week') week: string,
+    @Query('relativeWeek') relativeWeek: string,
     @UserId() userId: string,
   ) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    if (year && week) {
-      return this.service.getWeeklyPlan(userId, +year, +week);
+    if (relativeWeek) {
+      return this.service.getWeeklyPlan(userId, +relativeWeek);
     }
     return this.service.getCurrentWeekPlan(userId);
   }
 
   @Post('weekly-plan')
   upsertWeeklyPlan(
-    @Body() body: { year: number; week: number; startDate: string; workouts?: any[]; coachNotes?: string; rawText?: string },
+    @Body() body: { relativeWeek: number; workouts?: any[]; skeleton?: any; coachNotes?: string; rawText?: string },
     @UserId() userId: string,
   ) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.service.upsertWeeklyPlan(userId, body.year, body.week, {
-      startDate: new Date(body.startDate),
+    if (body.relativeWeek == null) throw new UnauthorizedException('relativeWeek is required');
+    const data = {
       workouts: body.workouts || [],
       coachNotes: body.coachNotes || '',
       rawText: body.rawText || '',
-    });
+    };
+    if (body.skeleton) {
+      return this.service.upsertWeeklyPlanWithSkeleton(userId, body.relativeWeek, data, body.skeleton);
+    }
+    return this.service.upsertWeeklyPlan(userId, body.relativeWeek, data);
   }
 
   @Delete('weekly-plan')
   deleteWeeklyPlan(
-    @Query('year') year: string,
-    @Query('week') week: string,
+    @Query('relativeWeek') relativeWeek: string,
     @UserId() userId: string,
   ) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.service.deleteWeeklyPlan(userId, +year, +week);
+    return this.service.deleteWeeklyPlan(userId, +relativeWeek);
   }
 }

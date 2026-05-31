@@ -88,7 +88,7 @@ export async function bootstrapReference(
     );
   }
 
-  scheduler.start();
+  // scheduler.start(); // DISABLED: auto-sync turned off - API keys not working
 
   const services: ReferenceServices = {
     runSync: (req) => runSyncInternal({ caller: "/sync", chatId: req.chatId }),

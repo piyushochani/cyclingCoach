@@ -25,7 +25,7 @@ export class ExpenseService {
   update(id: string, expense: Partial<Expense>, userId?: any): Promise<Expense | null> {
     const filter: any = { _id: id };
     if (userId) filter.user = userId as any;
-    return this.expenseModel.findOneAndUpdate(filter, expense, { new: true }).exec();
+    return this.expenseModel.findOneAndUpdate(filter, expense, { returnDocument: 'after' }).exec();
   }
 
   delete(id: string, userId?: any): Promise<Expense | null> {

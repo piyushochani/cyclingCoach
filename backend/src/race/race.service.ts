@@ -29,7 +29,7 @@ export class RaceService {
   update(id: string, race: Partial<Race>, userId?: any): Promise<Race | null> {
     const filter: any = { _id: id };
     if (userId) filter.user = userId as any;
-    return this.raceModel.findOneAndUpdate(filter, race, { new: true }).exec();
+    return this.raceModel.findOneAndUpdate(filter, race, { returnDocument: 'after' }).exec();
   }
 
   delete(id: string, userId?: any): Promise<Race | null> {

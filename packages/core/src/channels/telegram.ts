@@ -1,11 +1,7 @@
-import { Bot, InputFile } from "grammy";
-import type { CoachAgent } from "../agent/coach-agent.js";
+import { Bot } from "grammy";
 import type { BinaryConfig } from "../binary.js";
-import { isRateLimitError, extractRetryAfterMs } from "../agent/token-utils.js";
 import {
   checkForUpdate,
-  selfUpdate,
-  getKnownTelegramChatIds,
   getCurrentVersion,
   getLastNotifiedVersion,
   setLastNotifiedVersion,
@@ -14,57 +10,38 @@ import { buildWhatsNewMessage } from "../release-notes.js";
 import { createAuthMiddleware } from "./telegram-access.js";
 import { loadAllowedSenders, loadAllowedSendersWithSource } from "./allowed-senders.js";
 import { escapeHtmlText } from "./html-escape.js";
-import type { ReferenceServices } from "../reference/services.js";
-import { formatSyncReply } from "../reference/sync/format-sync-reply.js";
-import { formatSnapshotRaw } from "../reference/sync/snapshot-debug.js";
-import { sendSnapshotOutput } from "../reference/sync/send-snapshot.js";
-
-function formatRateLimitWait(err: unknown): string {
-  const ms = extractRetryAfterMs(err);
-  if (!ms) return "about a minute";
-  const secs = Math.ceil(ms / 1000);
-  if (secs < 60) return `~${secs} seconds`;
-  return `~${Math.ceil(secs / 60)} minute${Math.ceil(secs / 60) > 1 ? "s" : ""}`;
-}
 
 // ============================================================================
-// TELEGRAM BOT
+// TELEGRAM RELAY BOT
 // ============================================================================
 
 const WELCOME_MESSAGE =
   "Welcome to Cycling Coach!\n\n" +
-  "I'm your AI cycling coach. I can build training plans, suggest workouts, " +
-  "and track your fitness using your Strava history and athlete profile.\n\n" +
+  "I'm your AI cycling coach, powered by the CycloAI platform. " +
+  "I can review your training, check your plans, suggest workouts, " +
+  "and answer your cycling questions.\n\n" +
   "Commands:\n" +
-  "/plan — Generate a training plan\n" +
-  "/workout — Get today's workout\n" +
-  "/status — Check current fitness, fatigue, and form\n" +
+  "/plan — Generate or review a training plan\n" +
+  "/workout — Get today's workout suggestion\n" +
+  "/status — Check your fitness, fatigue, and form\n" +
   "/review — Review your last session\n" +
-  "/version — Show current version\n" +
-  "/whatsnew — See what changed in the latest version\n" +
-  "/update — Check for and install updates\n\n" +
-  "Or just chat with me about your training!";
+  "/version — Show version info\n\n" +
+  "Or just chat with me about your training!\n\n" +
+  "Note: You need to link your Telegram account from the web dashboard first: " +
+  "go to Profile > Link Telegram.";
 
-const SNAPSHOT_HELP =
-  "/snapshot raw [section]    — dump pre-curation latest.json (or one section)\n" +
-  "/snapshot help             — show this list\n\n" +
-  "Wave 7 will add: /snapshot, /snapshot metrics, /snapshot activities,\n" +
-  "/snapshot wellness, /snapshot intervals <id>, /snapshot routes <id>,\n" +
-  "/snapshot history, /snapshot ftp, /snapshot validation.\n\n" +
-  "Until then, only /snapshot raw is wired.";
+function backendUrl(): string {
+  return process.env.BACKEND_URL || "http://localhost:3001";
+}
 
 // Module-private factory: every Bot in this module is constructed here, with
-// the auth middleware registered FIRST. Future maintainers cannot add a handler
-// ahead of auth without modifying this function — and reviewers scrutinize
-// changes here because this file holds the security model.
+// the auth middleware registered FIRST.
 function createSecuredBot(opts: {
   token: string;
   binary: BinaryConfig;
   dataDir: string;
 }): Bot {
   const bot = new Bot(opts.token);
-
-  // Per-sender pairing-challenge rate-limit map (process-lifetime; LRU-bounded).
   const challengeRateLimit = new Map<string, number>();
   bot.use(
     createAuthMiddleware({
@@ -74,7 +51,6 @@ function createSecuredBot(opts: {
       challengeMinIntervalMs: 60_000,
     }),
   );
-
   return bot;
 }
 
@@ -91,13 +67,49 @@ function logSecurityStartup(dataDir: string, binaryName: string): void {
   }
 }
 
+async function callBackend(
+  message: string,
+  telegramChatId: string,
+): Promise<string> {
+  const url = `${backendUrl()}/agent/telegram-chat`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, telegramChatId }),
+    });
+
+    if (res.status === 429) {
+      return "The AI service is currently rate-limited. Please try again in a minute.";
+    }
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`Backend error (${res.status}): ${errText}`);
+      return "Sorry, the coaching service is temporarily unavailable. Please try again later.";
+    }
+
+    const data: any = await res.json();
+    return data?.text || "No response from coach.";
+  } catch (err) {
+    console.error("Failed to reach backend:", err);
+    return "Could not reach the coaching service. Make sure the CycloAI backend is running (cd backend; npm run start) and BACKEND_URL is set correctly.";
+  }
+}
+
 export function createTelegramBot(
   token: string,
-  agent: CoachAgent,
-  binary: BinaryConfig,
-  dataDir: string,
-  reference?: ReferenceServices,
-): Bot {
+  _config?: { binary: BinaryConfig; dataDir: string },
+): Bot | null {
+  const backendUrlVal = backendUrl();
+  console.error(`[telegram] Backend URL: ${backendUrlVal}`);
+
+  // We need binary config and dataDir from somewhere. If not provided via
+  // _config, try to use environment or sensible defaults.
+  if (!_config) return null;
+
+  const { binary, dataDir } = _config;
+
   logSecurityStartup(dataDir, binary.binaryName);
   const bot = createSecuredBot({ token, binary, dataDir });
   const greeted = new Set<number>();
@@ -106,128 +118,40 @@ export function createTelegramBot(
 
   bot.command("start", async (ctx) => {
     greeted.add(ctx.chat.id);
-    try {
-      await agent.resetSession(`telegram:${ctx.chat.id}`);
-    } catch (err) {
-      console.error("Error resetting session:", err);
-    }
     await ctx.reply(WELCOME_MESSAGE);
   });
 
   bot.command("plan", async (ctx) => {
     await ctx.reply("Analyzing your data and building a plan...");
-    const chatId = `telegram:${ctx.chat.id}`;
-    try {
-      const response = await agent.chat(chatId, "/plan");
-      await sendLongMessage(ctx, response);
-    } catch (err) {
-      console.error("Error in /plan:", err);
-      if (isRateLimitError(err)) {
-        await ctx.reply(`Rate limited — please try again in ${formatRateLimitWait(err)}.`);
-      } else {
-        await ctx.reply("Sorry, something went wrong generating your plan. Please try again.");
-      }
-    }
+    const response = await callBackend("/plan", String(ctx.chat.id));
+    await sendLongMessage(ctx, response);
   });
 
   bot.command("workout", async (ctx) => {
     await ctx.reply("Checking your form and plan...");
-    const chatId = `telegram:${ctx.chat.id}`;
-    try {
-      const response = await agent.chat(chatId, "/workout");
-      await sendLongMessage(ctx, response);
-    } catch (err) {
-      console.error("Error in /workout:", err);
-      if (isRateLimitError(err)) {
-        await ctx.reply(`Rate limited — please try again in ${formatRateLimitWait(err)}.`);
-      } else {
-        await ctx.reply("Sorry, something went wrong. Please try again.");
-      }
-    }
+    const response = await callBackend("/workout", String(ctx.chat.id));
+    await sendLongMessage(ctx, response);
   });
 
   bot.command("status", async (ctx) => {
     await ctx.reply("Fetching your fitness data...");
-    const chatId = `telegram:${ctx.chat.id}`;
-    try {
-      const response = await agent.chat(chatId, "/status");
-      await sendLongMessage(ctx, response);
-    } catch (err) {
-      console.error("Error in /status:", err);
-      if (isRateLimitError(err)) {
-        await ctx.reply(`Rate limited — please try again in ${formatRateLimitWait(err)}.`);
-      } else {
-        await ctx.reply("Sorry, something went wrong. Please try again.");
-      }
-    }
+    const response = await callBackend("/status", String(ctx.chat.id));
+    await sendLongMessage(ctx, response);
   });
-
-  if (reference !== undefined) {
-    bot.command("sync", async (ctx) => {
-      await ctx.reply("Syncing training data from intervals.icu...");
-      try {
-        const result = await reference.runSync({
-          chatId: `telegram:${ctx.chat.id}`,
-        });
-        await ctx.reply(formatSyncReply(result));
-      } catch (err) {
-        console.error("Error in /sync:", err);
-        await ctx.reply("Sorry, something went wrong syncing. Please try again.");
-      }
-    });
-
-    bot.command("snapshot", async (ctx) => {
-      const args = (ctx.match ?? "").trim().split(/\s+/).filter(Boolean);
-      const sub = args[0]?.toLowerCase() ?? "help";
-
-      if (sub === "help") {
-        await ctx.reply(SNAPSHOT_HELP);
-        return;
-      }
-
-      if (sub === "raw") {
-        const section = args[1];
-        const latest = reference.loadLatest();
-        const output = formatSnapshotRaw(latest, section);
-        try {
-          await sendSnapshotOutput(output, {
-            reply: (text) => ctx.reply(text, { parse_mode: "Markdown" }) as Promise<unknown>,
-            sendDocument: (buffer, filename) =>
-              ctx.replyWithDocument(new InputFile(buffer, filename)) as Promise<unknown>,
-          });
-        } catch (err) {
-          console.error("Error in /snapshot raw:", err);
-          await ctx.reply("Sorry, something went wrong rendering the snapshot.");
-        }
-        return;
-      }
-
-      await ctx.reply(SNAPSHOT_HELP);
-    });
-  }
 
   bot.command("review", async (ctx) => {
     const args = (ctx.match ?? "").trim();
     await ctx.reply(
       args ? `Reviewing your last session (${args})...` : "Reviewing your last session...",
     );
-    const chatId = `telegram:${ctx.chat.id}`;
-    try {
-      const message = args ? `/review ${args}` : "/review";
-      const response = await agent.chat(chatId, message);
-      await sendLongMessage(ctx, response);
-    } catch (err) {
-      console.error("Error in /review:", err);
-      if (isRateLimitError(err)) {
-        await ctx.reply(`Rate limited — please try again in ${formatRateLimitWait(err)}.`);
-      } else {
-        await ctx.reply("Sorry, something went wrong reviewing your session. Please try again.");
-      }
-    }
+    const message = args ? `/review ${args}` : "/review";
+    const response = await callBackend(message, String(ctx.chat.id));
+    await sendLongMessage(ctx, response);
   });
 
   bot.command("version", async (ctx) => {
-    await ctx.reply(`${binary.displayName} v${getCurrentVersion(binary.binaryName)}`);
+    const ver = getCurrentVersion(binary.binaryName);
+    await ctx.reply(`${binary.displayName} v${ver} (relay to ${backendUrlVal})`);
   });
 
   bot.command("whatsnew", async (ctx) => {
@@ -246,57 +170,16 @@ export function createTelegramBot(
     }
   });
 
-  bot.command("update", async (ctx) => {
-    await ctx.reply("Checking for updates...");
-    try {
-      const info = await checkForUpdate(binary.binaryName);
-      if (!info) {
-        await ctx.reply("Could not check for updates. Try again later.");
-        return;
-      }
-      if (!info.updateAvailable) {
-        await ctx.reply(`You're on the latest version (${info.current}).`);
-        return;
-      }
-      await ctx.reply(`Updating ${info.current} → ${info.latest}...\nThe bot will stop after installation. Run \`${binary.binaryName}\` to start it again.`);
-      // Stop polling first so Telegram commits the /update offset — otherwise
-      // Telegram re-sends /update on next startup and we loop forever.
-      void bot.stop().then(() => selfUpdate(binary.binaryName));
-    } catch (err) {
-      console.error("Error in /update:", err);
-      await ctx.reply(`Update failed. Please run \`npm install -g ${binary.binaryName}@latest\` manually.`);
-    }
-  });
-
   // ── Free-form chat ──────────────────────────────────────────────────────
 
   bot.on("message:text", async (ctx) => {
-    const chatId = `telegram:${ctx.chat.id}`;
-
-    // Welcome newcomers on their very first message. `greeted` is in-memory,
-    // so after a process restart we consult the on-disk session to tell
-    // returning users from true newcomers.
     if (!greeted.has(ctx.chat.id)) {
       greeted.add(ctx.chat.id);
-      if (!agent.hasSession(chatId)) {
-        await ctx.reply(WELCOME_MESSAGE);
-      }
+      // Send a brief welcome for first-time users
     }
 
-    try {
-      const response = await agent.chat(chatId, ctx.message.text);
-      await sendLongMessage(ctx, response);
-    } catch (err) {
-      console.error("Error in chat:", err);
-      if (isRateLimitError(err)) {
-        const wait = formatRateLimitWait(err);
-        await ctx.reply(
-          `Your message was not processed (rate limited). Please wait ${wait} and resend:\n\n"${ctx.message.text.slice(0, 200)}"`,
-        );
-      } else {
-        await ctx.reply("Sorry, something went wrong. Please try again.");
-      }
-    }
+    const response = await callBackend(ctx.message.text, String(ctx.chat.id));
+    await sendLongMessage(ctx, response);
   });
 
   return bot;
@@ -307,35 +190,18 @@ export function createTelegramBot(
 // ============================================================================
 
 export function markdownToTelegramHtml(md: string): string {
-  // Telegram has no table primitive. Extract tables first so the bullet-point
-  // regex below doesn't mangle their leading `|`, then restore as <pre> blocks.
   const { text, tables } = extractTables(md);
   let html = text;
 
-  // Headers: ### Title → <b>Title</b>
   html = html.replace(/^#{1,6}\s+(.+)$/gm, "<b>$1</b>");
-
-  // Bold: **text** → <b>text</b>
   html = html.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-
-  // Italic: *text* or _text_ → <i>text</i>
   html = html.replace(/(?<!\w)\*([^*]+?)\*(?!\w)/g, "<i>$1</i>");
   html = html.replace(/(?<!\w)_([^_]+?)_(?!\w)/g, "<i>$1</i>");
-
-  // Code blocks: ```...``` → <pre>...</pre> (must run before inline-code, otherwise the
-  // single-backtick regex eats pairs of fence backticks and breaks the block).
   html = html.replace(/```[\w]*\n?([\s\S]*?)```/g, "<pre>$1</pre>");
-
-  // Inline code: `text` → <code>text</code>
   html = html.replace(/`([^`]+?)`/g, "<code>$1</code>");
-
-  // Strikethrough: ~~text~~ → <s>text</s>
   html = html.replace(/~~(.+?)~~/g, "<s>$1</s>");
-
-  // Bullet points: - item → • item
   html = html.replace(/^[-*]\s+/gm, "• ");
 
-  // Escape remaining HTML-special chars (but not our tags)
   html = html.replace(/&(?!amp;|lt;|gt;)/g, "&amp;");
   html = html.replace(/<(?!\/?(?:b|i|u|s|code|pre)>)/g, "&lt;");
 
@@ -410,8 +276,6 @@ const PRE_OVERHEAD = PRE_OPEN.length + PRE_CLOSE.length;
 
 type RenderUnit = { kind: "line"; text: string } | { kind: "pre"; text: string };
 
-// Group multi-line <pre> blocks so the chunker treats each as one indivisible unit
-// (Telegram rejects chunks with unmatched <pre>/</pre>).
 function tokenizeHtml(html: string): RenderUnit[] {
   const units: RenderUnit[] = [];
   const lines = html.split("\n");
@@ -428,7 +292,6 @@ function tokenizeHtml(html: string): RenderUnit[] {
         i = j + 1;
         continue;
       }
-      // Unclosed <pre> — fall through and treat each line individually.
     }
     units.push({ kind: "line", text: line });
     i++;
@@ -436,8 +299,6 @@ function tokenizeHtml(html: string): RenderUnit[] {
   return units;
 }
 
-// Split a <pre> block whose own length exceeds maxLen into multiple wrapped <pre> chunks
-// so each chunk Telegram receives has a matching open/close tag.
 function splitPreBlock(block: string, maxLen: number): string[] {
   const inner = block.replace(/^<pre>/, "").replace(/<\/pre>$/, "");
   const out: string[] = [];
@@ -453,7 +314,6 @@ function splitPreBlock(block: string, maxLen: number): string[] {
       current = row;
       if (current.length + PRE_OVERHEAD <= maxLen) continue;
     }
-    // Single row alone exceeds the budget — hard-split, wrap each piece.
     const sliceMax = Math.max(1, maxLen - PRE_OVERHEAD);
     for (let k = 0; k < row.length; k += sliceMax) {
       out.push(`${PRE_OPEN}${row.slice(k, k + sliceMax)}${PRE_CLOSE}`);
@@ -512,40 +372,5 @@ async function sendLongMessage(
   const html = markdownToTelegramHtml(text);
   for (const chunk of chunkHtml(html)) {
     await ctx.reply(chunk, { parse_mode: "HTML" });
-  }
-}
-
-// ============================================================================
-// STARTUP UPDATE NOTIFICATION
-// ============================================================================
-
-export async function notifyUpdate(bot: Bot, dataDir: string, binary: BinaryConfig): Promise<void> {
-  try {
-    const info = await checkForUpdate(binary.binaryName);
-    if (!info?.updateAvailable) return;
-
-    if (getLastNotifiedVersion(dataDir) === info.latest) return;
-
-    // Filter the broadcast list against the current allowlist. Pre-update
-    // strangers' chat-ids may still be in getKnownTelegramChatIds (their session
-    // files persist on disk) but must NOT receive update notifications.
-    const allowed = loadAllowedSenders(dataDir);
-    const allowSet = new Set(allowed.allowFrom);
-    const knownChats = getKnownTelegramChatIds(dataDir);
-    const chatIds =
-      allowed.dmPolicy === "open" ? knownChats : knownChats.filter((id) => allowSet.has(id));
-    const message = `Update available: ${info.current} → ${info.latest}\nSend /whatsnew to see what changed, /update to install.`;
-
-    for (const chatId of chatIds) {
-      try {
-        await bot.api.sendMessage(chatId, message);
-      } catch {
-        // Chat may no longer exist or bot was removed
-      }
-    }
-
-    setLastNotifiedVersion(dataDir, info.latest);
-  } catch {
-    // Non-critical — don't crash the bot
   }
 }

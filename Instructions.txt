@@ -1,0 +1,320 @@
+CYCLOAI PERIODISATION AND PLANNING INSTRUCTIONS
+==============================================
+
+Goal
+----
+Build a safe, scalable, and intelligent training-planning architecture for CycloAI where core training structure is deterministic, athlete history influences model selection, and the LLM is used only for user-facing narrative and explanation.
+
+Core Principle
+--------------
+The deterministic engine must be the source of truth.
+The LLM must not invent training structure.
+The LLM should only explain, render, and personalize the structured output created by deterministic logic.
+
+Final System Split
+------------------
+
+1. Deterministic Layer
+This layer decides the actual training structure.
+It should handle:
+- feasibility assessment
+- periodisation model selection
+- macrocycle creation
+- mesocycle creation
+- weekly skeleton generation
+- progression rules
+- taper rules
+- workout slot allocation
+- validation rules
+
+2. LLM Layer
+This layer converts structured training decisions into readable and personalized content.
+It should handle:
+- weekly plan wording
+- session explanations
+- coaching notes
+- nutrition guidance text
+- pre-race instructions text
+- race-prep narrative
+- alternative suggestions for missed sessions
+
+3. Storage Layer
+This layer persists both the structured plan and rendered output.
+It should store:
+- deterministic skeleton as source of truth
+- LLM-rendered plan text for UI
+- athlete history and training response data
+- audit trail of model changes
+
+Recommended Architecture
+------------------------
+
+Deterministic modules:
+- packages/sport-cycling/src/plan-builder.ts
+  Builds the multi-week plan skeleton.
+  Output should include phases, weekly targets, zone distributions, and key workout intents.
+
+- packages/sport-cycling/src/periodization.ts
+  Selects the best periodisation model based on athlete level, training history, event type, event date, availability, and past response to training.
+
+- packages/sport-cycling/src/feasibility.ts
+  Assesses whether the stated goal is realistic given available time, current fitness, event date, and athlete history.
+
+Recommended additional deterministic modules:
+- constraints.ts
+  Checks protected weekdays, fatigue constraints, injury flags, max session duration, and available time.
+
+- taper.ts
+  Applies deterministic taper rules near races.
+
+- load-progressor.ts
+  Controls week-to-week progression, ramp rate, and recovery week placement.
+
+- workout-slotter.ts
+  Assigns workout intents into real weekdays based on athlete availability.
+
+- plan-validator.ts
+  Ensures the generated weekly structure is valid before saving.
+
+Recommended deterministic tools exposed to the LLM:
+- build_plan_skeleton
+- assess_feasibility
+- get_sample_week
+- validate_week_structure
+- build_taper_week
+- adjust_plan_for_missed_sessions
+
+Important Rule
+--------------
+The LLM may call deterministic tools, but the tool outputs must remain authoritative.
+The LLM should never override deterministic training structure unless a separate validated adjustment tool exists.
+
+How Weekly Plans Should Work
+----------------------------
+Do NOT let the LLM generate weekly plans from scratch.
+Instead:
+1. Deterministic engine creates the weekly structure
+2. LLM receives structured JSON
+3. LLM renders athlete-friendly weekly content
+4. Final output is validated and stored
+
+Weekly skeleton must define:
+- week number
+- phase
+- total volume target
+- intensity distribution
+- key sessions
+- recovery days
+- long ride target
+- taper flag if relevant
+- constraints and notes
+
+The LLM-generated weekly plan may add:
+- session descriptions
+- purpose of each workout
+- coaching advice
+- execution tips
+- motivational framing
+
+Periodisation Model Selection
+-----------------------------
+There is no single best periodisation model for every rider.
+The correct model depends on athlete profile and response history.
+
+Suggested default selection rules:
+- Beginner or inconsistent rider -> linear periodisation
+- Intermediate rider -> block or pyramidal periodisation
+- Advanced endurance rider -> polarized or pyramidal periodisation
+- Short race-specific build -> block periodisation
+- Long build with stable availability -> linear into block or pyramidal into polarized
+
+The system should choose the model based on:
+- training age
+- consistency of past training
+- available training hours
+- target event distance and demands
+- time until goal event
+- fatigue tolerance
+- recovery patterns
+- historical response to previous blocks
+
+How to Use Athlete History
+--------------------------
+Athlete history should influence model selection and future recommendations.
+
+Use rider history to evaluate:
+- improvement trend (FTP, race results, repeat efforts, climbing performance)
+- adherence to planned training
+- response to hard blocks
+- recovery quality after high load
+- whether the rider improves more under steady progression or concentrated load
+- whether previous tapers improved or hurt performance
+
+Examples:
+- Rider improves with focused threshold blocks and tolerates load well -> block periodisation may fit
+- Rider performs best with large aerobic volume and small hard doses -> polarized or pyramidal may fit
+- Rider often misses sessions or is inconsistent -> simpler linear model may fit better
+
+Auto-Change Recommendation Logic
+--------------------------------
+Yes, the system can recommend changing the periodisation model based on rider history.
+However, it should not silently auto-change by default.
+
+Best default behavior:
+1. Detect better-fitting model from history
+2. Create recommendation with confidence score
+3. Show fixed notification to rider
+4. Rider accepts, declines, or snoozes
+5. Change is applied only after confirmation unless auto-apply is explicitly enabled
+
+Why:
+- preserves rider trust
+- avoids surprise changes
+- improves adherence
+- gives the rider control
+
+Notification Rule
+-----------------
+Use a fixed in-app notification for model change recommendations.
+
+Example notification:
+"CycloAI detected that your recent training response matches a block periodisation model better than your current linear setup. Recommended change starting next week. Apply now?"
+
+Suggested actions:
+- Apply change
+- Keep current model
+- Remind me later
+
+When model changes are allowed:
+- at the start of a new training block
+- after a completed recovery week
+- after enough evidence has accumulated
+
+When model changes should NOT happen:
+- in the middle of a taper
+- just before a key race
+- during injury or illness uncertainty
+- when confidence is low
+
+Optional Power-User Setting
+---------------------------
+Allow an optional setting:
+"Auto-apply training model changes when confidence is high"
+
+Only use this if:
+- confidence score is high
+- no race is in a protected window
+- no injury/fatigue red flag exists
+- change occurs at a safe transition point
+
+Recommended Data Flow
+---------------------
+1. Athlete profile + goal + history enter deterministic engine
+2. feasibility.ts checks realism
+3. periodization.ts selects model
+4. plan-builder.ts creates macrocycle and weekly skeleton
+5. validation modules confirm safety and correctness
+6. LLM renders weekly narrative and session explanations
+7. MongoDB stores both skeleton and rendered plan
+8. Monitoring system watches rider response over time
+9. If a better model is detected, fixed notification is sent
+10. Model changes only with rider confirmation unless auto-apply is enabled
+
+Storage Recommendations
+-----------------------
+Store both structured and rendered forms.
+
+Recommended plan document fields:
+- athleteId
+- selectedPeriodisationModel
+- feasibilityResult
+- planSkeleton
+- renderedWeeklyPlans
+- generatedAt
+- lastUpdatedAt
+- modelChangeHistory
+- currentPlanStatus
+
+Recommended model change history fields:
+- previousModel
+- suggestedModel
+- reason
+- confidenceScore
+- triggeredAt
+- userDecision
+- appliedAt
+
+Validation Rules
+----------------
+Always validate deterministic output before saving.
+Check:
+- volume progression is safe
+- hard sessions are spaced correctly
+- recovery weeks are placed correctly
+- taper is applied when needed
+- availability constraints are respected
+- long rides fit athlete schedule
+- beginner plans are not overcomplicated
+
+What the LLM Must Never Do
+--------------------------
+The LLM must never:
+- invent weekly volume targets without skeleton input
+- change taper timing on its own
+- move key workouts without validation
+- override feasibility checks
+- choose a new periodisation model by itself
+- save plans without deterministic validation
+
+What the LLM Is Good At
+-----------------------
+The LLM is good at:
+- turning structured data into readable plans
+- making plans feel personalized
+- writing explanations in plain language
+- generating coaching notes
+- adapting tone based on athlete type
+- proposing fallback advice after missed sessions
+
+Best Final Recommendation for CycloAI
+-------------------------------------
+Use this final architecture:
+
+Deterministic first:
+- assess feasibility
+- choose periodisation model
+- build plan skeleton
+- validate constraints
+- decide if model recommendation should change
+
+LLM second:
+- render weekly plan
+- explain sessions
+- write race and nutrition guidance
+
+Human control:
+- rider confirms model changes through fixed notification
+- optional auto-apply only for high-confidence cases
+
+Summary Decision
+----------------
+Your architecture direction is correct, but it should follow these stricter rules:
+- deterministic engine is the source of truth
+- LLM is only for narrative and explanation
+- weekly plans must start from structured skeletons
+- periodisation model selection should use rider history
+- model changes should be recommended through fixed notifications
+- silent switching should not be the default
+
+Implementation Checklist
+------------------------
+[ ] Keep periodisation, feasibility, and plan skeleton deterministic
+[ ] Add constraints, taper, progression, slotting, and validation modules
+[ ] Expose deterministic planning tools to the LLM
+[ ] Generate weekly plans from structured JSON, not raw prompts
+[ ] Store both planSkeleton and planRendered
+[ ] Use athlete history to score better-fitting periodisation models
+[ ] Show fixed notifications for recommended model changes
+[ ] Allow optional auto-apply only under strict safety rules
+[ ] Prevent model changes in taper or race-protected windows
+[ ] Log every model recommendation and rider decision

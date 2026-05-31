@@ -63,13 +63,13 @@ const LandingNavbar = () => {
             Log In
           </motion.button>
         </Link>
-        <Link href="/signup">
+        <Link href="/signup" onClick={() => { localStorage.removeItem("cycloai_signed_in"); localStorage.removeItem("cycloai_user"); localStorage.removeItem("cycloai_session_ts"); }}>
           <motion.button
             whileHover={{ scale: 1.05, backgroundColor: '#E55C00' }}
             whileTap={{ scale: 0.95 }}
             className="skew-x-[-15deg] px-6 py-2 bg-accent-orange text-white font-dmSans text-lg relative group overflow-hidden"
           >
-            <span className="block skew-x-[15deg] group-hover:skew-x-0 transition-transform duration-300">Sign Up</span>
+            <span className="block skew-x-[15deg] group-hover:skew-x-0 transition-transform duration-300">Start Free</span>
           </motion.button>
         </Link>
       </div>

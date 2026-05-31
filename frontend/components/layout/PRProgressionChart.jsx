@@ -37,7 +37,7 @@ const PRProgressionChart = () => {
       <h2 className="font-bebasNeue text-2xl text-text-primary mb-4">PR Progression (5km)</h2>
 
       <div className="h-80">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={prProgressionData}>
             <CartesianGrid strokeDasharray="3 3" stroke="#3B414B" />
             <XAxis dataKey="date" stroke="#8F9BB3" className="font-dmSans text-sm" />

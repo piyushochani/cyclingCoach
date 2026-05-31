@@ -18,7 +18,7 @@ const WeeklyMileageGraph = ({ activities = [] }) => {
     const dayKm = weeklyActivities
       .filter((a) => new Date(a.date).getDay() === i)
       .reduce((sum, a) => sum + a.distance, 0);
-    return { name, km: Math.round(dayKm * 10) / 10 };
+    return { name, km: parseFloat(dayKm.toFixed(2)) };
   });
   return (
     <motion.div
@@ -30,7 +30,7 @@ const WeeklyMileageGraph = ({ activities = [] }) => {
       <h2 className="font-bebasNeue text-2xl text-text-primary mb-4">Weekly Mileage</h2>
 
       <div className="h-80">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart
             data={data}
             margin={{

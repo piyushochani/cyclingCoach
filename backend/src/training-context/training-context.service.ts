@@ -5,6 +5,7 @@ import { MonthContext } from './month-context.schema';
 import { WeekContext } from './week-context.schema';
 import { PreRaceWeekPlan } from './pre-race-week-plan.schema';
 import { WeeklyPlan } from './weekly-plan.schema';
+import { User } from '../user/user.schema';
 
 @Injectable()
 export class TrainingContextService {
@@ -13,7 +14,31 @@ export class TrainingContextService {
     @InjectModel(WeekContext.name) private weekContextModel: Model<WeekContext>,
     @InjectModel(PreRaceWeekPlan.name) private preRaceWeekPlanModel: Model<PreRaceWeekPlan>,
     @InjectModel(WeeklyPlan.name) private weeklyPlanModel: Model<WeeklyPlan>,
+    @InjectModel(User.name) private userModel: Model<User>,
   ) {}
+
+  private async getTrainingStart(userId: string): Promise<Date> {
+    try {
+      const user = await this.userModel.findById(userId).select('trainingStart').lean().exec();
+      if (user?.trainingStart) return new Date(user.trainingStart);
+    } catch {}
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+  }
+
+  private getMondayOfWeek(date: Date): Date {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    return d;
+  }
+
+  private computeRelativeWeek(targetDate: Date, trainingStart: Date): number {
+    const targetMonday = this.getMondayOfWeek(targetDate);
+    const startMonday = this.getMondayOfWeek(trainingStart);
+    const diffMs = targetMonday.getTime() - startMonday.getTime();
+    return Math.round(diffMs / (7 * 86400000));
+  }
 
   // ── Month Context (last 2 months, rotating) ──
 
@@ -29,7 +54,7 @@ export class TrainingContextService {
     return this.monthContextModel.findOneAndUpdate(
       { user: userId as any, year, month },
       { ...data, updatedAt: new Date() },
-      { upsert: true, new: true },
+      { upsert: true, returnDocument: 'after' },
     ).exec();
   }
 
@@ -61,7 +86,7 @@ export class TrainingContextService {
     return this.weekContextModel.findOneAndUpdate(
       { user: userId as any, year, week },
       { ...data, updatedAt: new Date() },
-      { upsert: true, new: true },
+      { upsert: true, returnDocument: 'after' },
     ).exec();
   }
 
@@ -92,7 +117,7 @@ export class TrainingContextService {
     return this.preRaceWeekPlanModel.findOneAndUpdate(
       { race: raceId as any, user: userId as any, weekOffset },
       { ...data, updatedAt: new Date() },
-      { upsert: true, new: true },
+      { upsert: true, returnDocument: 'after' },
     ).exec();
   }
 
@@ -107,36 +132,62 @@ export class TrainingContextService {
 
   // ── Weekly Plan (this week's training) ──
 
-  async getWeeklyPlan(userId: string, year: number, week: number): Promise<WeeklyPlan | null> {
+  async getWeeklyPlan(userId: string, relativeWeek: number): Promise<WeeklyPlan | null> {
     return this.weeklyPlanModel.findOne({
       user: userId as any,
-      year,
-      week,
+      relativeWeek,
     }).lean().exec();
   }
 
   async getCurrentWeekPlan(userId: string): Promise<WeeklyPlan | null> {
-    const now = new Date();
-    const startOfYear = new Date(now.getFullYear(), 0, 1);
-    const days = Math.floor((now.getTime() - startOfYear.getTime()) / 86400000);
-    const week = Math.ceil((days + startOfYear.getDay() + 1) / 7);
-    return this.getWeeklyPlan(userId, now.getFullYear(), week);
+    const trainingStart = await this.getTrainingStart(userId);
+    const relativeWeek = this.computeRelativeWeek(new Date(), trainingStart);
+    return this.getWeeklyPlan(userId, relativeWeek);
   }
 
-  async upsertWeeklyPlan(userId: string, year: number, week: number, data: any): Promise<WeeklyPlan> {
+  async upsertWeeklyPlan(userId: string, relativeWeek: number, data: any): Promise<WeeklyPlan> {
+    const trainingStart = await this.getTrainingStart(userId);
+    const targetDate = new Date(trainingStart);
+    targetDate.setDate(targetDate.getDate() + relativeWeek * 7);
+    const startDate = this.getMondayOfWeek(targetDate);
+    const { year, week } = this.getCalendarWeek(startDate);
     return this.weeklyPlanModel.findOneAndUpdate(
-      { user: userId as any, year, week },
-      { ...data, updatedAt: new Date() },
-      { upsert: true, new: true },
+      { user: userId as any, relativeWeek },
+      { ...data, year, week, startDate, updatedAt: new Date() },
+      { upsert: true, returnDocument: 'after' },
     ).exec();
   }
 
-  async deleteWeeklyPlan(userId: string, year: number, week: number): Promise<boolean> {
+  async upsertWeeklyPlanWithSkeleton(
+    userId: string,
+    relativeWeek: number,
+    data: any,
+    skeleton: Record<string, any>,
+  ): Promise<WeeklyPlan> {
+    const trainingStart = await this.getTrainingStart(userId);
+    const targetDate = new Date(trainingStart);
+    targetDate.setDate(targetDate.getDate() + relativeWeek * 7);
+    const startDate = this.getMondayOfWeek(targetDate);
+    const { year, week } = this.getCalendarWeek(startDate);
+    return this.weeklyPlanModel.findOneAndUpdate(
+      { user: userId as any, relativeWeek },
+      { ...data, year, week, startDate, skeleton, updatedAt: new Date() },
+      { upsert: true, returnDocument: 'after' },
+    ).exec();
+  }
+
+  async deleteWeeklyPlan(userId: string, relativeWeek: number): Promise<boolean> {
     const result = await this.weeklyPlanModel.findOneAndDelete({
       user: userId as any,
-      year,
-      week,
+      relativeWeek,
     }).exec();
     return !!result;
+  }
+
+  private getCalendarWeek(date: Date): { year: number; week: number } {
+    const startOfYear = new Date(date.getFullYear(), 0, 1);
+    const days = Math.floor((date.getTime() - startOfYear.getTime()) / 86400000);
+    const week = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+    return { year: date.getFullYear(), week };
   }
 }

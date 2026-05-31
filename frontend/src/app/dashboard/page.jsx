@@ -5,13 +5,15 @@ import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { api } from "../../../lib/api";
 import { useAutoSync } from "../../../lib/useAutoSync";
-import ProfileContainer from "../../../components/layout/ProfileContainer";
+import WeeklyGoalCard from "../../../components/layout/WeeklyGoalCard";
 import WeeklyScheduleCard from "../../../components/layout/WeekScheduleCard";
 import StatsYearCard from "../../../components/layout/StatsYearCard";
 import HeatmapContainer from "../../../components/layout/HeatmapContainer";
 import WeeklyGraph from "../../../components/layout/WeeklyGraph";
 import WeatherWidget from "../../../components/layout/WeatherWidget";
 import RecentActivity from "../../../components/layout/RecentActivity";
+import OnboardingChat from "../../../components/layout/OnboardingChat";
+
 
 function buildHeatmapData(activities) {
   if (!activities || activities.length === 0) return null;
@@ -43,7 +45,7 @@ function buildHeatmapData(activities) {
         const count = day.activities.length;
         const level = count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : 3;
         const hours = (day.totalTime / 3600).toFixed(1);
-        const dist = day.totalDistance.toFixed(1);
+        const dist = (day.totalDistance / 1000).toFixed(2);
         row.push({
           level,
           details: {
@@ -51,7 +53,7 @@ function buildHeatmapData(activities) {
             activities: count,
             time: `${hours} hrs`,
             distance: `${dist} km`,
-            calories: `${Math.round(day.totalDistance * 28)} kcal`,
+            calories: `${(day.totalDistance * 28 / 1000).toFixed(2)} kcal`,
           },
         });
       } else {
@@ -69,7 +71,9 @@ const DashboardPage = () => {
   const [stats, setStats] = useState(null);
   const [races, setRaces] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [weeklyPlan, setWeeklyPlan] = useState(null);
   const [user, setUser] = useState(null);
+  const [syncInfo, setSyncInfo] = useState(null);
   const { status: syncStatus, lastSynced } = useAutoSync();
 
   useEffect(() => {
@@ -85,22 +89,26 @@ const DashboardPage = () => {
       api.get('/activities').catch(() => []),
       api.get('/races').catch(() => []),
       api.get('/plans').catch(() => []),
+      api.get('/training-context/weekly-plan').catch(() => null),
+      api.get('/sync/status').catch(() => null),
     ])
-      .then(([statsData, activitiesData, racesData, plansData]) => {
+      .then(([statsData, activitiesData, racesData, plansData, weeklyPlanData, syncData]) => {
         setStats(statsData);
         setActivities(activitiesData);
         setRaces(racesData);
         setPlans(plansData);
+        setWeeklyPlan(weeklyPlanData);
+        setSyncInfo(syncData);
       });
   }, [pathname]);
 
   const statCards = useMemo(() => stats
     ? [
-        { label: "Distance", value: Math.round(stats.totalDistance).toLocaleString(), unit: "KM", accent: "→" },
-        { label: "Time", value: Math.round(stats.totalDuration / 3600).toLocaleString(), unit: "HRS", accent: "◷" },
+        { label: "Distance", value: (stats.totalDistance / 1000).toFixed(2), unit: "KM", accent: "→" },
+        { label: "Time", value: (stats.totalDuration / 3600).toFixed(1), unit: "HRS", accent: "◷" },
         { label: "Activities", value: stats.activityCount.toString(), unit: "", accent: "◈" },
         { label: "Races Played", value: races.length.toString(), unit: "", accent: "⬡" },
-        { label: "Avg / Week", value: stats.activityCount > 4 ? Math.round(stats.totalDistance / (stats.activityCount / 4)).toLocaleString() : "0", unit: "KM", accent: "∿" },
+        { label: "Avg / Week", value: stats.activityCount > 4 ? ((stats.totalDistance / 1000) / (stats.activityCount / 4)).toFixed(2) : "0", unit: "KM", accent: "∿" },
       ]
     : null, [stats, races]);
 
@@ -119,13 +127,13 @@ const DashboardPage = () => {
         transition={{ duration: 0.45, ease: "easeOut" }}
         className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
       >
-        <div className="mb-8 flex flex-col gap-3 border-b border-white/8 pb-6 md:flex-row md:items-end md:justify-between">
+        <div className="mb-8 flex flex-col gap-3 border-b border-white/10 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF4C00]/80">
+            <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
               Performance Dashboard
             </p>
             <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
-              Your Dashboard
+              Your <span className="text-[#FF5500]">Dashboard</span>
             </h1>
             <p className="mt-3 max-w-2xl font-dmSans text-sm text-white/50 md:text-[15px]">
               Track your season, review training consistency, and monitor your
@@ -135,12 +143,6 @@ const DashboardPage = () => {
 
           <div className="flex flex-col items-end gap-2">
             <WeatherWidget />
-            <div className="flex items-center gap-2 self-start rounded-full border border-[#FF4C00]/20 bg-[#FF4C00]/10 px-4 py-2 md:self-auto">
-              <span className="h-2 w-2 rounded-full bg-[#FF4C00] shadow-[0_0_10px_rgba(255,76,0,0.7)]" />
-              <span className="font-dmSans text-[11px] uppercase tracking-[0.14em] text-[#FF4C00]">
-                2026 Season Active
-              </span>
-            </div>
             {syncStatus !== "idle" && (
               <div className={`flex items-center gap-2 self-start rounded-full border px-3 py-1.5 md:self-auto ${
                 syncStatus === "syncing" ? "border-[#FF5500]/30 bg-[#FF5500]/10" :
@@ -163,13 +165,42 @@ const DashboardPage = () => {
                 </span>
               </div>
             )}
+            {syncInfo && (
+              <div className={`flex items-center gap-2 self-start rounded-full border px-3 py-1.5 md:self-auto ${
+                syncInfo.isUpToDate
+                  ? "border-green-500/30 bg-green-500/10"
+                  : "border-amber-500/30 bg-amber-500/10"
+              }`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${
+                  syncInfo.isUpToDate ? "bg-green-500" : "bg-amber-500"
+                }`} />
+                <span className={`font-dmSans text-[10px] uppercase tracking-[0.14em] ${
+                  syncInfo.isUpToDate ? "text-green-400" : "text-amber-400"
+                }`}>
+                  {syncInfo.isUpToDate ? "All rides synced" : "Needs refresh"}
+                </span>
+                {syncInfo.updatedAt && (
+                  <span className="font-dmSans text-[9px] text-white/30">
+                    {new Date(syncInfo.updatedAt).toLocaleDateString()}
+                  </span>
+                )}
+              </div>
+            )}
+            {syncInfo?.rateLimitExhausted && (
+              <div className="flex items-center gap-2 self-start rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 md:self-auto">
+                <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+                <span className="font-dmSans text-[10px] uppercase tracking-[0.14em] text-red-400">
+                  API rate limit hit
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="flex flex-col gap-5">
-            <ProfileContainer user={user} />
-            <WeeklyScheduleCard plans={plans} />
+                <WeeklyGoalCard activities={activities} />
+            <WeeklyScheduleCard plan={weeklyPlan} />
           </div>
 
           <div className="flex flex-col gap-5">
@@ -184,6 +215,8 @@ const DashboardPage = () => {
         <div className="mt-6">
           <RecentActivity activities={activities} />
         </div>
+
+        <OnboardingChat />
       </motion.main>
     </div>
   );

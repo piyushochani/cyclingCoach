@@ -41,7 +41,7 @@ const AIPeriodization = () => {
       {/* Periodization Timeline Bar Chart */}
       <h3 className="font-bebasNeue text-xl text-text-primary mb-3">Your Training Cycles</h3>
       <div className="h-48">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart
             data={periodizationData}
             layout="vertical"

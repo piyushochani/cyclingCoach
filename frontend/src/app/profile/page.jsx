@@ -144,6 +144,8 @@ const ProfilePage = () => {
           goal: u.goal || "",
           cyclingYears: u.cyclingYears || "",
           ftp: u.ftp || "",
+          maxHeartrate: u.maxHeartrate || "",
+          age: u.age || "",
           profileImage: u.profileImage || "",
           description: u.description || "",
         });
@@ -187,6 +189,8 @@ const ProfilePage = () => {
         goal: data.goal || "",
         cyclingYears: data.cyclingYears || "",
         ftp: data.ftp || "",
+        maxHeartrate: data.maxHeartrate || "",
+        age: data.age || "",
         profileImage: data.profileImage || "",
         description: data.description || "",
       }));
@@ -212,6 +216,8 @@ const ProfilePage = () => {
         goal: form.goal,
         cyclingYears: form.cyclingYears ? Number(form.cyclingYears) : 0,
         ftp: form.ftp ? Number(form.ftp) : null,
+        maxHeartrate: form.maxHeartrate ? Number(form.maxHeartrate) : null,
+        age: form.age ? Number(form.age) : null,
         description: form.description || null,
         coaches: customCoaches,
       });
@@ -300,11 +306,11 @@ const ProfilePage = () => {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: "easeOut" }}
-        className="relative z-[1] mx-auto max-w-[1120px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px]"
+        className="relative z-[1] mx-auto max-w-[1200px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px]"
       >
         <div className="mb-8 flex flex-col gap-3 border-b border-white/8 pb-6 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF4C00]/80">
+            <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
               Account
             </p>
             <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
@@ -316,7 +322,7 @@ const ProfilePage = () => {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="rounded-xl bg-[#FF5500] px-5 py-2.5 font-dmSans text-sm font-semibold text-white transition hover:bg-[#ff6a1a] disabled:opacity-50"
+                className="rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200 disabled:opacity-50"
               >
                 {saving ? "Saving..." : "Save Changes"}
               </button>
@@ -495,6 +501,8 @@ const ProfilePage = () => {
                     { key: "heightCm", label: "Height (cm)", type: "number" },
                     { key: "weightKg", label: "Weight (kg)", type: "number" },
                     { key: "ftp", label: "FTP (watts)", type: "number" },
+                    { key: "maxHeartrate", label: "Max HR (bpm)", type: "number" },
+                    { key: "age", label: "Age", type: "number" },
                     { key: "cyclingYears", label: "Cycling (years)", type: "number" },
                   ].map(({ key, label, type }) => (
                     <div key={key}>
@@ -571,6 +579,8 @@ const ProfilePage = () => {
                     { label: "Email", value: user.email || "—" },
                     { label: "Sport", value: user.mainSport || "—" },
                     { label: "Experience", value: user.experienceLevel || "—" },
+                    { label: "Max HR", value: user.maxHeartrate ? `${user.maxHeartrate} bpm` : "—" },
+                    { label: "Age", value: user.age || "—" },
                     { label: "Goal", value: user.goal || "No goal set" },
                     { label: "Description", value: user.description || "No description" },
                   ].map(({ label, value }) => (
@@ -582,6 +592,40 @@ const ProfilePage = () => {
                 </div>
               </motion.div>
             )}
+
+            {/* HR Zones */}
+            {!editing && (user.maxHeartrate || user.age) && (() => {
+              const maxHr = user.maxHeartrate ? Number(user.maxHeartrate) : Math.round(220 - Number(user.age));
+              const zones = maxHr >= 120 ? [
+                { label: "Z1 (Active Recovery)", min: 0, max: Math.round(maxHr * 0.55) },
+                { label: "Z2 (Endurance)", min: Math.round(maxHr * 0.55) + 1, max: Math.round(maxHr * 0.69) },
+                { label: "Z3 (Tempo)", min: Math.round(maxHr * 0.70), max: Math.round(maxHr * 0.79) },
+                { label: "Z4 (Threshold)", min: Math.round(maxHr * 0.80), max: Math.round(maxHr * 0.87) },
+                { label: "Z5 (VO2 Max)", min: Math.round(maxHr * 0.88), max: Math.round(maxHr * 0.94) },
+                { label: "Z6 (Anaerobic)", min: Math.round(maxHr * 0.95), max: maxHr },
+              ] : [];
+              return zones.length > 0 ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.08 }}
+                  className="rounded-[24px] border border-white/10 bg-white/[0.02] p-6"
+                >
+                  <h3 className="font-barlowCondensed text-2xl uppercase tracking-wide text-white">
+                    HR <span className="text-[#FF5500]">ZONES</span>
+                  </h3>
+                  <p className="mt-1 font-dmSans text-xs text-white/40">Based on max HR: {maxHr} bpm</p>
+                  <div className="mt-4 space-y-2">
+                    {zones.map(z => (
+                      <div key={z.label} className="flex items-center justify-between rounded-xl border border-white/10 bg-[#080808] px-4 py-2.5">
+                        <span className="font-dmSans text-sm text-white">{z.label}</span>
+                        <span className="font-dmSans text-sm text-white/60">{z.min}–{z.max} bpm</span>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              ) : null;
+            })()}
 
             {/* Change Coach */}
             <motion.div
@@ -685,7 +729,7 @@ const ProfilePage = () => {
                             <div className="flex gap-1">{ [1,2,3,4,5].map(s => (<button key={s} type="button" onClick={() => setCoachForm(p => ({ ...p, stars: s }))} className={`text-lg ${s <= coachForm.stars ? "text-[#FF5500]" : "text-white/15"}`}>★</button>)) }</div>
                           </div>
                           <div className="flex gap-2">
-                            <button onClick={handleAddCoach} className="flex-1 rounded-xl bg-[#FF5500] px-4 py-2.5 font-dmSans text-sm font-semibold text-white transition hover:bg-[#ff6a1a]">Add Coach</button>
+                            <button onClick={handleAddCoach} className="flex-1 rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200">Add Coach</button>
                             <button onClick={() => setShowCoachForm(false)} className="rounded-xl border border-white/10 px-4 py-2.5 font-dmSans text-sm text-white/60 transition hover:bg-white/5">Cancel</button>
                           </div>
                         </div>
@@ -845,7 +889,7 @@ const ProfilePage = () => {
                   }
                   setImageSaving(false);
                 }}
-                className="flex-1 rounded-xl bg-[#FF5500] px-5 py-2.5 font-dmSans text-sm font-semibold text-white transition hover:bg-[#ff6a1a]"
+                className="flex-1 rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200"
               >
                 Set Image
               </button>

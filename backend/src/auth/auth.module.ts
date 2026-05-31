@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from '../user/user.schema';
 import { Otp, OtpSchema } from './auth.schema';
 import { EmailModule } from '../email/email.module';
+import { SyncModule } from '../sync/sync.module';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 
@@ -11,6 +12,7 @@ import { AuthController } from './auth.controller';
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     MongooseModule.forFeature([{ name: Otp.name, schema: OtpSchema }]),
     EmailModule,
+    SyncModule,
   ],
   controllers: [AuthController],
   providers: [AuthService],

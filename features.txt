@@ -1,4 +1,4 @@
-CYCLOAI — FEATURES LIST
+CyclogenAI — FEATURES LIST
 ========================
 
 1. LANDING PAGE

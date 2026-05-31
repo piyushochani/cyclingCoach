@@ -18,7 +18,7 @@ function BikeCard({ bike, onSetActive, onDelete, onEdit }) {
       className={`group relative overflow-hidden rounded-2xl border p-5 transition-all duration-300 ${
         bike.isActive
           ? "border-[#FF5500]/40 bg-[#FF5500]/5 shadow-[0_0_25px_rgba(255,85,0,0.08)]"
-          : "border-white/[0.06] bg-[#0D0D0D] hover:border-white/15"
+          : "border-white/[0.06] bg-surface-cards hover:border-white/15"
       }`}
     >
       {bike.isActive && (
@@ -48,7 +48,7 @@ function BikeCard({ bike, onSetActive, onDelete, onEdit }) {
 
       <div className="mt-4 flex items-end justify-between">
         <div>
-          <p className="font-jetbrainsMono text-2xl font-bold text-white">{Math.round(bike.distanceUsed).toLocaleString()}</p>
+          <p className="font-jetbrainsMono text-2xl font-bold text-white">{bike.distanceUsed.toFixed(2)}</p>
           <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total KM</p>
         </div>
 
@@ -109,7 +109,7 @@ function EquipmentCard({ item, onDelete }) {
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-[#0D0D0D] px-4 py-3 transition-all hover:border-white/15"
+      className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-surface-cards px-4 py-3 transition-all hover:border-white/15"
     >
       <div className="flex items-center gap-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.04]">
@@ -220,17 +220,17 @@ export default function GearsPage() {
         <div className="absolute bottom-[-8%] right-[-5%] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.03)_0%,transparent_70%)]" />
       </div>
 
-      <div className="relative z-[1] mx-auto max-w-[1000px] px-4 pb-20 pt-10 md:px-8">
+      <div className="relative z-[1] mx-auto max-w-[1200px] px-4 pb-20 pt-10 md:px-8">
         <motion.div
           initial={{ opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="mb-10"
         >
-          <p className="font-dmSans mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#FF5500]/70">
+          <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Equipment
           </p>
-          <h1 className="font-bebasNeue text-6xl uppercase leading-none tracking-wide text-white md:text-7xl">
+          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
             Your <span className="text-[#FF5500]">Gear</span>
           </h1>
           <div className="mt-3 h-[2px] w-10 rounded-full bg-[#FF5500]" />
@@ -251,15 +251,15 @@ export default function GearsPage() {
               transition={{ delay: 0.1 }}
               className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-3"
             >
-              <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+              <div className="rounded-2xl border border-white/[0.05] bg-surface-cards px-4 py-3.5">
                 <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Bikes</p>
                 <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{bikes.length}</p>
               </div>
-              <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+              <div className="rounded-2xl border border-white/[0.05] bg-surface-cards px-4 py-3.5">
                 <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total KM</p>
-                <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{Math.round(totalBikeKm).toLocaleString()}</p>
+                <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{totalBikeKm.toFixed(2)}</p>
               </div>
-              <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+              <div className="rounded-2xl border border-white/[0.05] bg-surface-cards px-4 py-3.5">
                 <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Equipment</p>
                 <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{equipment.length}</p>
               </div>
@@ -272,7 +272,7 @@ export default function GearsPage() {
                 </h2>
                 <button
                   onClick={() => setShowAddBike(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#FF5500] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.1em] text-white transition-all hover:bg-[#FF5500]/90 hover:shadow-[0_0_20px_rgba(255,85,0,0.15)]"
+                  className="inline-flex items-center gap-1.5 rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -297,7 +297,7 @@ export default function GearsPage() {
                             value={newBikeName}
                             onChange={(e) => setNewBikeName(e.target.value)}
                             placeholder="e.g. Canyon Ultimate CF SL"
-                            className="w-full rounded-xl border border-white/[0.10] bg-[#0D0D0D] px-4 py-2.5 text-sm text-white outline-none transition-all focus:border-[#FF5500]/50 placeholder:text-white/15"
+                            className="w-full rounded-xl border border-white/[0.10] bg-surface-cards px-4 py-2.5 text-sm text-white outline-none transition-all focus:border-[#FF5500]/50 placeholder:text-white/15"
                             onKeyDown={(e) => e.key === "Enter" && addBike()}
                           />
                         </div>
@@ -314,7 +314,7 @@ export default function GearsPage() {
                           <button
                             onClick={addBike}
                             disabled={!newBikeName.trim()}
-                            className="rounded-xl bg-[#FF5500] px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] text-white transition-all hover:bg-[#FF5500]/90 disabled:opacity-40"
+                            className="rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200 disabled:opacity-40"
                           >
                             Add Bike
                           </button>
@@ -332,7 +332,7 @@ export default function GearsPage() {
               </AnimatePresence>
 
               {bikes.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/[0.06] bg-[#0D0D0D] px-6 py-12 text-center">
+                <div className="rounded-2xl border border-dashed border-white/[0.06] bg-surface-cards px-6 py-12 text-center">
                   <svg className="mx-auto mb-3 h-8 w-8 text-white/15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="10" strokeWidth="1.5" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 6v6l4 2" />
@@ -362,7 +362,7 @@ export default function GearsPage() {
                 </h2>
                 <button
                   onClick={() => setShowAddEquipment(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.10] bg-[#0D0D0D] px-4 py-2 text-[10px] font-bold uppercase tracking-[0.1em] text-white/60 transition-all hover:border-white/20 hover:text-white"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/[0.10] bg-surface-cards px-4 py-2 text-[10px] font-bold uppercase tracking-[0.1em] text-white/60 transition-all hover:border-white/20 hover:text-white"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -379,7 +379,7 @@ export default function GearsPage() {
                     exit={{ height: 0, opacity: 0 }}
                     className="mb-5 overflow-hidden"
                   >
-                    <div className="rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-5">
+                    <div className="rounded-2xl border border-white/[0.06] bg-surface-cards p-5">
                       <div className="flex flex-col gap-3 md:flex-row md:items-end">
                         <div className="flex-[2]">
                           <label className="font-dmSans mb-1.5 block text-[10px] uppercase tracking-[0.12em] text-white/40">Name</label>
@@ -406,7 +406,7 @@ export default function GearsPage() {
                         <button
                           onClick={addEquipment}
                           disabled={!newEquipName.trim()}
-                          className="rounded-xl bg-[#FF5500] px-5 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] text-white transition-all hover:bg-[#FF5500]/90 disabled:opacity-40"
+                          className="rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200 disabled:opacity-40"
                         >
                           Add
                         </button>
@@ -423,7 +423,7 @@ export default function GearsPage() {
               </AnimatePresence>
 
               {equipment.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-white/[0.06] bg-[#0D0D0D] px-6 py-10 text-center">
+                <div className="rounded-2xl border border-dashed border-white/[0.06] bg-surface-cards px-6 py-10 text-center">
                   <p className="font-dmSans text-sm text-white/20">No equipment added yet. Track your tyres, chains, and other components.</p>
                 </div>
               ) : (

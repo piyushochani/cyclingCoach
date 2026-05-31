@@ -33,8 +33,6 @@ export type { StravaActivity, StravaAthlete, AthleteProfile, Streams } from "./s
 export { StravaClient } from "./strava/client.js";
 
 // ─── Embeddings (Strava analysis parser) ───────────────────────────────
-export { parseStravaActivity } from "./embeddings/analysis-parser.js";
-
 // ─── LLM ──────────────────────────────────────────────────────────────
 export { LLM } from "./llm.js";
 export type { GenerateOpts, GenerateResult } from "./llm-types.js";
@@ -177,7 +175,7 @@ export type { OAuthCredential } from "./auth/profiles.js";
 export { runCodexLogin } from "./auth/openai-codex-login.js";
 
 // ─── Channels ─────────────────────────────────────────────────────────
-export { createTelegramBot, notifyUpdate } from "./channels/telegram.js";
+export { createTelegramBot } from "./channels/telegram.js";
 
 // ─── Config ───────────────────────────────────────────────────────────
 export {

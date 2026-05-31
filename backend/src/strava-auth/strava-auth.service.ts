@@ -17,6 +17,14 @@ export class StravaAuthService {
   private projectRoot = resolve(__dirname, '..', '..', '..');
 
   private readStravaConfig(): { clientId: string; clientSecret: string } {
+    // 1. Try environment variables first
+    const envClientId = process.env.STRAVA_CLIENT_ID || '';
+    const envClientSecret = process.env.STRAVA_CLIENT_SECRET || '';
+    if (envClientId && envClientSecret) {
+      return { clientId: envClientId, clientSecret: envClientSecret };
+    }
+
+    // 2. Fallback to config.yaml
     for (const filePath of this.configPaths) {
       if (existsSync(filePath)) {
         try {
@@ -31,7 +39,8 @@ export class StravaAuthService {
         }
       }
     }
-    throw new Error('Strava credentials not found in config.yaml');
+
+    throw new Error('Strava client credentials not configured. Add STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET to backend/.env');
   }
 
   private findConfigPath(): string | null {
@@ -42,6 +51,12 @@ export class StravaAuthService {
   }
 
   getStatus(): { connected: boolean } {
+    // 1. Try environment variables first
+    if (process.env.STRAVA_ACCESS_TOKEN && process.env.STRAVA_REFRESH_TOKEN) {
+      return { connected: true };
+    }
+
+    // 2. Fallback to config.yaml
     for (const filePath of this.configPaths) {
       if (existsSync(filePath)) {
         try {

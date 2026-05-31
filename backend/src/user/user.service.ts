@@ -27,12 +27,12 @@ export class UserService {
   }
 
   async update(email: string, data: Partial<User>): Promise<User | null> {
-    const allowed = ['firstName', 'lastName', 'mainSport', 'experienceLevel', 'heightCm', 'weightKg', 'goal', 'cyclingYears', 'ftp', 'profileImage', 'description', 'coaches'];
+    const allowed = ['firstName', 'lastName', 'mainSport', 'experienceLevel', 'heightCm', 'weightKg', 'goal', 'cyclingYears', 'ftp', 'maxHeartrate', 'age', 'profileImage', 'description', 'coaches', 'stravaUpdatedAt', 'isStravaUpToDate', 'trainingStart', 'onboardingSummary', 'telegramChatId'];
     const update: Record<string, any> = {};
     const d = data as Record<string, any>;
     for (const key of allowed) {
       if (d[key] !== undefined) update[key] = d[key];
     }
-    return this.userModel.findOneAndUpdate({ email }, update, { new: true }).exec();
+    return this.userModel.findOneAndUpdate({ email }, update, { returnDocument: 'after' }).exec();
   }
 }

@@ -101,20 +101,36 @@ const termSections = [
 
 export default function ConnectPage() {
   const [expandedFaq, setExpandedFaq] = useState(null);
-  const [stravaConnected, setStravaConnected] = useState(null);
+  const [authUrl, setAuthUrl] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   useEffect(() => {
     api.get("/strava/auth-url")
-      .then(() => setStravaConnected(false))
-      .catch(() => setStravaConnected(false));
+      .then((res) => {
+        setAuthUrl(res?.url || null);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+        setFetchError(true);
+      });
   }, []);
 
   const handleConnect = async () => {
-    try {
-      const { url } = await api.get("/strava/auth-url");
-      window.open(url, "_blank");
-    } catch {
-      alert("Failed to get Strava authorization URL.");
+    if (authUrl) {
+      window.open(authUrl, "_blank");
+    } else {
+      try {
+        const res = await api.get("/strava/auth-url");
+        if (res?.url) {
+          window.open(res.url, "_blank");
+        } else {
+          setFetchError(true);
+        }
+      } catch {
+        setFetchError(true);
+      }
     }
   };
 
@@ -125,7 +141,7 @@ export default function ConnectPage() {
         <div className="absolute bottom-[-12%] right-[-5%] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.03)_0%,transparent_70%)]" />
       </div>
 
-      <div className="relative z-[1] mx-auto max-w-[1000px] px-4 pb-20 pt-10 md:px-8">
+      <div className="relative z-[1] mx-auto max-w-[1200px] px-4 pb-20 pt-10 md:px-8">
         {/* Hero */}
         <motion.div
           initial={{ opacity: 0, y: -14 }}
@@ -133,10 +149,10 @@ export default function ConnectPage() {
           transition={{ duration: 0.5 }}
           className="mb-12"
         >
-          <p className="font-dmSans mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#FF5500]/70">
+          <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Integration
           </p>
-          <h1 className="font-bebasNeue text-6xl uppercase leading-none tracking-wide text-white md:text-7xl">
+          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
             Connect With <span className="text-[#FF5500]">Strava</span>
           </h1>
           <div className="mt-3 h-[2px] w-10 rounded-full bg-[#FF5500]" />
@@ -151,7 +167,7 @@ export default function ConnectPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1, duration: 0.5 }}
-          className="relative mb-12 overflow-hidden rounded-3xl border border-white/[0.06] bg-[#0D0D0D] p-8 md:p-12"
+          className="relative mb-12 overflow-hidden rounded-3xl border border-white/[0.06] bg-surface-cards p-8 md:p-12"
         >
           <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#FF5500]/5 blur-3xl" />
           <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-[#FF5500]/5 blur-3xl" />
@@ -165,27 +181,30 @@ export default function ConnectPage() {
 
             <div className="flex-1">
               <h2 className="font-barlowCondensed text-2xl uppercase tracking-wide text-white">
-                {stravaConnected === true ? "Strava Connected" : "Ready to Connect"}
+                {authUrl ? "Ready to Connect" : loading ? "Checking..." : "Connect Strava"}
               </h2>
               <p className="font-dmSans mt-2 text-sm leading-relaxed text-white/40">
-                {stravaConnected === true
-                  ? "Your Strava account is linked. Use the Refresh button in your profile menu to pull in new activities."
-                  : "Click below to authorize CycloAI to read your Strava activities. The link opens in a new tab."}
+                {authUrl
+                  ? "Click below to authorize CycloAI to read your Strava activities. The link opens in a new tab."
+                  : fetchError
+                    ? "Unable to connect to Strava. Please try again later."
+                    : "Fetching Strava configuration..."}
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <button
                   onClick={handleConnect}
-                  className="inline-flex items-center gap-2.5 rounded-xl bg-[#FF5500] px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white transition-all duration-200 hover:bg-[#FF5500]/90 hover:shadow-[0_0_30px_rgba(255,85,0,0.2)]"
+                  disabled={loading}
+                  className="inline-flex items-center gap-2.5 rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172H17.48l-2.093 4.116zM8.614 17.944l2.089-4.116h3.065L8.614 24l-5.15-10.172h2.058l2.093 4.116z" />
                   </svg>
-                  Connect with Strava
+                  {loading ? "Loading..." : "Connect with Strava"}
                 </button>
 
                 <span className="font-dmSans text-[11px] text-white/20">
-                  Redirects to strava.com for authorization
+                  {fetchError ? "Unable to connect to Strava. Please try again later." : "Redirects to strava.com for authorization"}
                 </span>
               </div>
             </div>
@@ -210,7 +229,7 @@ export default function ConnectPage() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.15 + i * 0.08, duration: 0.4 }}
-                className="group rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-6 transition-all duration-300 hover:border-[#FF5500]/20 hover:shadow-[0_0_20px_rgba(255,85,0,0.04)]"
+                className="group rounded-2xl border border-white/[0.06] bg-surface-cards p-6 transition-all duration-300 hover:border-[#FF5500]/20 hover:shadow-[0_0_20px_rgba(255,85,0,0.04)]"
               >
                 <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FF5500]/10 text-[#FF5500]">
@@ -239,7 +258,7 @@ export default function ConnectPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35, duration: 0.5 }}
-          className="mb-12 rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-6 md:p-8"
+          className="mb-12 rounded-2xl border border-white/[0.06] bg-surface-cards p-6 md:p-8"
         >
           <h2 className="font-barlowCondensed mb-6 text-2xl uppercase tracking-wide text-white">
             Navbar <span className="text-[#FF5500]">Tools</span>
@@ -309,7 +328,7 @@ export default function ConnectPage() {
             {faqItems.map((item, i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-white/[0.06] bg-[#0D0D0D] overflow-hidden transition-all duration-300"
+                className="rounded-2xl border border-white/[0.06] bg-surface-cards overflow-hidden transition-all duration-300"
               >
                 <button
                   onClick={() => setExpandedFaq(expandedFaq === i ? null : i)}
@@ -345,7 +364,7 @@ export default function ConnectPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45, duration: 0.5 }}
-          className="rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-6 md:p-8"
+          className="rounded-2xl border border-white/[0.06] bg-surface-cards p-6 md:p-8"
         >
           <h2 className="font-barlowCondensed mb-2 text-2xl uppercase tracking-wide text-white">
             Data & <span className="text-[#FF5500]">Privacy</span>

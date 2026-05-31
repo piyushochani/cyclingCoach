@@ -8,6 +8,7 @@ import PaceBotChat from '../ui/PaceBotChat';
 import PageTransitionWrapper from '../animations/PageTransitionWrapper';
 import AuthGuard from './AuthGuard';
 import StravaConnectOverlay from './StravaConnectOverlay';
+import ModelChangeBanner from './ModelChangeBanner';
 
 const publicPaths = ['/', '/login', '/signup', '/forgot-password'];
 
@@ -20,6 +21,7 @@ const ClientLayoutWrapper = ({ children }) => {
       <StravaConnectOverlay>
         <div className="min-h-screen bg-bg-dark text-text-primary">
           {!isPublic && <PostLoginNavbar />}
+          {!isPublic && <ModelChangeBanner />}
           <main className={!isPublic ? 'pt-20' : ''}>
             <PageTransitionWrapper>
               {children}

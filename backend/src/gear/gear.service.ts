@@ -26,7 +26,7 @@ export class GearService {
     if (data.isActive) {
       await this.bikeModel.updateMany({ user: userId as any, _id: { $ne: id } }, { isActive: false }).exec();
     }
-    return this.bikeModel.findOneAndUpdate({ _id: id, user: userId as any }, data, { new: true }).exec();
+    return this.bikeModel.findOneAndUpdate({ _id: id, user: userId as any }, data, { returnDocument: 'after' }).exec();
   }
 
   async deleteBike(id: string, userId: any): Promise<Bike | null> {
@@ -50,7 +50,7 @@ export class GearService {
   }
 
   async updateEquipment(id: string, data: Partial<Equipment>, userId: any): Promise<Equipment | null> {
-    return this.equipmentModel.findOneAndUpdate({ _id: id, user: userId as any }, data, { new: true }).exec();
+    return this.equipmentModel.findOneAndUpdate({ _id: id, user: userId as any }, data, { returnDocument: 'after' }).exec();
   }
 
   async deleteEquipment(id: string, userId: any): Promise<Equipment | null> {

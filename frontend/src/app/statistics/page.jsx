@@ -67,7 +67,7 @@ function StatCard({ icon, label, value, suffix, delay, sub }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.5, ease: 'easeOut' }}
-      className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-5 transition-all duration-300 hover:border-[#FF5500]/30 hover:shadow-[0_0_30px_rgba(255,85,0,0.06)]"
+      className="group relative overflow-hidden rounded-2xl border border-white/[0.06] bg-surface-cards p-5 transition-all duration-300 hover:border-[#FF5500]/30 hover:shadow-[0_0_30px_rgba(255,85,0,0.06)]"
     >
       <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#FF5500]/5 blur-2xl transition-all duration-500 group-hover:bg-[#FF5500]/10" />
       <div className="relative z-[1]">
@@ -84,7 +84,7 @@ function StatCard({ icon, label, value, suffix, delay, sub }) {
 
 function InsightCard({ icon, label, value, trend, color }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0D0D0D] px-4 py-3">
+    <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-surface-cards px-4 py-3">
       <span className="text-lg">{icon}</span>
       <div className="flex-1">
         <div className="font-dmSans text-[10px] uppercase tracking-[0.1em] text-white/40">{label}</div>
@@ -102,7 +102,7 @@ function InsightCard({ icon, label, value, trend, color }) {
 const CustomTooltip = ({ active, payload, label, formatter }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-[#FF5500]/30 bg-[#0D0D0D] px-4 py-3 shadow-2xl backdrop-blur-xl">
+    <div className="rounded-xl border border-[#FF5500]/30 bg-surface-cards px-4 py-3 shadow-2xl backdrop-blur-xl">
       <p className="font-dmSans text-xs text-white/50">{label}</p>
       {payload.map((p, i) => (
         <p key={i} className="font-jetbrainsMono text-sm font-bold text-white">
@@ -222,7 +222,7 @@ export default function StatisticsPage() {
       buckets[month].totalSpeed += a.distance / (a.durationSeconds / 3600);
       buckets[month].count += 1;
     }
-    return Object.values(buckets).map((b) => ({ month: b.month, speed: Math.round((b.totalSpeed / b.count) * 10) / 10 }));
+    return Object.values(buckets).map((b) => ({ month: b.month, speed: parseFloat((b.totalSpeed / b.count).toFixed(2)) }));
   }, [filteredActivities]);
 
   const bestEffortsPanel = useMemo(() => {
@@ -277,18 +277,18 @@ export default function StatisticsPage() {
     }
 
     const pct = (currVal, prevVal) => {
-      if (prevVal === 0) return '+100%';
+      if (prevVal === 0) return '+100.00%';
       const change = ((currVal - prevVal) / prevVal) * 100;
-      return `${change >= 0 ? '+' : ''}${Math.round(change)}%`;
+      return `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
     };
 
     return {
       distance: pct(curr.distance, prev.distance),
       count: pct(curr.count, prev.count),
       hours: pct(curr.hours, prev.hours),
-      currDistance: Math.round(curr.distance),
+      currDistance: parseFloat(curr.distance.toFixed(2)),
       currCount: curr.count,
-      currHours: Math.round(curr.hours * 10) / 10,
+      currHours: parseFloat(curr.hours.toFixed(2)),
     };
   }, [activities]);
 
@@ -298,9 +298,28 @@ export default function StatisticsPage() {
     return ['all', ...Array.from(sports)];
   }, [activities]);
 
+  const [weeklyGoal, setWeeklyGoal] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return parseFloat(localStorage.getItem('cycloai_weekly_goal') || '100');
+    }
+    return 100;
+  });
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [goalInput, setGoalInput] = useState('');
+
+  const currentWeekDistance = useMemo(() => {
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+    weekStart.setHours(0, 0, 0, 0);
+    return activities
+      .filter((a) => a.date && new Date(a.date) >= weekStart)
+      .reduce((s, a) => s + (a.distance || 0), 0);
+  }, [activities]);
+
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#080808]">
+      <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FF5500] border-t-transparent" />
           <p className="font-dmSans text-sm text-white/30">Loading statistics...</p>
@@ -310,10 +329,10 @@ export default function StatisticsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080808]">
+    <div className="min-h-screen bg-black">
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute left-[55%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.05)_0%,transparent_70%)]" />
-        <div className="absolute bottom-[-8%] right-[-5%] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.03)_0%,transparent_70%)]" />
+        <div className="absolute left-[55%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.06)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-10%] left-[-5%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.04)_0%,transparent_72%)]" />
       </div>
 
       <motion.div
@@ -328,24 +347,99 @@ export default function StatisticsPage() {
           transition={{ duration: 0.5 }}
           className="mb-6"
         >
-          <p className="font-dmSans mb-2 text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/70">
+          <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Performance Analytics
           </p>
-          <h1 className="font-bebasNeue text-6xl uppercase leading-none tracking-wide text-white md:text-7xl">
+          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
             Your <span className="text-[#FF5500]">Numbers</span>
           </h1>
           <div className="mt-3 h-[2px] w-10 rounded-full bg-[#FF5500]" />
         </motion.div>
+
+        {/* Weekly Goal Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.06, duration: 0.4 }}
+          className="mb-6 flex items-center justify-between rounded-2xl border border-white/[0.06] bg-surface-cards px-5 py-4"
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#FF5500]/10">
+              <svg className="h-5 w-5 text-[#FF5500]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/40">
+                Weekly Goal
+              </p>
+              <p className="font-jetbrainsMono mt-0.5 text-sm text-white">
+                {currentWeekDistance.toFixed(2)} km / {weeklyGoal} km
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => { setGoalInput(String(weeklyGoal)); setShowGoalModal(true); }}
+            className="rounded-xl border border-white/[0.08] bg-white/[0.03] px-4 py-2 font-dmSans text-xs font-medium text-white/60 transition hover:border-[#FF5500]/30 hover:text-white"
+          >
+            Set Goal
+          </button>
+        </motion.div>
+
+        {/* Set Goal Modal */}
+        {showGoalModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowGoalModal(false)}>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-surface-cards p-6 shadow-2xl"
+            >
+              <h3 className="font-dmSans text-sm font-semibold text-white">Set Weekly Goal</h3>
+              <p className="font-dmSans mt-1 text-xs text-white/40">Target distance in kilometers for this week.</p>
+              <input
+                type="number"
+                step="0.1"
+                min="1"
+                value={goalInput}
+                onChange={(e) => setGoalInput(e.target.value)}
+                className="mt-4 w-full rounded-xl border border-white/[0.08] bg-black px-4 py-3 font-jetbrainsMono text-sm text-white outline-none transition focus:border-[#FF5500]/50"
+                placeholder="e.g. 150"
+              />
+              <div className="mt-4 flex gap-3">
+                <button
+                  onClick={() => setShowGoalModal(false)}
+                  className="flex-1 rounded-xl border border-white/[0.08] px-4 py-2.5 font-dmSans text-sm text-white/50 transition hover:border-white/20 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    const val = parseFloat(goalInput);
+                    if (val > 0) {
+                      localStorage.setItem('cycloai_weekly_goal', String(val));
+                      setWeeklyGoal(val);
+                    }
+                    setShowGoalModal(false);
+                  }}
+                  className="flex-1 rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200"
+                >
+                  Save Goal
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
 
         {/* Sticky Filter Bar */}
         <motion.div
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05, duration: 0.4 }}
-          className="sticky top-20 z-30 -mx-4 mb-6 border-b border-white/[0.04] bg-[#080808]/95 px-4 py-3 backdrop-blur-xl md:-mx-8 md:px-8"
+          className="sticky top-20 z-30 -mx-4 mb-6 border-b border-white/[0.04] bg-black/95 px-4 py-3 backdrop-blur-xl md:-mx-8 md:px-8"
         >
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex rounded-xl border border-white/[0.08] bg-[#0D0D0D] p-0.5">
+            <div className="flex rounded-xl border border-white/[0.08] bg-surface-cards p-0.5">
               {[
                 { key: 'all', label: 'All Time' },
                 { key: 'year', label: 'Year' },
@@ -355,10 +449,10 @@ export default function StatisticsPage() {
                 <button
                   key={p.key}
                   onClick={() => setPeriod(p.key)}
-                  className={`rounded-lg px-3.5 py-1.5 font-dmSans text-xs font-bold uppercase tracking-[0.08em] transition-all duration-200 ${
+                  className={`rounded-lg px-4 py-1.5 text-xs font-semibold ${
                     period === p.key
-                      ? 'bg-[#FF5500] text-white'
-                      : 'text-white/40 hover:text-white/70'
+                      ? 'bg-[#FF5500] text-white border border-[#FF5500]'
+                      : 'border border-white/10 text-white/60 hover:border-white/20 hover:text-white transition-all'
                   }`}
                 >
                   {p.label}
@@ -366,15 +460,15 @@ export default function StatisticsPage() {
               ))}
             </div>
 
-            <div className="flex rounded-xl border border-white/[0.08] bg-[#0D0D0D] p-0.5">
+            <div className="flex rounded-xl border border-white/[0.08] bg-surface-cards p-0.5">
               {allSports.map((s) => (
                 <button
                   key={s}
                   onClick={() => setSportFilter(s)}
-                  className={`rounded-lg px-3 py-1.5 font-dmSans text-xs font-bold uppercase tracking-[0.08em] transition-all duration-200 ${
+                  className={`rounded-lg px-4 py-1.5 text-xs font-semibold ${
                     sportFilter === s
-                      ? 'bg-white/10 text-white'
-                      : 'text-white/30 hover:text-white/50'
+                      ? 'bg-[#FF5500] text-white border border-[#FF5500]'
+                      : 'border border-white/10 text-white/60 hover:border-white/20 hover:text-white transition-all'
                   }`}
                 >
                   {s === 'all' ? 'All Sports' : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -402,12 +496,12 @@ export default function StatisticsPage() {
 
         {/* KPI Strip */}
         <div className="mb-8 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          <StatCard icon="🚴" label="Total Distance" value={Math.round(totalDistance)} suffix=" km" delay={0.1} sub={activityCount > 0 ? `Avg ${Math.round(avgDistance)} km` : undefined} />
+          <StatCard icon="🚴" label="Total Distance" value={totalDistance.toFixed(2)} suffix=" km" delay={0.1} sub={activityCount > 0 ? `Avg ${avgDistance.toFixed(2)} km` : undefined} />
           <StatCard icon="⏱️" label="Moving Time" value={formatDuration(totalDuration)} suffix="" delay={0.13} sub={activityCount > 0 ? `Avg ${formatDurationShort(avgDuration)}` : undefined} />
-          <StatCard icon="🗻" label="Elevation" value={Math.round(totalElevation)} suffix=" m" delay={0.16} />
+          <StatCard icon="🗻" label="Elevation" value={totalElevation.toFixed(2)} suffix=" m" delay={0.16} />
           <StatCard icon="📊" label="Activities" value={activityCount} suffix="" delay={0.19} />
-          <StatCard icon="📈" label="Longest Ride" value={Math.round(longestRideVal)} suffix=" km" delay={0.22} />
-          <StatCard icon="🏔️" label="Biggest Climb" value={Math.round(biggestElevDay)} suffix=" m" delay={0.25} />
+          <StatCard icon="📈" label="Longest Ride" value={longestRideVal.toFixed(2)} suffix=" km" delay={0.22} />
+          <StatCard icon="🏔️" label="Biggest Climb" value={biggestElevDay.toFixed(2)} suffix=" m" delay={0.25} />
         </div>
 
         {/* AI Review Buttons */}
@@ -433,7 +527,7 @@ export default function StatisticsPage() {
                 const dayActivities = activities.filter((a) => a.date && new Date(a.date).toISOString().slice(0, 10) === today);
                 setAnalysisModal({ open: true, type: 'daily', activities: dayActivities, previousActivities: [], activityName: `Today (${today})` });
               }}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#0D0D0D] px-4 py-2.5 text-sm font-dmSans text-white/70 transition-all duration-200 hover:border-[#FF5500]/30 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-surface-cards px-4 py-2.5 text-sm font-dmSans text-white/70 transition-all duration-200 hover:border-[#FF5500]/30 hover:text-white"
             >
               <svg className="h-3.5 w-3.5 text-[#FF5500]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -456,7 +550,7 @@ export default function StatisticsPage() {
                 const prevWeekActivities = activities.filter((a) => a.date && new Date(a.date) >= prevWeekStart && new Date(a.date) <= prevWeekEnd);
                 setAnalysisModal({ open: true, type: 'weekly', activities: weekActivities, previousActivities: prevWeekActivities, activityName: `Week of ${weekStart.toISOString().slice(0, 10)}` });
               }}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#0D0D0D] px-4 py-2.5 text-sm font-dmSans text-white/70 transition-all duration-200 hover:border-[#FF5500]/30 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-surface-cards px-4 py-2.5 text-sm font-dmSans text-white/70 transition-all duration-200 hover:border-[#FF5500]/30 hover:text-white"
             >
               <svg className="h-3.5 w-3.5 text-[#FF5500]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -474,7 +568,7 @@ export default function StatisticsPage() {
                 const prevMonthActivities = activities.filter((a) => a.date && new Date(a.date) >= prevMonthStart && new Date(a.date) <= prevMonthEnd);
                 setAnalysisModal({ open: true, type: 'monthly', activities: monthActivities, previousActivities: prevMonthActivities, activityName: `${MONTHS[now.getMonth()]} ${now.getFullYear()}` });
               }}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-[#0D0D0D] px-4 py-2.5 text-sm font-dmSans text-white/70 transition-all duration-200 hover:border-[#FF5500]/30 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/[0.06] bg-surface-cards px-4 py-2.5 text-sm font-dmSans text-white/70 transition-all duration-200 hover:border-[#FF5500]/30 hover:text-white"
             >
               <svg className="h-3.5 w-3.5 text-[#FF5500]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -487,7 +581,7 @@ export default function StatisticsPage() {
         {/* Trend Charts Row */}
         <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
           <ChartCard title="Distance Over Time" delay={0.2}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={weeklyData.length > 0 ? weeklyData : monthlyData}>
                 <defs>
                   <linearGradient id="distGrad" x1="0" y1="0" x2="0" y2="1">
@@ -505,7 +599,7 @@ export default function StatisticsPage() {
           </ChartCard>
 
           <ChartCard title="Time Over Time" delay={0.25}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={weeklyData.length > 0 ? weeklyData : monthlyData} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis dataKey={weeklyData.length > 0 ? "week" : "month"} axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
@@ -517,7 +611,7 @@ export default function StatisticsPage() {
           </ChartCard>
 
           <ChartCard title="Elevation Over Time" delay={0.3}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <AreaChart data={weeklyData.length > 0 ? weeklyData : monthlyData}>
                 <defs>
                   <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
@@ -542,7 +636,7 @@ export default function StatisticsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35, duration: 0.5 }}
-            className="rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-6"
+            className="rounded-2xl border border-white/[0.06] bg-surface-cards p-6"
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-dmSans text-xs uppercase tracking-[0.15em] text-white/40">Best Efforts</h3>
@@ -575,7 +669,7 @@ export default function StatisticsPage() {
                         {formatDurationShort(e.best.time)}
                       </div>
                       <div className="font-dmSans text-[10px] text-white/30">
-                        {Math.round(e.best.avgSpeed * 3.6 * 10) / 10} km/h
+                        {(e.best.avgSpeed * 3.6).toFixed(2)} km/h
                       </div>
                     </div>
                   </div>
@@ -590,7 +684,7 @@ export default function StatisticsPage() {
 
           {/* Activity Frequency */}
           <ChartCard title="Activity Frequency by Week" delay={0.4}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={weeklyData.slice(-16)} barCategoryGap="20%">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis dataKey="week" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
@@ -606,7 +700,7 @@ export default function StatisticsPage() {
         <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Avg Speed Trend */}
           <ChartCard title="Average Speed Trend" delay={0.42}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <LineChart data={avgSpeedTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 10 }} />
@@ -620,7 +714,7 @@ export default function StatisticsPage() {
           {/* Sport Split */}
           <ChartCard title="Sport Split by Distance" delay={0.45}>
             {sportDist.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                 <PieChart>
                   <Pie data={sportDist} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={4} dataKey="value">
                     {sportDist.map((entry) => (
@@ -647,7 +741,7 @@ export default function StatisticsPage() {
 
           {/* Day of Week Pattern */}
           <ChartCard title="Day of Week Distribution" delay={0.48}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0}>
               <BarChart data={dayOfWeekData} barCategoryGap="15%">
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: 'rgba(255,255,255,0.25)', fontSize: 10 }} />
@@ -670,7 +764,7 @@ export default function StatisticsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.52, duration: 0.5 }}
-            className="rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-6"
+            className="rounded-2xl border border-white/[0.06] bg-surface-cards p-6"
           >
             <h3 className="font-dmSans mb-4 text-xs uppercase tracking-[0.15em] text-white/40">Longest Rides</h3>
             {longestRides.length > 0 ? (
@@ -703,7 +797,7 @@ export default function StatisticsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.55, duration: 0.5 }}
-            className="rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-6"
+            className="rounded-2xl border border-white/[0.06] bg-surface-cards p-6"
           >
             <h3 className="font-dmSans mb-4 text-xs uppercase tracking-[0.15em] text-white/40">Recent Activities</h3>
             <div className="max-h-[340px] overflow-y-auto">
@@ -722,9 +816,9 @@ export default function StatisticsPage() {
                     <tr key={a._id || i} className="border-b border-white/[0.02] transition-colors hover:bg-white/[0.02]">
                       <td className="font-dmSans py-2.5 pr-3 text-xs text-white/40">{formatDate(a.date)}</td>
                       <td className="font-dmSans py-2.5 pr-3 text-xs text-white/70">{a.name}</td>
-                      <td className="font-jetbrainsMono py-2.5 text-right text-xs text-white">{Math.round(a.distance || 0)} km</td>
-                      <td className="font-jetbrainsMono hidden py-2.5 text-right text-xs text-white/60 md:table-cell">{formatDurationShort(a.durationSeconds || 0)}</td>
-                      <td className="font-jetbrainsMono hidden py-2.5 text-right text-xs text-white/60 lg:table-cell">{Math.round(a.elevationGain || 0)} m</td>
+                       <td className="font-jetbrainsMono py-2.5 text-right text-xs text-white">{(a.distance || 0).toFixed(2)} km</td>
+                       <td className="font-jetbrainsMono hidden py-2.5 text-right text-xs text-white/60 md:table-cell">{formatDurationShort(a.durationSeconds || 0)}</td>
+                       <td className="font-jetbrainsMono hidden py-2.5 text-right text-xs text-white/60 lg:table-cell">{(a.elevationGain || 0).toFixed(2)} m</td>
                     </tr>
                   ))}
                 </tbody>
@@ -752,7 +846,7 @@ function ChartCard({ title, delay, children }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.5 }}
-      className="rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-5"
+      className="rounded-2xl border border-white/[0.06] bg-surface-cards p-5"
     >
       <h3 className="font-dmSans mb-4 text-xs uppercase tracking-[0.15em] text-white/40">{title}</h3>
       <div className="h-[240px]">{children}</div>

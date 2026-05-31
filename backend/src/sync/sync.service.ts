@@ -7,13 +7,12 @@ import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
 import { Activity } from '../activity/activity.schema';
 import { User } from '../user/user.schema';
+import { ActivitySyncPipelineService } from '../analysis/activity-sync-pipeline.service';
+import { NotificationService } from '../notification/notification.service';
 
 const STRAVA_API = 'https://www.strava.com/api/v3';
 const CYCLING_SPORTS = ['cycling', 'bike', 'ride', 'bicycle'];
-
-function isCyclingSport(sport: string): boolean {
-  return CYCLING_SPORTS.includes((sport || '').toLowerCase());
-}
+const STREAM_KEYS = ['time', 'distance', 'altitude', 'velocity_smooth', 'heartrate', 'cadence', 'watts', 'temp', 'moving', 'grade_smooth'];
 
 interface StravaConfig {
   clientId: string;
@@ -23,19 +22,43 @@ interface StravaConfig {
   expiresAt: number;
 }
 
+function isCyclingSport(sport: string): boolean {
+  return CYCLING_SPORTS.includes((sport || '').toLowerCase());
+}
+
+const SYNC_MONTHS = parseInt(process.env.STRAVA_SYNC_MONTHS || '6', 10);
+
 @Injectable()
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
   private config: StravaConfig | null = null;
+  private rateLimitHit = false;
 
   constructor(
     @InjectModel(Activity.name) private activityModel: Model<Activity>,
     @InjectModel(User.name) private userModel: Model<User>,
+    private readonly activityPipeline: ActivitySyncPipelineService,
+    private readonly notificationService: NotificationService,
   ) {
     this.loadConfig();
   }
 
   private loadConfig() {
+    // 1. Try environment variables first
+    const envClientId = process.env.STRAVA_CLIENT_ID;
+    const envClientSecret = process.env.STRAVA_CLIENT_SECRET;
+    if (envClientId && envClientSecret) {
+      this.config = {
+        clientId: envClientId,
+        clientSecret: envClientSecret,
+        accessToken: process.env.STRAVA_ACCESS_TOKEN || '',
+        refreshToken: process.env.STRAVA_REFRESH_TOKEN || '',
+        expiresAt: parseInt(process.env.STRAVA_EXPIRES_AT || '0', 10),
+      };
+      return;
+    }
+
+    // 2. Fallback to config.yaml
     const configPaths = [
       join(homedir(), '.cycling-coach', 'config.yaml'),
       join(homedir(), '.config', 'cycling-coach', 'config.yaml'),
@@ -95,6 +118,11 @@ export class SyncService {
       const res = await fetch(`${STRAVA_API}${path}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.status === 429) {
+        this.rateLimitHit = true;
+        this.logger.warn('Strava API rate limit exhausted (429)');
+        return null;
+      }
       if (!res.ok) return null;
       return res.json();
     } catch {
@@ -102,10 +130,27 @@ export class SyncService {
     }
   }
 
-  private async fetchAllActivities(userId: any): Promise<any[]> {
+  private async fetchDetailedActivity(stravaId: number): Promise<any> {
+    return this.stravaFetch(`/activities/${stravaId}`);
+  }
+
+  private async fetchActivityStreams(stravaId: number): Promise<any> {
+    const keys = STREAM_KEYS.join(',');
+    return this.stravaFetch(`/activities/${stravaId}/streams?keys=${keys}&key_by_type=true`);
+  }
+
+  getRateLimitHit(): boolean {
+    return this.rateLimitHit;
+  }
+
+  resetRateLimitFlag(): void {
+    this.rateLimitHit = false;
+  }
+
+  private async fetchAllActivities(): Promise<any[]> {
     const all: any[] = [];
     const perPage = 100;
-    const after = Math.floor(new Date('2026-01-01').getTime() / 1000);
+    const after = Math.floor(new Date(Date.now() - SYNC_MONTHS * 30 * 24 * 3600 * 1000).getTime() / 1000);
     let page = 1;
     while (true) {
       const batch = await this.stravaFetch(`/athlete/activities?per_page=${perPage}&page=${page}&after=${after}`);
@@ -117,7 +162,7 @@ export class SyncService {
     return all;
   }
 
-  private async fetchRecentActivities(userId: any, afterEpoch?: number): Promise<any[]> {
+  private async fetchRecentActivities(afterEpoch?: number): Promise<any[]> {
     const perPage = 50;
     let url = `/athlete/activities?per_page=${perPage}`;
     if (afterEpoch) url += `&after=${afterEpoch}`;
@@ -126,19 +171,120 @@ export class SyncService {
     return batch;
   }
 
+  private async processSingleActivity(
+    a: any,
+    userId: string,
+    userFtp?: number,
+    userWeightKg?: number,
+  ): Promise<void> {
+    const stravaId = a.id;
+    const distance = a.distance || 0;
+    const movingTime = a.moving_time || a.elapsed_time || 0;
+    const elevation = a.total_elevation_gain || 0;
+    const calories = a.calories || 0;
+
+    const existing = await this.activityModel.findOne({ stravaId, user: userId as any }).exec();
+    if (existing && existing.embeddingStatus === 'done') {
+      this.logger.debug(`Activity ${stravaId} already processed, skipping`);
+      return;
+    }
+
+    let rawActivity: any = null;
+    let rawStreams: any = null;
+    try {
+      rawActivity = await this.fetchDetailedActivity(stravaId);
+    } catch {
+      this.logger.warn(`Failed to fetch detailed activity ${stravaId}, using list data`);
+    }
+
+    try {
+      const streamsResult = await this.fetchActivityStreams(stravaId);
+      if (streamsResult && Array.isArray(streamsResult)) {
+        rawStreams = {};
+        for (const entry of streamsResult) {
+          rawStreams[entry.type] = entry.data;
+        }
+      }
+    } catch {
+      this.logger.warn(`Failed to fetch streams for activity ${stravaId}, continuing without streams`);
+    }
+
+    const activityPayload: any = {
+      stravaId,
+      name: (rawActivity?.name || a.name || 'Unknown'),
+      sport: (rawActivity?.sport_type || rawActivity?.type || a.type || 'Ride'),
+      distance: rawActivity?.distance ?? distance,
+      durationSeconds: rawActivity?.moving_time ?? movingTime,
+      elevationGain: rawActivity?.total_elevation_gain ?? elevation,
+      calories: rawActivity?.calories ?? calories,
+      averageWatts: rawActivity?.average_watts ?? a.average_watts ?? null,
+      maxWatts: rawActivity?.max_watts ?? a.max_watts ?? null,
+      weightedAverageWatts: rawActivity?.weighted_average_watts ?? a.weighted_average_watts ?? null,
+      kilojoules: rawActivity?.kilojoules ?? a.kilojoules ?? null,
+      averageHeartrate: rawActivity?.average_heartrate ?? a.average_heartrate ?? null,
+      maxHeartrate: rawActivity?.max_heartrate ?? a.max_heartrate ?? null,
+      trainer: rawActivity?.trainer ?? a.trainer ?? false,
+      date: new Date(rawActivity?.start_date_local || a.start_date_local || a.start_date || Date.now()),
+      tracked: false,
+      user: userId as any,
+    };
+
+    activityPayload.userFtp = userFtp;
+    activityPayload.userMaxHr = rawActivity?.max_heartrate || a.max_heartrate || null;
+
+    if (existing) {
+      await this.activityModel.updateOne(
+        { _id: existing._id },
+        {
+          $set: {
+            ...activityPayload,
+            rawActivity: rawActivity ?? null,
+            rawStreams: rawStreams ?? null,
+            embeddingStatus: 'pending',
+            updatedAt: new Date(),
+          },
+        },
+      ).exec();
+      this.logger.debug(`Updated existing activity ${stravaId} with raw data`);
+    } else {
+      await this.activityModel.create({
+        ...activityPayload,
+        rawActivity: rawActivity ?? null,
+        rawStreams: rawStreams ?? null,
+        embeddingStatus: 'pending',
+        syncedAt: new Date(),
+        updatedAt: new Date(),
+      });
+      this.logger.debug(`Created new activity ${stravaId} with raw data`);
+      this.notificationService.createActivitySynced(userId, activityPayload.name || 'Ride', String(stravaId)).catch(() => {});
+    }
+
+    await this.activityPipeline.processActivity(
+      { ...activityPayload, id: stravaId },
+      userId,
+      rawActivity,
+      rawStreams,
+    );
+  }
+
   async incrementalSync(userId: any): Promise<{ newActivities: number }> {
     if (!userId) return { newActivities: 0 };
     const user = await this.userModel.findById(userId as any).exec();
     if (!user) return { newActivities: 0 };
 
     const afterEpoch = user.lastSyncAt ? Math.floor(user.lastSyncAt.getTime() / 1000) - 3600 : undefined;
-    const activities = await this.fetchRecentActivities(userId, afterEpoch);
+    const activities = await this.fetchRecentActivities(afterEpoch);
     if (activities.length === 0) {
-      user.lastSyncAt = new Date();
+      const now = new Date();
+      user.lastSyncAt = now;
+      user.stravaUpdatedAt = now;
+      user.isStravaUpToDate = true;
       await user.save();
       return { newActivities: 0 };
     }
 
+    const ftp = user.ftp || undefined;
+    const weightKg = user.weightKg || undefined;
     let newCount = 0;
     let addDistance = 0;
     let addMovingTime = 0;
@@ -147,31 +293,17 @@ export class SyncService {
 
     for (const a of activities) {
       const exists = await this.activityModel.findOne({ stravaId: a.id, user: userId as any }).exec();
-      if (exists) continue;
+      if (exists && exists.embeddingStatus === 'done') continue;
 
-      const distance = a.distance || 0;
-      const movingTime = a.moving_time || a.elapsed_time || 0;
-      const elevation = a.total_elevation_gain || 0;
-      const calories = a.calories || 0;
+      if (!exists) {
+        addDistance += a.distance || 0;
+        addMovingTime += a.moving_time || a.elapsed_time || 0;
+        addElevation += a.total_elevation_gain || 0;
+        addCalories += a.calories || 0;
+      }
 
-      await this.activityModel.create({
-        stravaId: a.id,
-        name: a.name || 'Unknown',
-        sport: a.type || 'Ride',
-        distance,
-        durationSeconds: movingTime,
-        elevationGain: elevation,
-        calories,
-        date: new Date(a.start_date_local || a.start_date || Date.now()),
-        tracked: false,
-        user: userId as any,
-      });
-
+      await this.processSingleActivity(a, String(user._id), ftp, weightKg);
       newCount++;
-      addDistance += distance;
-      addMovingTime += movingTime;
-      addElevation += elevation;
-      addCalories += calories;
     }
 
     if (newCount > 0) {
@@ -185,8 +317,15 @@ export class SyncService {
       }).exec();
     }
 
-    user.lastSyncAt = new Date();
+    const now = new Date();
+    user.lastSyncAt = now;
+    user.stravaUpdatedAt = now;
+    user.isStravaUpToDate = true;
     await user.save();
+
+    if (newCount > 0) {
+      await this.notificationService.createSyncCompleteNotification(String(user._id), newCount).catch(() => {});
+    }
 
     return { newActivities: newCount };
   }
@@ -198,15 +337,20 @@ export class SyncService {
 
     const existingCount = await this.activityModel.countDocuments({ user: userId as any }).exec();
     const allActivities = existingCount > 0
-      ? await this.fetchRecentActivities(userId)
-      : await this.fetchAllActivities(userId);
+      ? await this.fetchRecentActivities()
+      : await this.fetchAllActivities();
 
     if (allActivities.length === 0) {
-      user.lastSyncAt = new Date();
+      const now = new Date();
+      user.lastSyncAt = now;
+      user.stravaUpdatedAt = now;
+      user.isStravaUpToDate = true;
       await user.save();
       return { newActivities: 0 };
     }
 
+    const ftp = user.ftp || undefined;
+    const weightKg = user.weightKg || undefined;
     let newCount = 0;
     let addDistance = 0;
     let addMovingTime = 0;
@@ -215,31 +359,17 @@ export class SyncService {
 
     for (const a of allActivities) {
       const exists = await this.activityModel.findOne({ stravaId: a.id, user: userId as any }).exec();
-      if (exists) continue;
+      if (exists && exists.embeddingStatus === 'done') continue;
 
-      const distance = a.distance || 0;
-      const movingTime = a.moving_time || a.elapsed_time || 0;
-      const elevation = a.total_elevation_gain || 0;
-      const calories = a.calories || 0;
+      if (!exists) {
+        addDistance += a.distance || 0;
+        addMovingTime += a.moving_time || a.elapsed_time || 0;
+        addElevation += a.total_elevation_gain || 0;
+        addCalories += a.calories || 0;
+      }
 
-      await this.activityModel.create({
-        stravaId: a.id,
-        name: a.name || 'Unknown',
-        sport: a.type || 'Ride',
-        distance,
-        durationSeconds: movingTime,
-        elevationGain: elevation,
-        calories,
-        date: new Date(a.start_date_local || a.start_date || Date.now()),
-        tracked: false,
-        user: userId as any,
-      });
-
+      await this.processSingleActivity(a, String(user._id), ftp, weightKg);
       newCount++;
-      addDistance += distance;
-      addMovingTime += movingTime;
-      addElevation += elevation;
-      addCalories += calories;
     }
 
     if (newCount > 0) {
@@ -253,9 +383,29 @@ export class SyncService {
       }).exec();
     }
 
-    user.lastSyncAt = new Date();
+    const now = new Date();
+    user.lastSyncAt = now;
+    user.stravaUpdatedAt = now;
+    user.isStravaUpToDate = true;
     await user.save();
 
     return { newActivities: newCount };
+  }
+
+  async getLatestActivityDate(userId: any): Promise<Date | null> {
+    const latest = await this.activityModel.findOne({ user: userId as any }).sort({ date: -1 }).exec();
+    return latest?.date || null;
+  }
+
+  async getSyncStatus(userId: any): Promise<{ updatedAt: Date | null; isUpToDate: boolean; syncWindowMonths: number; rateLimitExhausted: boolean }> {
+    const user = await this.userModel.findById(userId as any).exec();
+    if (!user) return { updatedAt: null, isUpToDate: false, syncWindowMonths: SYNC_MONTHS, rateLimitExhausted: this.rateLimitHit };
+
+    return {
+      updatedAt: user.stravaUpdatedAt || null,
+      isUpToDate: user.isStravaUpToDate ?? false,
+      syncWindowMonths: SYNC_MONTHS,
+      rateLimitExhausted: this.rateLimitHit,
+    };
   }
 }

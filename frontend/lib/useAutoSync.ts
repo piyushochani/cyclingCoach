@@ -3,11 +3,29 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "./api";
 
-const SYNC_INTERVAL_MS = 30 * 60 * 1000;
+const SYNC_INTERVAL_MS = 2 * 60 * 60 * 1000;
 const STORAGE_KEY = "cycloai_last_sync";
 const STORAGE_STATUS_KEY = "cycloai_sync_status";
+const AUTO_SYNC_ENABLED_KEY = "cycloai_auto_sync_enabled";
 
 export type SyncStatus = "idle" | "syncing" | "success" | "error";
+
+export function isAutoSyncEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const val = localStorage.getItem(AUTO_SYNC_ENABLED_KEY);
+    return val === null ? true : val === "true";
+  } catch {
+    return true;
+  }
+}
+
+export function setAutoSyncEnabled(enabled: boolean) {
+  try {
+    localStorage.setItem(AUTO_SYNC_ENABLED_KEY, String(enabled));
+    window.dispatchEvent(new CustomEvent("auto-sync-toggle", { detail: enabled }));
+  } catch {}
+}
 
 export function getSyncStatus(): SyncStatus {
   if (typeof window === "undefined") return "idle";
@@ -53,6 +71,17 @@ export async function triggerGlobalSync(): Promise<boolean> {
     const now = Date.now();
     setLastSyncTime(now);
     setSyncStatus("success");
+    // Refresh stored user with updated sync fields
+    try {
+      const syncStatus: any = await api.get("/sync/status");
+      const stored = localStorage.getItem("cycloai_user");
+      if (stored) {
+        const user = JSON.parse(stored);
+        user.stravaUpdatedAt = syncStatus.updatedAt;
+        user.isStravaUpToDate = syncStatus.isUpToDate;
+        localStorage.setItem("cycloai_user", JSON.stringify(user));
+      }
+    } catch {}
     setTimeout(() => setSyncStatus("idle"), 4000);
     return true;
   } catch {
@@ -92,7 +121,8 @@ export function useAutoSync() {
   useEffect(() => {
     const last = getLastSync();
     const elapsed = Date.now() - last;
-    const shouldAutoSync = last !== 0 && elapsed > SYNC_INTERVAL_MS;
+    const enabled = isAutoSyncEnabled();
+    const shouldAutoSync = enabled && last !== 0 && elapsed > SYNC_INTERVAL_MS;
 
     if (shouldAutoSync) {
       triggerIncrementalSync();
@@ -100,7 +130,7 @@ export function useAutoSync() {
 
     const interval = setInterval(() => {
       const lastCheck = getLastSync();
-      if (Date.now() - lastCheck > SYNC_INTERVAL_MS) {
+      if (enabled && Date.now() - lastCheck > SYNC_INTERVAL_MS) {
         triggerIncrementalSync();
       }
     }, SYNC_INTERVAL_MS);
@@ -114,14 +144,29 @@ export function useAutoSync() {
     const onCompleted = () => {
       setLastSynced(getLastSyncTimeFormatted());
     };
+    const onToggle = () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      const stillEnabled = isAutoSyncEnabled();
+      if (stillEnabled) {
+        const newInterval = setInterval(() => {
+          const lastCheck = getLastSync();
+          if (Date.now() - lastCheck > SYNC_INTERVAL_MS) {
+            triggerIncrementalSync();
+          }
+        }, SYNC_INTERVAL_MS);
+        timerRef.current = newInterval;
+      }
+    };
 
     window.addEventListener("sync-status-change", onStatusChange);
     window.addEventListener("sync-completed", onCompleted);
+    window.addEventListener("auto-sync-toggle", onToggle);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       window.removeEventListener("sync-status-change", onStatusChange);
       window.removeEventListener("sync-completed", onCompleted);
+      window.removeEventListener("auto-sync-toggle", onToggle);
     };
   }, [getLastSync]);
 

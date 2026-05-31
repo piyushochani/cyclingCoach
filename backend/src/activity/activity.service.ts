@@ -39,7 +39,7 @@ export class ActivityService {
   async update(id: string, data: Partial<Activity>, userId?: any): Promise<Activity | null> {
     const filter: any = { _id: id };
     if (userId) filter.user = userId as any;
-    return this.activityModel.findOneAndUpdate(filter, data, { new: true }).exec();
+    return this.activityModel.findOneAndUpdate(filter, data, { returnDocument: 'after' }).exec();
   }
 
   async delete(id: string, userId?: any): Promise<Activity | null> {

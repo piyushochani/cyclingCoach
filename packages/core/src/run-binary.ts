@@ -307,19 +307,19 @@ export async function runBinary(
       await runStartupCapture(config.telegram.botToken, binary, config.dataDir);
     }
 
-    const { createTelegramBot, notifyUpdate } = await import("./channels/telegram.js");
+    const { createTelegramBot } = await import("./channels/telegram.js");
     const bot = createTelegramBot(
       config.telegram.botToken,
-      agent,
-      binary,
-      config.dataDir,
-      reference.services,
+      { binary, dataDir: config.dataDir },
     );
+    if (!bot) {
+      console.error("Failed to create Telegram bot (missing config).");
+      return;
+    }
     console.log(
-      `${binary.displayName} (Telegram mode) is running. Open Telegram and message your bot — Ctrl+C to stop.`,
+      `${binary.displayName} (Telegram mode) is running and relaying to ${process.env.BACKEND_URL || "http://localhost:3001"}. Open Telegram and message your bot — Ctrl+C to stop.`,
     );
     bot.start();
-    notifyUpdate(bot, config.dataDir, binary).catch(() => {});
   } else {
     console.log(`${binary.displayName} (CLI mode). Type your message:`);
     const { createInterface } = await import("node:readline");

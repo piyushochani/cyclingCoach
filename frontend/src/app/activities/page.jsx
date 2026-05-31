@@ -34,15 +34,12 @@ const formatDuration = (seconds) => {
   if (!seconds && seconds !== 0) return "—";
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  const s = seconds % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}h`;
-  if (m > 0) return `${m}:${String(s).padStart(2, "0")}m`;
-  return `${s}s`;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 };
 
 const formatDistance = (val) => {
   if (val === undefined || val === null || Number.isNaN(parseFloat(val))) return "—";
-  return parseFloat(val).toFixed(1);
+  return (parseFloat(val) / 1000).toFixed(2);
 };
 
 const formatPace = (distance, seconds) => {
@@ -70,7 +67,7 @@ const sportMeta = {
 };
 
 const getSportMeta = (sport = "") =>
-  sportMeta[sport] || { icon: "⚡", label: (sport || "").toUpperCase(), color: "rgba(255,255,255,0.35)" };
+  sportMeta[sport] || { icon: "🚴", label: (sport || "").toUpperCase(), color: "rgba(255,255,255,0.35)" };
 
 function FilterSelect({ label, value, onChange, options }) {
   return (
@@ -82,12 +79,12 @@ function FilterSelect({ label, value, onChange, options }) {
         <select
           value={value}
           onChange={onChange}
-          className="appearance-none rounded-xl border border-white/[0.10] bg-[#0D0D0D] px-3.5 py-2.5 pr-9 text-sm font-medium text-white outline-none transition-all duration-200 hover:border-white/20 focus:border-[#FF5500]/50 min-w-[140px]"
+          className="appearance-none rounded-xl border border-white/[0.10] bg-surface-cards px-3.5 py-2.5 pr-9 text-sm font-medium text-white outline-none transition-all duration-200 hover:border-white/20 focus:border-[#FF5500]/50 min-w-[140px]"
         >
           {options.map((o) => {
             const option = typeof o === "string" ? { label: o, value: o } : o;
             return (
-              <option key={option.value} value={option.value} className="bg-[#0D0D0D] text-white">
+              <option key={option.value} value={option.value} className="bg-surface-cards text-white">
                 {option.label}
               </option>
             );
@@ -141,7 +138,7 @@ function ActivityRow({ activity, index }) {
       </span>
 
       <span className="font-jetbrainsMono text-[13px] text-white/35">
-        {activity.elevation ?? activity.elevationGain ?? "—"} m
+        {((activity.elevation ?? activity.elevationGain) || 0).toFixed(2)} m
       </span>
 
       <span className="flex items-center gap-1.5 text-xs text-white/20">
@@ -227,68 +224,60 @@ export default function ActivitiesPage() {
 
   const summaryStats = useMemo(() => {
     const total = activities.length;
-    const totalDist = activities.reduce((s, a) => s + (parseFloat(a.distance) || 0), 0);
+    const totalDist = activities.reduce((s, a) => s + (parseFloat(a.distance) || 0), 0) / 1000;
     const totalElev = activities.reduce((s, a) => s + (a.elevationGain || 0), 0);
     const totalTime = activities.reduce((s, a) => s + (a.durationSeconds || 0), 0);
     return { total, totalDist, totalElev, totalTime };
   }, [activities]);
 
   return (
-    <div className="min-h-screen bg-[#080808]">
+    <div className="min-h-screen bg-black text-white">
+      {/* Background Glows */}
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute left-[60%] top-[-8%] h-[450px] w-[450px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.04)_0%,transparent_70%)]" />
-        <div className="absolute bottom-[-12%] left-[-5%] h-[350px] w-[350px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.03)_0%,transparent_72%)]" />
+        <div className="absolute left-[62%] top-[-8%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.06)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-10%] left-[-5%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.04)_0%,transparent_72%)]" />
       </div>
 
-      <div className="relative z-[1] mx-auto max-w-[1120px] px-4 pb-20 pt-10 md:px-6">
-        <motion.div
-          initial={{ opacity: 0, y: -14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-8"
-        >
-          <p className="font-dmSans mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#FF5500]/70">
-            Training Log
-          </p>
-          <h1 className="font-bebasNeue text-[clamp(3rem,7vw,5rem)] font-normal leading-none tracking-wide text-white">
-            YOUR <span className="text-[#FF5500]">ACTIVITIES</span>
-          </h1>
-          <div className="mt-3 h-[2px] w-9 rounded-full bg-[#FF5500]" />
-          <p className="font-dmSans mt-3 text-sm text-white/25">
-            Every ride, run, and walk — filtered like a performance board.
-          </p>
-        </motion.div>
+      <motion.main
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
+      >
+        <div className="mb-8 flex flex-col gap-3 border-b border-white/10 pb-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
+              Training Log
+            </p>
+            <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
+              Your <span className="text-[#FF5500]">Activities</span>
+            </h1>
+            <p className="mt-3 max-w-2xl font-dmSans text-sm text-white/50 md:text-[15px]">
+              Every ride, run, and walk — filtered like a performance board.
+            </p>
+          </div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1 }}
-          className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4"
-        >
-          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+        <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="rounded-2xl border border-white/5 bg-[#111318] px-5 py-4">
             <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total Activities</p>
-            <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{summaryStats.total}</p>
+            <p className="font-jetbrainsMono mt-1 text-2xl font-bold text-white">{summaryStats.total}</p>
           </div>
-          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+          <div className="rounded-2xl border border-white/5 bg-[#111318] px-5 py-4">
             <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total Distance</p>
-            <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{Math.round(summaryStats.totalDist)} km</p>
+            <p className="font-jetbrainsMono mt-1 text-2xl font-bold text-white">{summaryStats.totalDist.toFixed(2)} <span className="text-xs text-white/30 ml-1">KM</span></p>
           </div>
-          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+          <div className="rounded-2xl border border-white/5 bg-[#111318] px-5 py-4">
             <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total Elevation</p>
-            <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{Math.round(summaryStats.totalElev)} m</p>
+            <p className="font-jetbrainsMono mt-1 text-2xl font-bold text-white">{summaryStats.totalElev.toFixed(0)} <span className="text-xs text-white/30 ml-1">M</span></p>
           </div>
-          <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] px-4 py-3.5">
+          <div className="rounded-2xl border border-white/5 bg-[#111318] px-5 py-4">
             <p className="font-dmSans text-[10px] uppercase tracking-[0.12em] text-white/30">Total Time</p>
-            <p className="font-jetbrainsMono mt-1 text-xl font-bold text-white">{formatDuration(summaryStats.totalTime)}</p>
+            <p className="font-jetbrainsMono mt-1 text-2xl font-bold text-white">{formatDuration(summaryStats.totalTime)}</p>
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.15 }}
-          className="mb-4 flex flex-wrap items-center gap-3"
-        >
+        <div className="mb-6 flex flex-wrap items-center gap-4">
           <FilterSelect label="Sort by" value={sortBy} onChange={(e) => setSortBy(e.target.value)} options={SORT_OPTIONS} />
           <FilterSelect
             label="Activity"
@@ -301,44 +290,39 @@ export default function ActivitiesPage() {
             placeholder="Search activities..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="min-w-[200px] flex-1 rounded-xl border border-white/[0.10] bg-[#0D0D0D] px-3.5 py-2.5 text-sm font-medium text-white outline-none transition-all duration-200 placeholder:text-white/20 focus:border-[#FF5500]/50"
+            className="min-w-[240px] flex-1 rounded-xl border border-white/10 bg-[#111318] px-4 py-3 text-sm font-medium text-white outline-none transition-all duration-200 placeholder:text-white/20 focus:border-[#FF5500]/50"
           />
-        </motion.div>
+        </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.18 }}
-          className="mb-5 flex flex-wrap gap-2"
-        >
+        <div className="mb-6 flex flex-wrap gap-2">
           {DATE_RANGE_OPTIONS.map((opt) => {
             const active = dateRange === opt;
             return (
               <button
                 key={opt}
                 onClick={() => setDateRange(opt)}
-                className={`rounded-full border px-4 py-1.5 text-xs font-semibold tracking-wide transition-all duration-200 ${
+                className={`rounded-lg px-4 py-1.5 text-xs font-semibold ${
                   active
-                    ? "border-[#FF5500] bg-[#FF5500] text-white"
-                    : "border-white/[0.10] bg-transparent text-white/50 hover:border-white/20"
+                    ? "bg-[#FF5500] text-white border border-[#FF5500]"
+                    : "border border-white/10 text-white/60 hover:border-white/20 hover:text-white transition-all"
                 }`}
               >
                 {opt}
               </button>
             );
           })}
-        </motion.div>
+        </div>
 
-        <p className="font-dmSans mb-4 text-[11px] text-white/20">
-          Showing {visible.length} of {sorted.length} activities
+        <p className="font-dmSans mb-4 text-[11px] uppercase tracking-wider text-white/20">
+          Showing {visible.length} of {sorted.length} results
         </p>
 
-        <div className="rounded-2xl border border-white/[0.05] bg-[#0D0D0D] overflow-hidden">
-          <div className="grid grid-cols-[56px_minmax(0,1.5fr)_100px_105px_85px_100px] gap-3 border-b border-white/[0.06] px-4 py-2.5 md:grid-cols-[72px_minmax(0,1.5fr)_110px_120px_100px_110px]">
+        <div className="rounded-2xl border border-white/5 bg-[#111318] overflow-hidden shadow-2xl">
+          <div className="grid grid-cols-[56px_minmax(0,1.5fr)_100px_105px_85px_100px] gap-3 border-b border-white/5 px-6 py-4 md:grid-cols-[72px_minmax(0,1.5fr)_110px_120px_100px_110px]">
             {["Type", "Activity", "Distance", "Time", "Elev", "Date"].map((h) => (
               <span
                 key={h}
-                className="font-dmSans text-[10px] font-bold uppercase tracking-[0.12em] text-white/20"
+                className="font-dmSans text-[10px] font-bold uppercase tracking-[0.15em] text-white/30"
               >
                 {h}
               </span>
@@ -348,8 +332,8 @@ export default function ActivitiesPage() {
           {loading ? (
             <SkeletonRows />
           ) : visible.length === 0 ? (
-            <div className="px-4 py-10 text-center">
-              <p className="font-dmSans text-sm text-white/20">No activities found.</p>
+            <div className="px-6 py-20 text-center">
+              <p className="font-dmSans text-sm text-white/20">No activities found matching your criteria.</p>
             </div>
           ) : (
             <motion.div variants={stagger} initial="hidden" animate="show">
@@ -361,16 +345,18 @@ export default function ActivitiesPage() {
         </div>
 
         {hasMore && (
-          <motion.button
-            onClick={() => setVisibleCount((c) => c + 12)}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#FF5500] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.08em] text-white transition-all duration-200 hover:bg-[#FF5500]/90 hover:shadow-[0_0_20px_rgba(255,85,0,0.15)]"
-          >
-            Load More
-          </motion.button>
+          <div className="mt-8 flex justify-center">
+            <motion.button
+              onClick={() => setVisibleCount((c) => c + 12)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200"
+            >
+              Load More Activities
+            </motion.button>
+          </div>
         )}
-      </div>
+      </motion.main>
     </div>
   );
 }

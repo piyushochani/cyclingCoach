@@ -36,6 +36,12 @@ export class User extends Document {
   @Prop({ default: null })
   ftp: number;
 
+  @Prop({ default: null })
+  maxHeartrate: number;
+
+  @Prop({ default: null })
+  age: number;
+
   @Prop({ default: '' })
   description: string;
 
@@ -59,6 +65,36 @@ export class User extends Document {
 
   @Prop({ default: null })
   lastSyncAt: Date;
+
+  @Prop({ default: 'free', enum: ['free', 'pro'] })
+  subscriptionTier: string;
+
+  @Prop({ default: null })
+  subscriptionStartDate: Date;
+
+  @Prop({ default: null })
+  subscriptionEndDate: Date;
+
+  @Prop({ default: null })
+  stripeCustomerId: string;
+
+  @Prop({ default: null })
+  stripeSubscriptionId: string;
+
+  @Prop({ default: null })
+  stravaUpdatedAt: Date;
+
+  @Prop({ default: false })
+  isStravaUpToDate: boolean;
+
+  @Prop({ default: null })
+  trainingStart: Date;
+
+  @Prop({ default: '' })
+  onboardingSummary: string;
+
+  @Prop({ default: null })
+  telegramChatId: string;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

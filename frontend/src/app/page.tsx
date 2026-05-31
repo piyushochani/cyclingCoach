@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React from "react";
 import Link from "next/link";
 import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion";
 
@@ -46,7 +46,7 @@ const STEPS = [
     num: "01",
     title: "Connect your rides",
     body: "Import your Strava, Wahoo, or Garmin history. CycloAI reads power, HR, cadence, and recovery signals instantly.",
-    img: null,
+    img: "C:/Users/piyus/OneDrive/Documents/Workspaces/cyclingCoach/cycling-coach/frontend/images/StravaConnection.webp",
   },
   {
     num: "02",
@@ -105,47 +105,45 @@ const WheelSVG = ({ className = "", style = {} }) => (
   </svg>
 );
 
-function Navbar({ scrolled }: { scrolled: boolean }) {
+function Navbar() {
   return (
     <motion.header
       initial={{ y: -32, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-500 ${
-        scrolled
-          ? "bg-[#060709]/80 backdrop-blur-2xl border-b border-white/[0.06]"
-          : "bg-transparent"
-      }`}
+      className="fixed inset-x-0 top-0 z-50 bg-[#060709] border-b border-white/[0.06]"
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between px-8 py-5 md:px-14">
         <Link href="/" className="group flex items-center gap-3">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
-            className="text-[#FF6B00]"
-          >
-            <WheelSVG className="h-8 w-8" />
+          <motion.div whileHover={{ scale: 1.05 }}>
+            <img
+              src="/images/cyclogen_logo.png"
+              alt="Cyclogen"
+              className="h-8 w-auto"
+            />
           </motion.div>
-          <div className="leading-none">
-            <p
-              className="text-[1.45rem] font-black uppercase tracking-[0.12em] text-white"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-            >
-              CycloAI
-            </p>
-          </div>
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
-          {NAV_LINKS.map((l) => (
-            <Link
-              key={l}
-              href={`#${l.toLowerCase().replace(/ /g, "-")}`}
-              className="font-medium text-sm tracking-wide text-white/50 transition hover:text-white"
-            >
-              {l}
-            </Link>
-          ))}
+          {NAV_LINKS.map((l) =>
+            l === "Pricing" ? (
+              <Link
+                key={l}
+                href="#pricing"
+                className="font-medium text-sm tracking-wide text-white/50 transition hover:text-white"
+              >
+                {l}
+              </Link>
+            ) : (
+              <Link
+                key={l}
+                href={`#${l.toLowerCase().replace(/ /g, "-")}`}
+                className="font-medium text-sm tracking-wide text-white/50 transition hover:text-white"
+              >
+                {l}
+              </Link>
+            )
+          )}
         </nav>
 
         <div className="flex items-center gap-3">
@@ -154,7 +152,7 @@ function Navbar({ scrolled }: { scrolled: boolean }) {
               Log In
             </button>
           </Link>
-          <Link href="/signup">
+          <Link href="/signup" onClick={() => { localStorage.removeItem("cycloai_signed_in"); localStorage.removeItem("cycloai_user"); localStorage.removeItem("cycloai_session_ts"); }}>
             <button
               className="rounded-full px-5 py-2 text-sm font-bold text-black transition hover:scale-[1.03] active:scale-[0.98]"
               style={{ background: "#FF6B00" }}
@@ -244,7 +242,7 @@ function HeroSection() {
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-center"
           >
-            <Link href="/signup">
+            <Link href="/signup" onClick={() => { localStorage.removeItem("cycloai_signed_in"); localStorage.removeItem("cycloai_user"); localStorage.removeItem("cycloai_session_ts"); }}>
               <button
                 className="group flex items-center gap-2 rounded-full px-8 py-4 text-base font-bold text-black transition hover:scale-[1.02] active:scale-[0.98] hover:shadow-[0_0_30px_rgba(255,107,0,0.4)]"
                 style={{ background: "#FF6B00" }}
@@ -322,21 +320,19 @@ function FeaturesSection() {
     <section id="features" className="relative bg-[#060709] px-8 py-20 md:px-14 md:py-28">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(255,107,0,0.03),transparent_50%)]" />
       <div className="mx-auto max-w-7xl">
-        <div className="mb-14 flex items-end justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-white/30">
-              What we offer
-            </p>
-            <h2
-              className="mt-3 text-5xl font-black uppercase leading-none tracking-tight text-white md:text-7xl"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-            >
-              Every edge,<br />
-              <span style={{ WebkitTextStroke: "2px #FF6B00", color: "transparent" }}>
-                engineered.
-              </span>
-            </h2>
-          </div>
+        <div className="mb-14 text-center">
+          <p className="text-xs font-bold uppercase tracking-[0.28em] text-white/30">
+            What we offer
+          </p>
+          <h2
+            className="mt-3 text-5xl font-black uppercase leading-none tracking-tight text-white md:text-7xl"
+            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+          >
+            Every edge,<br />
+            <span style={{ WebkitTextStroke: "2px #FF6B00", color: "transparent" }}>
+              engineered.
+            </span>
+          </h2>
         </div>
 
         <div className="grid gap-6 md:grid-cols-3">
@@ -464,7 +460,7 @@ function HowItWorksSection() {
 
 function PricingSection() {
   return (
-    <section id="pricing" className="relative bg-[#060709] px-6 py-20 md:px-10 md:py-28">
+    <section id="pricing" className="relative bg-[#060709] px-6 py-20 md:px-10 md:py-2">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_70%_30%,rgba(255,107,0,0.03),transparent_50%)]" />
       <div className="mx-auto max-w-7xl">
         <div className="mb-14 text-center">
@@ -498,7 +494,7 @@ function PricingSection() {
                 </li>
               ))}
             </ul>
-            <Link href="/signup">
+            <Link href="/signup" onClick={() => { localStorage.removeItem("cycloai_signed_in"); localStorage.removeItem("cycloai_user"); localStorage.removeItem("cycloai_session_ts"); }}>
               <button className="mt-8 w-full rounded-full px-8 py-4 text-base font-bold text-black transition hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] active:scale-[0.98]" style={{ background: "#FF6B00" }}>
                 Start Free Trial
               </button>
@@ -513,7 +509,7 @@ function PricingSection() {
 
 function AboutSection() {
   return (
-    <section id="about" className="relative bg-[#060709] px-6 py-20 md:px-10 md:py-28">
+    <section id="about" className="relative bg-[#060709] px-6 py-20 md:px-10 md:py-20">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_80%,rgba(255,140,0,0.03),transparent_50%)]" />
       <div className="mx-auto max-w-7xl">
         <div className="text-center">
@@ -553,13 +549,7 @@ function AboutSection() {
 function TestimonialsSection() {
   return (
     <section id="reviews" className="relative bg-[#060709] px-6 py-20 md:px-10 md:py-28">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_80%,rgba(255,69,0,0.03),transparent_50%)]" />
-      <div
-        className="pointer-events-none absolute left-8 top-16 select-none text-[18rem] font-black leading-none text-white/[0.02]"
-        aria-hidden
-      >
-        "
-      </div>
+      
 
       <div className="mx-auto max-w-7xl">
         <div className="mb-12 text-center">
@@ -649,7 +639,7 @@ function CTASection() {
         </p>
 
         <div className="mt-7 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link href="/signup">
+          <Link href="/signup" onClick={() => { localStorage.removeItem("cycloai_signed_in"); localStorage.removeItem("cycloai_user"); localStorage.removeItem("cycloai_session_ts"); }}>
             <button
               className="group flex items-center gap-2 rounded-full px-9 py-4 text-base font-bold text-black transition hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(255,107,0,0.4)] active:scale-[0.98]"
               style={{ background: "#FF6B00" }}
@@ -726,23 +716,14 @@ function Footer() {
 }
 
 export default function Home() {
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 32);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   return (
     <div className="min-h-screen bg-[#060709] text-white antialiased">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,800;1,900&display=swap');
       `}</style>
 
-      <Navbar scrolled={scrolled} />
-      <main>
+      <Navbar />
+      <main className="pt-10">
         <HeroSection />
         <StatsBar />
         <FeaturesSection />

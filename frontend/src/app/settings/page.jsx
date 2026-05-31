@@ -14,7 +14,7 @@ function Section({ title, subtitle, children, delay = 0 }) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay, duration: 0.4 }}
-      className="rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-6 md:p-8"
+      className="rounded-2xl border border-white/[0.06] bg-surface-cards p-6 md:p-8"
     >
       <h2 className="font-barlowCondensed text-lg uppercase tracking-wide text-white">{title}</h2>
       {subtitle && <p className="font-dmSans mt-1 text-sm text-white/30">{subtitle}</p>}
@@ -66,7 +66,7 @@ function SaveButton({ onClick, dirty }) {
     <button
       onClick={onClick}
       disabled={!dirty}
-      className="inline-flex items-center gap-2 rounded-xl bg-[#FF5500] px-5 py-2.5 text-xs font-bold uppercase tracking-[0.08em] text-white transition-all hover:bg-[#FF5500]/90 hover:shadow-[0_0_20px_rgba(255,85,0,0.15)] disabled:opacity-30 disabled:cursor-not-allowed"
+      className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
     >
       <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
@@ -160,17 +160,17 @@ export default function SettingsPage() {
         <div className="absolute bottom-[-10%] left-[-5%] h-[350px] w-[350px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.03)_0%,transparent_70%)]" />
       </div>
 
-      <div className="relative z-[1] mx-auto max-w-[800px] px-4 pb-20 pt-10 md:px-8">
+      <div className="relative z-[1] mx-auto max-w-[1200px] px-4 pb-20 pt-10 md:px-8">
         <motion.div
           initial={{ opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="mb-10"
         >
-          <p className="font-dmSans mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#FF5500]/70">
+          <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Configuration
           </p>
-          <h1 className="font-bebasNeue text-6xl uppercase leading-none tracking-wide text-white md:text-7xl">
+          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
             <span className="text-[#FF5500]">Settings</span>
           </h1>
           <div className="mt-3 h-[2px] w-10 rounded-full bg-[#FF5500]" />
@@ -240,7 +240,7 @@ export default function SettingsPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.4 }}
-            className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-6"
+            className="flex items-center justify-between rounded-2xl border border-white/[0.06] bg-surface-cards p-6"
           >
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FF5500]/10">
@@ -265,7 +265,7 @@ export default function SettingsPage() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25, duration: 0.4 }}
-            className="rounded-2xl border border-white/[0.06] bg-[#0D0D0D] p-6"
+            className="rounded-2xl border border-white/[0.06] bg-surface-cards p-6"
           >
             <h2 className="font-barlowCondensed text-lg uppercase tracking-wide text-white">About</h2>
             <div className="mt-4 space-y-2">
