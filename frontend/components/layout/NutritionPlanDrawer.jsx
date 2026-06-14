@@ -38,8 +38,8 @@ const NutritionPlanDrawer = ({ isOpen, onClose, raceName = 'Selected Race' }) =>
             {/* On-Bike Timeline */}
             <div>
               <h4 className="font-bebasNeue text-lg text-text-primary mb-3 border-b border-chain-link-grey pb-1">On-Bike Fuel Timeline</h4>
-              <div className="overflow-x-auto custom-scrollbar pb-2">
-                <div className="flex items-center space-x-8 min-w-max">
+              <div className="overflow-x-hidden pb-2">
+                <div className="flex items-center space-x-8">
                   {/* Example timeline points */}
                   {[
                     { dist: '0km', fuel: 'Water' },

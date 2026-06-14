@@ -45,12 +45,12 @@ const LandingFooter = () => {
                 <path d="M50 10 L50 90 M15 50 L85 50" stroke="currentColor" strokeWidth="4" />
               </motion.svg>
               <span className="font-barlowCondensed text-xl text-text-primary uppercase tracking-wide">
-                CycloAI
+                CyclogenAI
               </span>
             </motion.div>
           </Link>
           <p className="font-dmSans text-sm text-text-muted mt-4">
-            &copy; {new Date().getFullYear()} CycloAI. All rights reserved.
+            &copy; {new Date().getFullYear()} CyclogenAI. All rights reserved.
           </p>
         </div>
 

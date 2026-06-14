@@ -4,6 +4,8 @@ import { Model } from 'mongoose';
 import { User } from '../user/user.schema';
 import { Activity } from '../activity/activity.schema';
 
+const CYCLING_FILTER = { sport: { $regex: /ride|cycling|bike|bicycle|velomobile|handcycle/i } };
+
 @Injectable()
 export class StatsService {
   constructor(
@@ -12,7 +14,7 @@ export class StatsService {
   ) {}
 
   async getAllStats() {
-    const activities = await this.activityModel.find().exec();
+    const activities = await this.activityModel.find(CYCLING_FILTER).exec();
     const totalDistance = activities.reduce((sum, act) => sum + act.distance, 0);
     const totalDuration = activities.reduce((sum, act) => sum + act.durationSeconds, 0);
     const totalElevation = activities.reduce((sum, act) => sum + act.elevationGain, 0);
@@ -21,7 +23,7 @@ export class StatsService {
 
   async getUserStats(userId: any) {
     const user = await this.userModel.findById(userId as any).exec();
-    const activities = await this.activityModel.find({ user: userId as any }).sort({ date: -1 }).exec();
+    const activities = await this.activityModel.find({ ...CYCLING_FILTER, user: userId as any }).sort({ date: -1 }).exec();
     const activityCount = activities.length;
 
     const totalDistance = activities.reduce((s, a) => s + (a.distance || 0), 0);

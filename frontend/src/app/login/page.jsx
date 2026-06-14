@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (localStorage.getItem("cycloai_signed_in") === "true") {
+    if (localStorage.getItem("cyclogenai_signed_in") === "true") {
       router.replace("/dashboard");
     }
   }, [router]);
@@ -29,9 +29,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const user = await api.post("/auth/login", { email, password });
-      localStorage.setItem("cycloai_signed_in", "true");
-      localStorage.setItem("cycloai_user", JSON.stringify(user));
-      localStorage.setItem("cycloai_session_ts", String(Date.now()));
+      localStorage.setItem("cyclogenai_signed_in", "true");
+      localStorage.setItem("cyclogenai_user", JSON.stringify(user));
+      localStorage.setItem("cyclogenai_session_ts", String(Date.now()));
+      localStorage.removeItem("cyclogenai_onboarding_done");
       router.replace("/dashboard");
     } catch (err) {
       setError(err.message || "Invalid email or password");
@@ -58,7 +59,7 @@ export default function LoginPage() {
                 <path d="M50 9v14M50 77v14M9 50h14M77 50h14M22 22l10 10M68 68l10 10M78 22 68 32M22 78l10-10" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
               </svg>
               <span className="font-barlowCondensed text-2xl uppercase tracking-[0.08em] text-white">
-                CycloAI
+                CyclogenAI
               </span>
             </Link>
           </div>

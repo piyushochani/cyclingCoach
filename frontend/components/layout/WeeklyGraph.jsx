@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { api } from "../../lib/api";
 
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -27,6 +28,11 @@ function weekStartDate(key) {
 
 const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
+const WORKOUT_LABELS = {
+  rest: "Rest", recovery: "Recovery", endurance: "Endurance", tempo: "Tempo",
+  threshold: "Threshold", intervals: "Intervals", vo2max: "VO2Max", race: "Race", long: "Long Ride", custom: "Custom",
+};
+
 function fmtTime(hrs) {
   const h = Math.floor(hrs);
   const m = Math.round((hrs % 1) * 60);
@@ -49,7 +55,21 @@ function buildDayData(start, dayOffset, dayActivities) {
   return { day: dayName, date: dateStr, activity: "Rest", time: "—", distance: "—" };
 }
 
-function buildWeeklyData(activities) {
+function buildDayDataFromPlan(workout, dayOffset, startDate) {
+  const day = new Date(startDate);
+  day.setDate(startDate.getDate() + dayOffset);
+  const dateStr = `${String(day.getDate()).padStart(2, "0")}/${String(day.getMonth() + 1).padStart(2, "0")}`;
+  const dayName = DAY_NAMES[dayOffset];
+
+  if (workout && workout.type !== 'rest') {
+    const label = WORKOUT_LABELS[workout.type] || workout.type || "Workout";
+    const dist = workout.distance ? `${(workout.distance / 1000).toFixed(2)} km` : "—";
+    return { day: dayName, date: dateStr, activity: label, time: "—", distance: dist };
+  }
+  return { day: dayName, date: dateStr, activity: "Rest", time: "—", distance: "—" };
+}
+
+function buildWeeklyData(activities, weeklyPlansMap = {}) {
   if (!activities || activities.length === 0) return [];
 
   const weeks = {};
@@ -75,9 +95,9 @@ function buildWeeklyData(activities) {
         dayBuckets: {},
       };
     }
-    weeks[key].km += (a.distance || 0) / 1000;
+    weeks[key].km = Math.round((weeks[key].km + (a.distance || 0) / 1000) * 100) / 100;
     weeks[key].hrs += (a.durationSeconds || 0) / 3600;
-    weeks[key].elev += a.elevationGain || 0;
+    weeks[key].elev = Math.round((weeks[key].elev + (a.elevationGain || 0)) * 100) / 100;
     const dayName = DAY_NAMES[(d.getDay() + 6) % 7];
     if (!weeks[key].dayBuckets[dayName]) weeks[key].dayBuckets[dayName] = [];
     weeks[key].dayBuckets[dayName].push(a);
@@ -86,7 +106,13 @@ function buildWeeklyData(activities) {
   let prevMonth = null;
   return Object.values(weeks).map((w) => {
     const performed = DAY_NAMES.map((_, i) => buildDayData(w.startDate, i, w.dayBuckets[DAY_NAMES[i]]));
-    const planned = performed;
+    const plan = weeklyPlansMap[w.week];
+    const planned = plan && plan.workouts?.length
+      ? DAY_NAMES.map((_, i) => {
+          const wo = plan.workouts.find((w) => w.dayOfWeek === i);
+          return buildDayDataFromPlan(wo, i, w.startDate);
+        })
+      : performed;
     const m = w.month === prevMonth ? null : w.month;
     prevMonth = w.month;
     return { ...w, planned, performed, month: m, activities: Object.values(w.dayBuckets).flat() };
@@ -157,9 +183,29 @@ export default function WeeklyGraph({ activities: apiActivities }) {
   const [activeIdx, setActiveIdx] = useState(0);
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [zoomLevel, setZoomLevel] = useState(0);
+  const [weeklyPlans, setWeeklyPlans] = useState([]);
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [goalInput, setGoalInput] = useState("");
   const svgRef = useRef(null);
 
-  const weeklyData = useMemo(() => buildWeeklyData(apiActivities || []), [apiActivities]);
+  useEffect(() => {
+    api.get('/training-context/weekly-plans')
+      .then((plans) => setWeeklyPlans(plans || []))
+      .catch(() => {});
+  }, []);
+
+  const weeklyPlansMap = useMemo(() => {
+    const map = {};
+    for (const plan of weeklyPlans) {
+      if (!plan.startDate) continue;
+      const d = new Date(plan.startDate);
+      const key = weekKey(d);
+      map[key] = plan;
+    }
+    return map;
+  }, [weeklyPlans]);
+
+  const weeklyData = useMemo(() => buildWeeklyData(apiActivities || [], weeklyPlansMap), [apiActivities, weeklyPlansMap]);
 
   const visibleCount = ZOOM_STEPS[zoomLevel];
   const visibleData = weeklyData.slice(-visibleCount);
@@ -262,6 +308,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
           <button
             type="button"
             style={controlButtonStyle("default")}
+            onClick={() => setShowGoalModal(true)}
           >
             <span>🎯</span>
             <span>Set Weekly Goal</span>
@@ -320,6 +367,59 @@ export default function WeeklyGraph({ activities: apiActivities }) {
         </div>
       </div>
 
+      {/* ── EMPTY STATE ── */}
+      {weeklyData.length === 0 && (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "60px 20px",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 16,
+              background: "rgba(255,255,255,0.04)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 24,
+            }}
+          >
+            📊
+          </div>
+          <p
+            style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 14,
+              color: "rgba(255,255,255,0.35)",
+              textAlign: "center",
+              margin: 0,
+            }}
+          >
+            No ride data yet
+          </p>
+          <p
+            style={{
+              fontFamily: "'DM Sans', sans-serif",
+              fontSize: 12,
+              color: "rgba(255,255,255,0.2)",
+              textAlign: "center",
+              margin: 0,
+              maxWidth: 280,
+            }}
+          >
+            Activities will appear here once synced from Strava. Auto-sync runs every 5 minutes, or use "Refresh Strava Data" in your profile menu to sync now.
+          </p>
+        </div>
+      )}
+
+      {weeklyData.length > 0 && <>
       {/* ── STATS ROW ── */}
       <div style={{ paddingTop: 12, paddingBottom: 12 }}>
         <div style={{ display: "flex", gap: 40, flexWrap: "wrap", justifyContent: "center" }}>
@@ -476,7 +576,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                       fontWeight: 700,
                     }}
                   >
-                    {p.km} km
+                    {Number(p.km).toFixed(2)} km
                   </text>
                 )}
               </g>
@@ -529,7 +629,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                       fontSize: 10,
                     }}
                   >
-                    {p.km} km
+                    {Number(p.km).toFixed(2)} km
                   </text>
                 </g>
               );
@@ -990,6 +1090,57 @@ export default function WeeklyGraph({ activities: apiActivities }) {
           </div>
         </motion.div>
       </AnimatePresence>}
+    </>}
+
+      {showGoalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md" onClick={() => setShowGoalModal(false)}>
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-[#111318] p-6 shadow-2xl"
+          >
+            <h3 className="font-dmSans text-sm font-semibold text-white">Set Weekly Goal</h3>
+            <p className="font-dmSans mt-1 text-xs text-white/40">Target distance in kilometers for this week.</p>
+            <input
+              type="number"
+              step="0.1"
+              min="1"
+              value={goalInput}
+              onChange={(e) => setGoalInput(e.target.value)}
+              className="mt-4 w-full rounded-xl border border-white/[0.08] bg-black px-4 py-3 font-jetbrainsMono text-sm text-white outline-none transition focus:border-[#FF5500]/50"
+              placeholder="e.g. 150"
+            />
+            <div className="mt-4 flex gap-3">
+              <button
+                onClick={() => setShowGoalModal(false)}
+                className="flex-1 rounded-xl border border-white/[0.08] px-4 py-2.5 font-dmSans text-sm text-white/50 transition hover:border-white/20 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  const val = parseFloat(goalInput);
+                  if (!(val > 0)) return;
+                  try {
+                    const u = JSON.parse(localStorage.getItem("cyclogenai_user") || "{}");
+                    const email = u.email;
+                    if (email) {
+                      const updated = await api.put('/users/' + encodeURIComponent(email), { weeklyGoalKm: val });
+                      localStorage.setItem("cyclogenai_user", JSON.stringify(updated));
+                    }
+                    window.location.reload();
+                  } catch (e) { console.error("Failed to save goal", e); }
+                  setShowGoalModal(false);
+                }}
+                className="flex-1 rounded-xl bg-[#FF5500] px-4 py-2.5 font-dmSans text-sm font-bold text-white transition hover:bg-[#e04a00]"
+              >
+                Save Goal
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

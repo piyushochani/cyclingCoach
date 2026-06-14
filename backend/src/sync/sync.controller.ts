@@ -23,4 +23,16 @@ export class SyncController {
     if (!userId) throw new UnauthorizedException('User ID required');
     return this.syncService.getSyncStatus(userId);
   }
+
+  @Post('latest')
+  async syncLatest(@UserId() userId: string) {
+    if (!userId) throw new UnauthorizedException('User ID required');
+    return this.syncService.syncLatestActivity(userId);
+  }
+
+  @Post('analyze')
+  async analyzeLatest(@UserId() userId: string) {
+    if (!userId) throw new UnauthorizedException('User ID required');
+    return this.syncService.analyzeLatestActivity(userId);
+  }
 }

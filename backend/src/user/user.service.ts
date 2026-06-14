@@ -27,7 +27,7 @@ export class UserService {
   }
 
   async update(email: string, data: Partial<User>): Promise<User | null> {
-    const allowed = ['firstName', 'lastName', 'mainSport', 'experienceLevel', 'heightCm', 'weightKg', 'goal', 'cyclingYears', 'ftp', 'maxHeartrate', 'age', 'profileImage', 'description', 'coaches', 'stravaUpdatedAt', 'isStravaUpToDate', 'trainingStart', 'onboardingSummary', 'telegramChatId'];
+    const allowed = ['firstName', 'lastName', 'mainSport', 'experienceLevel', 'heightCm', 'weightKg', 'goal', 'cyclingYears', 'ftp', 'maxHeartrate', 'age', 'profileImage', 'description', 'coaches', 'stravaUpdatedAt', 'isStravaUpToDate', 'trainingStart', 'onboardingSummary', 'telegramChatId', 'weeklyGoalKm', 'selectedCoach', 'customCoaches', 'autoSyncEnabled'];
     const update: Record<string, any> = {};
     const d = data as Record<string, any>;
     for (const key of allowed) {

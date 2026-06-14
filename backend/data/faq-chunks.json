@@ -1,0 +1,387 @@
+[
+  {
+    "id": "faq-1",
+    "category": "",
+    "question": "",
+    "content": "# CyclogenAI FAQ",
+    "heading": ""
+  },
+  {
+    "id": "faq-2",
+    "category": "Getting Started",
+    "question": "How do I create an account",
+    "content": "Visit the signup page and enter your name, email, and password. After signing up, you'll be prompted to complete your onboarding — set your cycling experience, goals, FTP, weight, and other profile details. You can also connect Strava during onboarding.",
+    "heading": "How do I create an account"
+  },
+  {
+    "id": "faq-3",
+    "category": "Getting Started",
+    "question": "How do I log in",
+    "content": "Go to the login page and enter your email and password. If you used Google OAuth during signup, use the Google sign-in button instead.",
+    "heading": "How do I log in"
+  },
+  {
+    "id": "faq-4",
+    "category": "Getting Started",
+    "question": "I forgot my password. What do I do",
+    "content": "Click \"Forgot Password\" on the login page. Enter your email and you'll receive a reset link. Click the link in the email to set a new password. After resetting, you'll be automatically logged in and redirected to the dashboard.",
+    "heading": "I forgot my password. What do I do"
+  },
+  {
+    "id": "faq-5",
+    "category": "Getting Started",
+    "question": "How do I set up my profile after signing up",
+    "content": "Go to Settings > Profile. You can update your name, FTP, weight, height, max heart rate, age, and cycling experience. Your FTP is especially important for accurate zone calculations and training plan recommendations.",
+    "heading": "How do I set up my profile after signing up"
+  },
+  {
+    "id": "faq-6",
+    "category": "Getting Started",
+    "question": "What is FTP and why does it matter",
+    "content": "FTP (Functional Threshold Power) is the highest power you can sustain for approximately one hour. It's the cornerstone of power-based training. All your power zones, workout intensities, and training load calculations are based on your FTP. Keep it updated as you get fitter.",
+    "heading": "What is FTP and why does it matter"
+  },
+  {
+    "id": "faq-7",
+    "category": "Dashboard & Navigation",
+    "question": "Where is the dashboard",
+    "content": "The dashboard is the first page you see after logging in. It shows your weekly summary, recent activities, heatmap, training readiness, and quick stats. You can access it anytime by clicking the logo or \"Dashboard\" in the sidebar.",
+    "heading": "Where is the dashboard"
+  },
+  {
+    "id": "faq-8",
+    "category": "Dashboard & Navigation",
+    "question": "How do I navigate the app",
+    "content": "Use the sidebar on the left. The main sections are: Dashboard, Activities, Calendar, Training, Gear, Strava settings, and Account settings. On mobile, the sidebar collapses into a hamburger menu.",
+    "heading": "How do I navigate the app"
+  },
+  {
+    "id": "faq-9",
+    "category": "Dashboard & Navigation",
+    "question": "What does each sidebar item do",
+    "content": "- Dashboard: Your home screen with weekly stats, recent rides, heatmap, goal progress\n- Activities: Full list of all your rides with search, filter, and detail views\n- Calendar: Monthly view of your activities and planned workouts\n- Training: Weekly training plan, AI coaching, and performance analysis\n- Gear: Manage your bikes and equipment\n- Strava: Connect/disconnect Strava, manage sync settings\n- Settings: Profile, password, notifications, preferences",
+    "heading": "What does each sidebar item do"
+  },
+  {
+    "id": "faq-10",
+    "category": "Dashboard & Navigation",
+    "question": "Where do I see my weekly statistics",
+    "content": "The weekly statistics graph and summary are on the Dashboard. It shows performed activities vs planned workouts for the current and past weeks. You can zoom in/out to see more weeks.",
+    "heading": "Where do I see my weekly statistics"
+  },
+  {
+    "id": "faq-11",
+    "category": "Dashboard & Navigation",
+    "question": "What does the heatmap show",
+    "content": "The heatmap on the dashboard shows all your activities as colored lines on a map. Warmer colors (orange/red) indicate higher intensity. Click any activity line to view its details.",
+    "heading": "What does the heatmap show"
+  },
+  {
+    "id": "faq-12",
+    "category": "Strava Integration",
+    "question": "How do I connect Strava",
+    "content": "Go to Settings > Strava and click \"Connect Strava.\" You'll be redirected to Strava's authorization page. Approve the requested permissions, and you'll be redirected back. Your activities will sync automatically.",
+    "heading": "How do I connect Strava"
+  },
+  {
+    "id": "faq-13",
+    "category": "Strava Integration",
+    "question": "What data does CyclogenAI sync from Strava",
+    "content": "We sync all cycling activities (rides, virtual rides, e-bike rides) including distance, duration, elevation, power data, heart rate, cadence, speed, temperature, and route/stream data. Non-cycling activities are not synced.",
+    "heading": "What data does CyclogenAI sync from Strava"
+  },
+  {
+    "id": "faq-14",
+    "category": "Strava Integration",
+    "question": "How often does auto-sync run",
+    "content": "Auto-sync checks for new activities every 30 minutes by default. You can adjust this in Settings > Strava or manually trigger a sync anytime.",
+    "heading": "How often does auto-sync run"
+  },
+  {
+    "id": "faq-15",
+    "category": "Strava Integration",
+    "question": "How do I manually sync",
+    "content": "In Settings > Strava, click \"Sync Now\" to pull the latest activities. You can also ask the chatbot: \"Sync my Strava\" or \"Run a sync.\"",
+    "heading": "How do I manually sync"
+  },
+  {
+    "id": "faq-16",
+    "category": "Strava Integration",
+    "question": "How do I disconnect Strava",
+    "content": "In Settings > Strava, click \"Disconnect Strava.\" This revokes CyclogenAI's access to your Strava account. Your existing data remains in CyclogenAI but no new activities will sync.",
+    "heading": "How do I disconnect Strava"
+  },
+  {
+    "id": "faq-17",
+    "category": "Strava Integration",
+    "question": "Why is my sync stuck or failing",
+    "content": "Common causes: Strava API rate limits (429 errors), expired tokens, or network issues. Try the following:\n1. Go to Settings > Strava and check the sync status\n2. Click \"Sync Now\" to retry\n3. If the token is expired, disconnect and reconnect Strava\n4. Wait a few minutes — Strava rate limits reset hourly\n5. Contact support if the issue persists",
+    "heading": "Why is my sync stuck or failing"
+  },
+  {
+    "id": "faq-18",
+    "category": "Strava Integration",
+    "question": "How do I check sync status",
+    "content": "Ask the chatbot \"What's my sync status?\" or go to Settings > Strava. The status shows when your last sync was, whether you're up to date, and any rate limit issues.",
+    "heading": "How do I check sync status"
+  },
+  {
+    "id": "faq-19",
+    "category": "Strava Integration",
+    "question": "What is Strava rate limiting",
+    "content": "Strava limits API requests to 100 requests every 15 minutes and 1000 requests per day. If you have many activities, a full sync may take several rounds. The system handles this automatically and resumes when the limit resets.",
+    "heading": "What is Strava rate limiting"
+  },
+  {
+    "id": "faq-20",
+    "category": "Training Plans",
+    "question": "How do I generate a training plan",
+    "content": "You can generate a plan in two ways:\n1. On the Training page, click \"Generate Plan\" or use the AI planning tool\n2. Ask the chatbot: \"Generate a training plan for this week\" or \"Plan my week\"\nThe AI will consider your fitness level, recent training load, goals, and available time.",
+    "heading": "How do I generate a training plan"
+  },
+  {
+    "id": "faq-21",
+    "category": "Training Plans",
+    "question": "What types of workouts can the AI create",
+    "content": "The AI can create: Endurance rides, Tempo workouts, Sweet Spot sessions, Threshold intervals, VO2max intervals, Sprint workouts, Recovery rides, and Pre-race taper blocks. Each workout includes duration, intensity zones, and structure.",
+    "heading": "What types of workouts can the AI create"
+  },
+  {
+    "id": "faq-22",
+    "category": "Training Plans",
+    "question": "How do I view my current weekly plan",
+    "content": "Ask the chatbot \"What's my plan for this week?\" or go to the Training page. The plan shows each day's workout type, duration, and intensity.",
+    "heading": "How do I view my current weekly plan"
+  },
+  {
+    "id": "faq-23",
+    "category": "Training Plans",
+    "question": "Can I modify a generated plan",
+    "content": "Yes. You can tell the chatbot \"Change Wednesday's workout to endurance\" or \"Make Saturday's ride 3 hours instead of 2.\" You can also manually edit the plan on the Training page.",
+    "heading": "Can I modify a generated plan"
+  },
+  {
+    "id": "faq-24",
+    "category": "Training Plans",
+    "question": "How does the AI determine my training load",
+    "content": "The AI uses your recent activity history (last 3-4 weeks), CTL (Chronic Training Load), ATL (Acute Training Load), and TSB (Training Stress Balance). It adjusts intensity and volume to avoid overtraining while ensuring progressive overload.",
+    "heading": "How does the AI determine my training load"
+  },
+  {
+    "id": "faq-25",
+    "category": "Training Plans",
+    "question": "What is progressive overload",
+    "content": "Progressive overload means gradually increasing training stress (volume, intensity, or frequency) over time to drive fitness gains. The AI plans typically increase load by 5-10% per week, with recovery weeks every 3-4 weeks.",
+    "heading": "What is progressive overload"
+  },
+  {
+    "id": "faq-26",
+    "category": "Training Plans",
+    "question": "How do I set a weekly distance goal",
+    "content": "Click \"Set Weekly Goal\" on the Dashboard's weekly statistics section, or ask the chatbot \"Set my weekly goal to 150km.\" The goal is saved in your browser and reset manually.",
+    "heading": "How do I set a weekly distance goal"
+  },
+  {
+    "id": "faq-27",
+    "category": "Activities",
+    "question": "Where can I see all my activities",
+    "content": "Go to the Activities page from the sidebar. It shows a sortable, filterable list of all your rides. You can search by name, filter by date range, or sort by distance, duration, or date.",
+    "heading": "Where can I see all my activities"
+  },
+  {
+    "id": "faq-28",
+    "category": "Activities",
+    "question": "How do I view activity details",
+    "content": "Click any activity in the list or on the heatmap. The detail page shows: map with route, power/heartrate/cadence graphs, splits, elevation profile, weather, gear used, and AI analysis.",
+    "heading": "How do I view activity details"
+  },
+  {
+    "id": "faq-29",
+    "category": "Activities",
+    "question": "What is AI activity analysis",
+    "content": "For each activity, the AI generates an analysis covering: workout type classification, performance metrics, fatigue patterns, pacing assessment, and recommendations for future training. Look for the analysis section on the activity detail page.",
+    "heading": "What is AI activity analysis"
+  },
+  {
+    "id": "faq-30",
+    "category": "Activities",
+    "question": "How do I find a specific activity",
+    "content": "Use the search bar on the Activities page. You can search by name, or use the date filters to narrow down. You can also ask the chatbot \"Find my ride from last Tuesday.\"",
+    "heading": "How do I find a specific activity"
+  },
+  {
+    "id": "faq-31",
+    "category": "Activities",
+    "question": "Can I delete an activity",
+    "content": "Currently, activities synced from Strava cannot be deleted from CyclogenAI. They are removed automatically if deleted on Strava after the next sync.",
+    "heading": "Can I delete an activity"
+  },
+  {
+    "id": "faq-32",
+    "category": "Gear Management",
+    "question": "How do I add a bike",
+    "content": "Go to Gear from the sidebar and click \"Add Bike.\" Enter the bike name (e.g., \"Trek Emonda\") and optionally set it as active. Bikes synced from Strava appear automatically.",
+    "heading": "How do I add a bike"
+  },
+  {
+    "id": "faq-33",
+    "category": "Gear Management",
+    "question": "How do I set a bike as active",
+    "content": "On the Gear page, click the \"Set Active\" button on the bike you want. The active bike is used for distance tracking and appears on activity detail pages. You can also ask the chatbot \"Set my active bike to [name].\"",
+    "heading": "How do I set a bike as active"
+  },
+  {
+    "id": "faq-34",
+    "category": "Gear Management",
+    "question": "How do I add other equipment",
+    "content": "On the Gear page, switch to the \"Equipment\" tab and click \"Add Equipment.\" Enter the name and type (e.g., \"Garmin 530\" — Computer). Equipment is for your reference and tracking.",
+    "heading": "How do I add other equipment"
+  },
+  {
+    "id": "faq-35",
+    "category": "Gear Management",
+    "question": "My Strava bikes don't appear in CyclogenAI",
+    "content": "Run a manual sync from Settings > Strava. Bikes are synced from Strava during the sync process. If they still don't appear, try disconnecting and reconnecting Strava.",
+    "heading": "My Strava bikes don't appear in CyclogenAI"
+  },
+  {
+    "id": "faq-36",
+    "category": "Gear Management",
+    "question": "How is gear distance tracked",
+    "content": "When you complete a ride with a Strava bike, the distance is automatically added to that bike's total. You can see total distance per bike on the Gear page.",
+    "heading": "How is gear distance tracked"
+  },
+  {
+    "id": "faq-37",
+    "category": "Chatbot (PaceBot)",
+    "question": "How do I open the chatbot",
+    "content": "Click the orange circular button at the bottom-right corner of any page. It has a chat icon.",
+    "heading": "How do I open the chatbot"
+  },
+  {
+    "id": "faq-38",
+    "category": "Chatbot (PaceBot)",
+    "question": "What can I ask the chatbot",
+    "content": "You can ask about:\n- Your training: \"How was my last ride?\", \"What's my plan this week?\"\n- Generating plans: \"Plan my week\", \"Create a workout for tomorrow\"\n- Zones: \"What are my power zones?\", \"Calculate zones from 280 FTP\"\n- Strava: \"Sync my Strava\", \"What's my sync status?\", \"Connect Strava\"\n- Gear: \"List my bikes\", \"Add a bike called Canyon Aeroad\", \"Set active bike\"\n- General help: \"How do I connect Strava?\", \"Where is the settings page?\", \"How do I generate a training plan?\"\n- Activity analysis: \"Analyze my ride from yesterday\", \"How was my weekend ride?\"",
+    "heading": "What can I ask the chatbot"
+  },
+  {
+    "id": "faq-39",
+    "category": "Chatbot (PaceBot)",
+    "question": "What commands does the chatbot support",
+    "content": "The chatbot understands natural language. Some common command examples:\n- \"/week\" — Opens the weekly training plan\n- \"Sync Strava\" — Triggers a manual sync\n- \"My power zones\" — Shows your FTP-based zones\n- \"Set my weekly goal to 200km\"\n- \"Add a bike called [name]\"\n- \"List all my bikes\"",
+    "heading": "What commands does the chatbot support"
+  },
+  {
+    "id": "faq-40",
+    "category": "Chatbot (PaceBot)",
+    "question": "Why is the chatbot giving short answers",
+    "content": "The chatbot is designed to be concise. It answers directly without greetings or padding. If you need more detail, ask a follow-up question like \"Tell me more about that\" or \"Give me the full analysis.\"",
+    "heading": "Why is the chatbot giving short answers"
+  },
+  {
+    "id": "faq-41",
+    "category": "Chatbot (PaceBot)",
+    "question": "Can the chatbot remember previous conversations",
+    "content": "Yes. The chatbot remembers the context of your current conversation (last ~30 messages). It also has access to your training history, fitness profile, and any notes the AI coach has saved about you.",
+    "heading": "Can the chatbot remember previous conversations"
+  },
+  {
+    "id": "faq-42",
+    "category": "Account Settings",
+    "question": "How do I change my password",
+    "content": "Go to Settings > Account > Change Password. Enter your current password and the new password. The change-password page uses the orange theme matching the rest of the app.",
+    "heading": "How do I change my password"
+  },
+  {
+    "id": "faq-43",
+    "category": "Account Settings",
+    "question": "How do I update my fitness profile",
+    "content": "Go to Settings > Profile. You can update: FTP, weight, height, max heart rate, age, cycling experience, and training goals. These values are used by the AI coach for plan generation and analysis.",
+    "heading": "How do I update my fitness profile"
+  },
+  {
+    "id": "faq-44",
+    "category": "Account Settings",
+    "question": "How do I change my notification preferences",
+    "content": "Go to Settings > Notifications. You can enable/disable email notifications for: new activity analysis, weekly training plan ready, sync completed, and account updates.",
+    "heading": "How do I change my notification preferences"
+  },
+  {
+    "id": "faq-45",
+    "category": "Account Settings",
+    "question": "Can I delete my account",
+    "content": "Account deletion is not currently available from the app. Contact support if you need your account removed.",
+    "heading": "Can I delete my account"
+  },
+  {
+    "id": "faq-46",
+    "category": "Troubleshooting",
+    "question": "The app shows old data or activities are missing",
+    "content": "Try these steps in order:\n1. Go to Settings > Strava and click \"Sync Now\"\n2. Check that Strava is connected (reconnect if needed)\n3. Check that the activities are cycling activities (other sports are not synced)\n4. Wait for the sync to complete (large syncs may take time due to rate limits)",
+    "heading": "The app shows old data or activities are missing"
+  },
+  {
+    "id": "faq-47",
+    "category": "Troubleshooting",
+    "question": "The activity detail page won't open",
+    "content": "If clicking an activity shows a blank page or error:\n1. Refresh the page\n2. Try opening from a different location (heatmap vs. activity list)\n3. Clear your browser cache and reload\n4. If the URL shows \"undefined\" in the path, report this as a bug",
+    "heading": "The activity detail page won't open"
+  },
+  {
+    "id": "faq-48",
+    "category": "Troubleshooting",
+    "question": "The weekly graph shows no data",
+    "content": "If the weekly statistics graph is empty:\n1. Ensure you have synced activities for the current week\n2. Try changing the zoom level\n3. Check that your training start date is set correctly in Settings\n4. The graph requires at least one activity to show",
+    "heading": "The weekly graph shows no data"
+  },
+  {
+    "id": "faq-49",
+    "category": "Troubleshooting",
+    "question": "The onboarding screen keeps showing",
+    "content": "This can happen if your browser clears localStorage. To prevent this:\n1. Complete onboarding fully (all steps)\n2. The system now checks multiple sources (localStorage, backend, database)\n3. If it still shows, contact support",
+    "heading": "The onboarding screen keeps showing"
+  },
+  {
+    "id": "faq-50",
+    "category": "Troubleshooting",
+    "question": "The chatbot is not responding",
+    "content": "If the chatbot doesn't reply:\n1. Check your internet connection\n2. Refresh the page and try again\n3. The backend may be starting up — wait a moment\n4. If using a VPN, try disabling it\n5. Contact support if the issue persists",
+    "heading": "The chatbot is not responding"
+  },
+  {
+    "id": "faq-51",
+    "category": "Troubleshooting",
+    "question": "I see \"401 Unauthorized\" errors",
+    "content": "This usually means your session expired. Log out and log back in. If the issue continues, clear your browser cache and cookies.",
+    "heading": "I see \"401 Unauthorized\" errors"
+  },
+  {
+    "id": "faq-52",
+    "category": "Troubleshooting",
+    "question": "The forgot password email didn't arrive",
+    "content": "1. Check your spam/junk folder\n2. Ensure you entered the correct email address\n3. Wait a few minutes — email delivery can be delayed\n4. Contact support if you still don't receive it",
+    "heading": "The forgot password email didn't arrive"
+  },
+  {
+    "id": "faq-53",
+    "category": "Troubleshooting",
+    "question": "How do I report a bug or get help",
+    "content": "For bugs and support requests, report the issue at the project repository or contact the development team through the support channel.",
+    "heading": "How do I report a bug or get help"
+  },
+  {
+    "id": "faq-54",
+    "category": "Troubleshooting",
+    "question": "What browsers are supported",
+    "content": "CyclogenAI supports the latest versions of Chrome, Firefox, Safari, and Edge. Internet Explorer is not supported.",
+    "heading": "What browsers are supported"
+  },
+  {
+    "id": "faq-55",
+    "category": "Troubleshooting",
+    "question": "Is there a mobile app",
+    "content": "CyclogenAI is a web application that works on mobile browsers. There is no native mobile app currently.",
+    "heading": "Is there a mobile app"
+  }
+]

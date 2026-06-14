@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
 
-const GEAR_STORAGE_KEY = "cycloai_gears";
+const GEAR_STORAGE_KEY = "cyclogenai_gears";
 
 function loadGears() {
   try {
@@ -12,8 +12,8 @@ function loadGears() {
   } catch { return []; }
 }
 
-const COACH_STORAGE_KEY = "cycloai_selected_coach";
-const CUSTOM_COACHES_KEY = "cycloai_custom_coaches";
+const COACH_STORAGE_KEY = "cyclogenai_selected_coach";
+const CUSTOM_COACHES_KEY = "cyclogenai_custom_coaches";
 
 const defaultCoaches = [
   { id: "pogi", name: "Tadej Pogačar", team: "UAE Team Emirates", image: "/images/pogi.jpg", stars: 5, verified: true, specialty: "Grand Tours" },
@@ -35,24 +35,52 @@ const coachUrls = {
 
 function loadCoach() {
   try {
+    const raw = localStorage.getItem("cyclogenai_user");
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (u.selectedCoach) return u.selectedCoach;
+    }
     const saved = localStorage.getItem(COACH_STORAGE_KEY);
     if (saved) return JSON.parse(saved);
   } catch {}
   return defaultCoaches[0];
 }
 
-function saveCoach(coach) {
+async function saveCoach(coach) {
   localStorage.setItem(COACH_STORAGE_KEY, JSON.stringify(coach));
+  try {
+    const raw = localStorage.getItem("cyclogenai_user");
+    if (raw) {
+      const u = JSON.parse(raw);
+      u.selectedCoach = coach;
+      localStorage.setItem("cyclogenai_user", JSON.stringify(u));
+      if (u.email) await api.put('/users/' + encodeURIComponent(u.email), { selectedCoach: coach });
+    }
+  } catch {}
 }
 
 function loadCustomCoaches() {
   try {
+    const raw = localStorage.getItem("cyclogenai_user");
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (u.customCoaches && u.customCoaches.length > 0) return u.customCoaches;
+    }
     return JSON.parse(localStorage.getItem(CUSTOM_COACHES_KEY) || "[]");
   } catch { return []; }
 }
 
-function saveCustomCoaches(list) {
+async function saveCustomCoaches(list) {
   localStorage.setItem(CUSTOM_COACHES_KEY, JSON.stringify(list));
+  try {
+    const raw = localStorage.getItem("cyclogenai_user");
+    if (raw) {
+      const u = JSON.parse(raw);
+      u.customCoaches = list;
+      localStorage.setItem("cyclogenai_user", JSON.stringify(u));
+      if (u.email) await api.put('/users/' + encodeURIComponent(u.email), { customCoaches: list });
+    }
+  } catch {}
 }
 
 const sportOptions = ["cycling", "running", "swimming", "triathlon"];
@@ -109,6 +137,7 @@ const ProfilePage = () => {
   }
 
   const [gears, setGears] = useState([]);
+  const [apiBikes, setApiBikes] = useState([]);
 
   const [selectedCoach, setSelectedCoach] = useState(null);
   const [showCoachPicker, setShowCoachPicker] = useState(false);
@@ -128,7 +157,7 @@ const ProfilePage = () => {
   }, [showCoachPicker, isCropping]);
 
   useEffect(() => {
-    const stored = localStorage.getItem("cycloai_user");
+    const stored = localStorage.getItem("cyclogenai_user");
     if (stored) {
       try {
         const u = JSON.parse(stored);
@@ -151,6 +180,7 @@ const ProfilePage = () => {
         });
       } catch {}
     }
+    api.get("/gear/bikes").then(setApiBikes).catch(() => {});
     setGears(loadGears());
     setSelectedCoach(loadCoach());
     const storedCoaches = loadCustomCoaches();
@@ -171,7 +201,7 @@ const ProfilePage = () => {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const stored = localStorage.getItem("cycloai_user");
+    const stored = localStorage.getItem("cyclogenai_user");
     if (!stored) return;
     const email = JSON.parse(stored).email;
     if (!email) return;
@@ -198,7 +228,7 @@ const ProfilePage = () => {
         setCustomCoaches(data.coaches);
         saveCustomCoaches(data.coaches);
       }
-      localStorage.setItem("cycloai_user", JSON.stringify(data));
+      localStorage.setItem("cyclogenai_user", JSON.stringify(data));
     } catch {}
   }, []);
 
@@ -222,7 +252,7 @@ const ProfilePage = () => {
         coaches: customCoaches,
       });
       setUser(updated);
-      localStorage.setItem("cycloai_user", JSON.stringify(updated));
+      localStorage.setItem("cyclogenai_user", JSON.stringify(updated));
       setEditing(false);
       setMessage({ type: "success", text: "Profile updated successfully!" });
     } catch (err) {
@@ -339,8 +369,8 @@ const ProfilePage = () => {
                       ftp: orig.ftp ? Number(orig.ftp) : null,
                       cyclingYears: orig.cyclingYears ? Number(orig.cyclingYears) : 0,
                     }));
-                    localStorage.setItem("cycloai_user", JSON.stringify({
-                      ...JSON.parse(localStorage.getItem("cycloai_user") || "{}"),
+                    localStorage.setItem("cyclogenai_user", JSON.stringify({
+                      ...JSON.parse(localStorage.getItem("cyclogenai_user") || "{}"),
                       ...orig,
                     }));
                   }
@@ -469,9 +499,20 @@ const ProfilePage = () => {
               </h3>
 
               <div className="mt-4 space-y-2">
-                {gears.length === 0 && (
+                {apiBikes.length === 0 && gears.length === 0 && (
                   <p className="font-dmSans text-sm text-white/30">No gears added yet.</p>
                 )}
+                {apiBikes.map((b) => (
+                  <div key={b._id} className="rounded-xl border border-white/10 bg-[#080808] px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <p className="font-dmSans text-sm font-semibold text-white">{b.name}</p>
+                      {b.stravaId && <span className="font-dmSans text-[9px] uppercase tracking-[0.1em] text-[#1e90ff]">Strava</span>}
+                    </div>
+                    <p className="font-dmSans text-[11px] text-white/40">
+                      {((b.distanceUsed || 0) / 1000).toFixed(1)} km{b.isActive ? " · Active" : ""}
+                    </p>
+                  </div>
+                ))}
                 {gears.map((g) => (
                   <div key={g.id} className="rounded-xl border border-white/10 bg-[#080808] px-4 py-3">
                     <p className="font-dmSans text-sm font-semibold text-white">{g.name}</p>
@@ -589,6 +630,12 @@ const ProfilePage = () => {
                       <p className="mt-1 font-dmSans text-sm text-white">{value}</p>
                     </div>
                   ))}
+                  {user.onboardingSummary && (
+                    <div className="rounded-xl border border-white/10 bg-[#080808] px-4 py-3">
+                      <p className="font-dmSans text-[10px] uppercase tracking-[0.08em] text-white/25">About You</p>
+                      <div className="mt-1 font-dmSans text-sm text-white whitespace-pre-line">{user.onboardingSummary}</div>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -880,9 +927,9 @@ const ProfilePage = () => {
                     const result = await api.post(`/users/${encodeURIComponent(form.email)}/upload-image`, { image: cropped });
                     setForm(p => ({ ...p, profileImage: result.profileImage }));
                     setUser(prev => ({ ...prev, profileImage: result.profileImage }));
-                    const stored = JSON.parse(localStorage.getItem("cycloai_user") || "{}");
+                    const stored = JSON.parse(localStorage.getItem("cyclogenai_user") || "{}");
                     stored.profileImage = result.profileImage;
-                    localStorage.setItem("cycloai_user", JSON.stringify(stored));
+                    localStorage.setItem("cyclogenai_user", JSON.stringify(stored));
                     setMessage({ type: "success", text: "Profile image updated!" });
                   } catch (err) {
                     setMessage({ type: "error", text: err?.message || "Failed to upload image." });

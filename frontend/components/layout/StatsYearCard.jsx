@@ -4,14 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 
 const StatsYearCard = ({ stats, year = "2026" }) => {
-  const statCards = stats || [
-    { label: "Distance", value: "4,280", unit: "KM", accent: "→" },
-    { label: "Time", value: "186", unit: "HRS", accent: "◷" },
-    { label: "Activities", value: "92", unit: "", accent: "◈" },
-    { label: "Races Played", value: "11", unit: "", accent: "⬡" },
-    { label: "Achievements", value: "14", unit: "", accent: "◆" },
-    { label: "Avg / Week", value: "82", unit: "KM", accent: "∿" },
-  ];
+  if (!stats) return null;
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -35,7 +28,7 @@ const StatsYearCard = ({ stats, year = "2026" }) => {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {statCards.map((item, index) => (
+        {stats.map((item, index) => (
           <motion.div
             key={item.label}
             initial={{ opacity: 0, y: 12 }}

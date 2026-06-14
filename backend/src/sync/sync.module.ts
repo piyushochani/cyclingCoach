@@ -6,6 +6,7 @@ import { SyncController } from './sync.controller';
 import { SyncService } from './sync.service';
 import { AnalysisModule } from '../analysis/analysis.module';
 import { NotificationModule } from '../notification/notification.module';
+import { GearModule } from '../gear/gear.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { NotificationModule } from '../notification/notification.module';
     ]),
     AnalysisModule,
     NotificationModule,
+    GearModule,
   ],
   controllers: [SyncController],
   providers: [SyncService],

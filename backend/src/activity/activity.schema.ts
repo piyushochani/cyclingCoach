@@ -82,6 +82,9 @@ export class Activity extends Document {
 
   @Prop({ default: null })
   updatedAt: Date;
+
+  @Prop({ type: String, default: null })
+  llmAnalysis: string | null;
 }
 
 export const ActivitySchema = SchemaFactory.createForClass(Activity);

@@ -18,6 +18,45 @@ const workoutTypeStyles = {
   long: { bg: "bg-indigo-500/5", dot: "bg-indigo-500", label: "Long Ride" },
 };
 
+const speedEstimates = {
+  rest: 0, recovery: 20, endurance: 25, tempo: 30, threshold: 32, intervals: 28, vo2max: 28, race: 35, long: 24,
+};
+
+function estimateSpeedKmh(type) {
+  if (!type) return 25;
+  const t = type.toLowerCase();
+  if (t.includes("rest") || t.includes("off")) return 0;
+  if (t.includes("recovery")) return 20;
+  if (t.includes("endurance") || t.includes("base")) return 25;
+  if (t.includes("tempo")) return 30;
+  if (t.includes("threshold") || t.includes("ftp")) return 32;
+  if (t.includes("interval") || t.includes("vo2")) return 28;
+  if (t.includes("race") || t.includes("tt")) return 35;
+  if (t.includes("long")) return 24;
+  return 25;
+}
+
+function formatDuration(distanceKm, type) {
+  if (!distanceKm || distanceKm <= 0) return null;
+  const speed = estimateSpeedKmh(type);
+  if (speed <= 0) return null;
+  const hours = distanceKm / speed;
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  if (h === 0 && m === 0) return null;
+  if (h === 0) return `${m}min`;
+  return `${h}:${m.toString().padStart(2, "0")}`;
+}
+
+function extractHighestZone(zoneBreakdown) {
+  if (!zoneBreakdown) return null;
+  const matches = zoneBreakdown.match(/Z(\d)/g);
+  if (!matches) return null;
+  const zones = matches.map((z) => parseInt(z[1], 10));
+  const highest = Math.max(...zones);
+  return `Z${highest}`;
+}
+
 function detectWorkoutType(type) {
   if (!type) return workoutTypeStyles.rest;
   const t = type.toLowerCase();
@@ -40,7 +79,7 @@ function getMonday(d) {
 
 function getTrainingStart() {
   try {
-    const stored = localStorage.getItem("cycloai_user");
+    const stored = localStorage.getItem("cyclogenai_user");
     if (stored) {
       const u = JSON.parse(stored);
       if (u.trainingStart) return new Date(u.trainingStart);
@@ -72,7 +111,10 @@ const WeeklyScheduleCard = ({ plan: initialPlan }) => {
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekStart.getDate() + 6);
   const weekNum = relativeWeek + weekOffset;
-  const dateStr = `${weekStart.getDate()}/${weekStart.getMonth() + 1} – ${weekEnd.getDate()}/${weekEnd.getMonth() + 1}`;
+
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const weekOfMonth = Math.ceil((weekStart.getDate() + ((weekStart.getDay() + 6) % 7)) / 7);
+  const weekLabel = `${monthNames[weekStart.getMonth()]}-W${weekOfMonth}`;
 
   const now = new Date();
   const todayDisplayIdx = (now.getDay() + 6) % 7;
@@ -114,36 +156,35 @@ const WeeklyScheduleCard = ({ plan: initialPlan }) => {
       className="rounded-[24px] border border-white/10 bg-white/[0.02] p-5 md:p-6"
     >
       <div className="mb-5">
-        <div className="mb-3 flex items-center gap-2">
+        <p className="mb-4 text-center font-dmSans text-[10px] uppercase tracking-[0.16em] text-white/35">
+          Weekly Training Plan
+        </p>
+
+        <div className="flex items-center justify-center gap-4">
           <button
             type="button"
             onClick={() => setWeekOffset((o) => o - 1)}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-sm text-white/50 transition hover:border-[#FF6B00]/30 hover:text-[#FF6B00]"
+            className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-white/[0.03] transition-all hover:border-white/20 hover:bg-white/10 active:scale-95"
+            aria-label="Previous week"
           >
-            ‹
+            <span className="text-lg text-white/40 transition-colors group-hover:text-white">←</span>
           </button>
 
-          <span className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 font-dmSans text-[10px] tracking-[0.12em] text-white/45">
-            {isCurrentWeek ? "Current" : `W${weekNum}`}
-          </span>
+          <div className="w-[200px] flex justify-center">
+            <h3 className="text-center font-dmSans text-xl font-semibold tracking-[-0.02em] text-white">
+              {weekLabel}
+            </h3>
+          </div>
 
           <button
             type="button"
             disabled={isCurrentWeek}
             onClick={() => setWeekOffset((o) => o + 1)}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.03] text-sm text-white/50 transition hover:border-[#FF6B00]/30 hover:text-[#FF6B00] disabled:opacity-30 disabled:cursor-not-allowed"
+            className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-white/[0.03] transition-all hover:border-white/20 hover:bg-white/10 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Next week"
           >
-            ›
+            <span className="text-lg text-white/40 transition-colors group-hover:text-white">→</span>
           </button>
-        </div>
-
-        <div>
-          <p className="font-dmSans text-[10px] uppercase tracking-[0.16em] text-white/35">
-            Week Schedule
-          </p>
-          <h3 className="mt-1 font-dmSans text-2xl font-semibold tracking-[-0.02em] text-white">
-            {hasPlan && plan.coachNotes ? plan.coachNotes : isCurrentWeek ? "This Week" : `Week of ${dateStr}`}
-          </h3>
         </div>
       </div>
 
@@ -157,7 +198,8 @@ const WeeklyScheduleCard = ({ plan: initialPlan }) => {
             const isToday = displayIdx === todayDisplayIdx && isCurrentWeek;
             const workout = workoutMap[displayIdx];
             const style = workout ? detectWorkoutType(workout.type) : workoutTypeStyles.rest;
-            const distance = workout?.distance ? `${parseFloat(workout.distance).toFixed(2)} km` : null;
+            const duration = workout?.distance ? formatDuration(workout.distance, workout.type) : null;
+            const zone = workout?.zoneBreakdown ? extractHighestZone(workout.zoneBreakdown) : null;
 
             return (
               <motion.div
@@ -193,20 +235,15 @@ const WeeklyScheduleCard = ({ plan: initialPlan }) => {
                     >
                       {isToday ? "Today" : workout ? style.label : "—"}
                     </span>
-                    {workout && distance && (
+                    {workout && (
                       <span className="font-dmSans text-[11px] text-white/30 mt-0.5">
-                        {distance}{workout.notes ? ` · ${workout.notes.slice(0, 30)}` : ""}
+                        {zone ? `${zone} ` : ""}{duration || ""}
                       </span>
                     )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0 ml-3">
-                  {workout && (
-                    <span className="font-dmSans text-[10px] text-white/25 uppercase tracking-wider">
-                      {workout.zoneBreakdown || ""}
-                    </span>
-                  )}
                   <span
                     className={`h-2 w-2 rounded-full ${
                       isToday

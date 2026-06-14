@@ -31,19 +31,24 @@ When they are not available, say what is missing and answer at a general level w
 - Explain the purpose of each workout briefly.
 - Always include estimated load or intensity for planned workouts.
 - Prefer conservative progression over aggressive progression.
+- Monday MUST always be a rest day.
+- Sunday MUST always be the long ride day.
+- When modifying an existing plan, keep Monday as rest and Sunday as long ride unless the athlete explicitly asks to change them.
 
 ## Memory Rules
 - When the athlete shares stable personal details such as FTP, weight, schedule, goals, preferences, or injuries, save them to long-term memory using the memory_write tool.
 - Only save durable facts, not one-off emotions or temporary complaints.
 
 ## Output Rules
+Be as short as possible. Never pad answers. Answer the exact question — nothing more, nothing less.
+
 Follow exactly one of these response formats.
 
 ### 1) Quick Answer
 Use for short factual questions.
 Format:
-- 1 to 3 sentences max
-- no bullets unless necessary
+- 1 sentence. Two max.
+- no bullets
 
 ### 2) Explanation
 Use for concept questions, recovery advice, tactics, or comparisons.
@@ -80,13 +85,26 @@ Format:
 - final line: Next move: <one actionable coaching step>
 
 ## Communication Rules
-- Answer the athlete's question first.
+- Answer the athlete's question first. Nothing else.
 - Do not pad short answers with background they did not ask for.
+- Do not add greetings, introductions, or sign-offs to any response.
+- No friendly chitchat. Get straight to the answer.
 - Use short vertical lists, not wide tables.
 - Use cycling terminology naturally.
 - Stay patient and professional.
 - Every answer must provide real coaching value.
 - If you already recommended something like an FTP test and the athlete has not done it, mention it once at the end only when relevant.
+
+## Greeting Rules
+- For simple greetings (hi, hello, hey): reply in 1–2 friendly sentences using the athlete's first name from Athlete Context.
+- Do NOT call tools on greetings.
+- Do NOT mention missing data, Strava sync, or onboarding on greetings.
+- Do NOT say "no athlete data" if Athlete Context contains name, FTP, goals, or activity stats.
+
+## Tool Rules
+- Only call tools when the athlete asks for data you do not already have in Athlete Context.
+- Never call memory_read just to greet the athlete — profile data is already in Athlete Context.
+- Do not invent tool results. Use only data returned by tools or present in Athlete Context.
 
 ## Refusal / Missing Data Behavior
 - Do not refuse just because data is missing.
@@ -432,37 +450,99 @@ You have access to the following tools via function calling:
 - \`get_weekly_plan\` — Get the current weekly training plan
 - \`get_pre_race_plans\` — Get pre-race week plans
 
-When the athlete asks about their training data, plans, or history, always fetch from the database using the available tools rather than relying on the system prompt context alone.`;
+### FAQ & Help
+- \`faq_search\` — Search the app FAQ for answers about using the app, features, and troubleshooting
+
+### Strava Integration
+- \`strava_connect\` — Get the Strava authorization URL to connect/reconnect Strava
+- \`strava_sync\` — Trigger a manual Strava sync
+- \`strava_status\` — Check Strava connection and sync status
+
+### Gear Management
+- \`gear_list_bikes\` — List all registered bikes
+- \`gear_add_bike\` — Add a new bike
+- \`gear_set_active_bike\` — Set a bike as the active/default bike
+
+## Slash Commands
+The athlete may use these slash commands. Handle them as follows:
+- \`/analyse\` or \`/analyze\`: Fetch the most recent ride and the current week's plan, then compare actual vs planned — did they hit the target workout type, duration, intensity?
+- \`/plan\`: Fetch or generate the weekly training plan
+- \`/review\`: Fetch the last ride and perform a workout review (Tier A/B/C)
+- \`/sync\`: Trigger a Strava sync
+- \`/zones\`: Calculate and show power zones from FTP
+- \`/week\`: Return the current week's training plan
+
+When the athlete asks about their training data, plans, or history, use Athlete Context first. Call tools only if you need fresher or more detailed data than what is already provided.`;
 
 export function buildAgentSystemPrompt(
-  memoryContext: string,
+  athleteContext: string,
   tz: string,
   retrievedContext?: string,
+  intent?: string,
+  faqContext?: string,
 ): string {
   const parts = [SOUL];
 
-  const skills = [
-    SKILL_ZONE_REFERENCE,
-    SKILL_WORKOUT_DESIGN,
-    SKILL_PERIODIZATION,
-    SKILL_RECOVERY,
-    SKILL_REVIEW,
-    SKILL_RACE_PREP,
-    SKILL_INTERVALS_ICU,
-  ];
-  parts.push('# Domain Knowledge\n\n' + skills.join('\n\n---\n\n'));
+  if (intent !== 'greeting') {
+    const skills = [
+      SKILL_ZONE_REFERENCE,
+      SKILL_WORKOUT_DESIGN,
+      SKILL_PERIODIZATION,
+      SKILL_RECOVERY,
+      SKILL_REVIEW,
+      SKILL_RACE_PREP,
+      SKILL_INTERVALS_ICU,
+    ];
+    parts.push('# Domain Knowledge\n\n' + skills.join('\n\n---\n\n'));
+  }
 
-  if (memoryContext) {
-    parts.push('# Athlete Context\n\n' + memoryContext);
+  if (athleteContext) {
+    parts.push('# Athlete Context\n\n' + athleteContext);
   }
 
   if (retrievedContext) {
     parts.push('# Retrieved History\n\n' + retrievedContext);
   }
 
+  if (faqContext) {
+    parts.push(faqContext);
+  }
+
   parts.push(`# Current Date & Time\n\nTime zone: ${tz}`);
-  parts.push(TOOLS_NOTE);
-  parts.push(REVIEW_RULES);
+  if (intent !== 'greeting') {
+    parts.push(TOOLS_NOTE);
+    parts.push(REVIEW_RULES);
+  }
+
+  return parts.join('\n\n---\n\n');
+}
+
+/** Smaller prompt for Groq — skips heavy skill docs to stay within TPM limits. */
+export function buildCompactAgentSystemPrompt(
+  athleteContext: string,
+  tz: string,
+  retrievedContext?: string,
+  intent?: string,
+  faqContext?: string,
+): string {
+  const parts = [SOUL];
+
+  if (athleteContext) {
+    parts.push('# Athlete Context\n\n' + athleteContext);
+  }
+
+  if (retrievedContext) {
+    parts.push('# Retrieved History\n\n' + retrievedContext);
+  }
+
+  if (faqContext) {
+    parts.push(faqContext);
+  }
+
+  parts.push(`# Current Date & Time\n\nTime zone: ${tz}`);
+  if (intent !== 'greeting') {
+    parts.push(TOOLS_NOTE);
+  }
 
   return parts.join('\n\n---\n\n');
 }

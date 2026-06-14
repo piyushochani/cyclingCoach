@@ -3,17 +3,21 @@
 import React, { useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { api } from "../../lib/api";
 
 const WeeklyGoalCard = ({ activities }) => {
   const [showModal, setShowModal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
-
-  const weeklyGoal = useMemo(() => {
+  const [weeklyGoal, setWeeklyGoal] = useState(() => {
     if (typeof window !== "undefined") {
-      return parseFloat(localStorage.getItem("cycloai_weekly_goal") || "100");
+      try {
+        const u = JSON.parse(localStorage.getItem("cyclogenai_user") || "{}");
+        return u.weeklyGoalKm ?? 100;
+      } catch { return 100; }
     }
     return 100;
-  }, []);
+  });
+  const [saving, setSaving] = useState(false);
 
   const currentWeekDistance = useMemo(() => {
     if (!activities || activities.length === 0) return 0;
@@ -42,8 +46,7 @@ const WeeklyGoalCard = ({ activities }) => {
         initial={{ opacity: 0, x: -12 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, delay: 0.05 }}
-        className="relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.02] p-6 md:p-7"
-      >
+        className="relative overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.02] p-6 md:p-7 h-[400px]">
         <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full border border-[#FF6B00]/10" />
         <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full border border-[#FF6B00]/10" />
 
@@ -131,17 +134,26 @@ const WeeklyGoalCard = ({ activities }) => {
                 Cancel
               </button>
               <button
-                onClick={() => {
+                disabled={saving}
+                onClick={async () => {
                   const val = parseFloat(goalInput);
-                  if (val > 0) {
-                    localStorage.setItem("cycloai_weekly_goal", String(val));
-                    window.location.reload();
-                  }
+                  if (!(val > 0)) return;
+                  setSaving(true);
+                  try {
+                    const u = JSON.parse(localStorage.getItem("cyclogenai_user") || "{}");
+                    const email = u.email;
+                    if (email) {
+                      const updated = await api.put('/users/' + encodeURIComponent(email), { weeklyGoalKm: val });
+                      localStorage.setItem("cyclogenai_user", JSON.stringify(updated));
+                    }
+                    setWeeklyGoal(val);
+                  } catch (e) { console.error("Failed to save goal", e); }
+                  setSaving(false);
                   setShowModal(false);
                 }}
-                className="flex-1 rounded-xl bg-[#FF6B00] px-4 py-2.5 font-dmSans text-sm font-bold text-black transition hover:bg-[#FF6B00]/90"
+                className="flex-1 rounded-xl bg-[#FF6B00] px-4 py-2.5 font-dmSans text-sm font-bold text-black transition hover:bg-[#FF6B00]/90 disabled:opacity-50"
               >
-                Save Goal
+                {saving ? "Saving..." : "Save Goal"}
               </button>
             </div>
           </motion.div>

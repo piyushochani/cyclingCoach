@@ -11,7 +11,7 @@ class ApiError extends Error {
 function getUserHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};
   try {
-    const raw = localStorage.getItem('cycloai_user');
+    const raw = localStorage.getItem('cyclogenai_user');
     if (!raw) return {};
     const user = JSON.parse(raw);
     const id = user._id || user.id;
@@ -24,6 +24,7 @@ function getUserHeaders(): Record<string, string> {
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = { 'Content-Type': 'application/json', ...getUserHeaders(), ...options?.headers };
   const res = await fetch(`${API_BASE}${path}`, {
+    cache: 'no-store', // Always fetch fresh data from the server
     ...options,
     headers,
   });

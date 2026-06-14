@@ -22,8 +22,8 @@ const steps = [
       </svg>
     ),
     title: "Approve Permissions",
-    desc: "Strava will ask you to grant CycloAI access to read your activities, profile, and stats. Click \"Authorize\" to continue.",
-    detail: "We only request read permissions — CycloAI will never post or modify your Strava data.",
+    desc: "Strava will ask you to grant CyclogenAI access to read your activities, profile, and stats. Click \"Authorize\" to continue.",
+    detail: "We only request read permissions — CyclogenAI will never post or modify your Strava data.",
   },
   {
     icon: (
@@ -32,7 +32,7 @@ const steps = [
       </svg>
     ),
     title: "Auto-Redirect Back",
-    desc: "After authorizing, Strava redirects you back to CycloAI. Your access tokens are exchanged and stored automatically.",
+    desc: "After authorizing, Strava redirects you back to CyclogenAI. Your access tokens are exchanged and stored automatically.",
     detail: "You'll be redirected to the dashboard once complete.",
   },
   {
@@ -42,7 +42,7 @@ const steps = [
       </svg>
     ),
     title: "Sync Your Data",
-    desc: "Use the \"Refresh\" button in the profile dropdown to pull your latest activities from Strava into CycloAI.",
+    desc: "Use the \"Refresh\" button in the profile dropdown to pull your latest activities from Strava into CyclogenAI.",
     detail: "Sync processes new rides, runs, and walks — usually takes a few seconds.",
   },
 ];
@@ -50,23 +50,23 @@ const steps = [
 const faqItems = [
   {
     q: "What does the Refresh button do?",
-    a: "The Refresh button (in your profile dropdown menu) triggers a manual sync that pulls your latest activities from Strava into CycloAI. It runs a script that fetches new rides, runs, walks, and other activities you've recorded since the last sync. After syncing, the page reloads to reflect the latest data.",
+    a: "The Refresh button (in your profile dropdown menu) triggers a manual sync that pulls your latest activities from Strava into CyclogenAI. It runs a script that fetches new rides, runs, walks, and other activities you've recorded since the last sync. After syncing, the page reloads to reflect the latest data.",
   },
   {
     q: "What does Re-authorize Strava do?",
-    a: "If your Strava connection ever stops working (e.g., tokens expired or were revoked), use the Re-authorize Strava button. It opens the Strava OAuth flow so you can re-grant CycloAI access to your Strava account. You'll need to log into Strava and approve permissions again. This is also useful if you want to switch to a different Strava account.",
+    a: "If your Strava connection ever stops working (e.g., tokens expired or were revoked), use the Re-authorize Strava button. It opens the Strava OAuth flow so you can re-grant CyclogenAI access to your Strava account. You'll need to log into Strava and approve permissions again. This is also useful if you want to switch to a different Strava account.",
   },
   {
     q: "How often is my data synced?",
     a: "Data syncs are currently manual via the Refresh button. We recommend syncing after each ride or at least once a week to keep your dashboard up to date. Auto-sync on a schedule is coming soon.",
   },
   {
-    q: "What data does CycloAI access from Strava?",
-    a: "CycloAI reads your activity data (distance, duration, elevation, heart rate, power, speed), athlete profile, and stats. We never write data to Strava, post on your behalf, or share your data with third parties. All data stays in your private CycloAI account.",
+    q: "What data does CyclogenAI access from Strava?",
+    a: "CyclogenAI reads your activity data (distance, duration, elevation, heart rate, power, speed), athlete profile, and stats. We never write data to Strava, post on your behalf, or share your data with third parties. All data stays in your private CyclogenAI account.",
   },
   {
     q: "Can I disconnect Strava at any time?",
-    a: "Yes. Go to your Strava settings > My Apps > Revoke access for CycloAI. You can also re-authorize later from this page if you change your mind. Disconnecting will stop future syncs but your previously synced data will remain in CycloAI.",
+    a: "Yes. Go to your Strava settings > My Apps > Revoke access for CyclogenAI. You can also re-authorize later from this page if you change your mind. Disconnecting will stop future syncs but your previously synced data will remain in CyclogenAI.",
   },
 ];
 
@@ -102,35 +102,28 @@ const termSections = [
 export default function ConnectPage() {
   const [expandedFaq, setExpandedFaq] = useState(null);
   const [authUrl, setAuthUrl] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(false);
-
-  useEffect(() => {
-    api.get("/strava/auth-url")
-      .then((res) => {
-        setAuthUrl(res?.url || null);
-        setLoading(false);
-      })
-      .catch(() => {
-        setLoading(false);
-        setFetchError(true);
-      });
-  }, []);
 
   const handleConnect = async () => {
     if (authUrl) {
       window.open(authUrl, "_blank");
-    } else {
-      try {
-        const res = await api.get("/strava/auth-url");
-        if (res?.url) {
-          window.open(res.url, "_blank");
-        } else {
-          setFetchError(true);
-        }
-      } catch {
+      return;
+    }
+    setLoading(true);
+    setFetchError(false);
+    try {
+      const res = await api.get("/strava/auth-url");
+      if (res?.url) {
+        setAuthUrl(res.url);
+        window.open(res.url, "_blank");
+      } else {
         setFetchError(true);
       }
+    } catch {
+      setFetchError(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -157,7 +150,7 @@ export default function ConnectPage() {
           </h1>
           <div className="mt-3 h-[2px] w-10 rounded-full bg-[#FF5500]" />
           <p className="font-dmSans mt-4 max-w-2xl text-sm leading-relaxed text-white/40">
-            Link your Strava account to bring every ride, run, and adventure into CycloAI.
+            Link your Strava account to bring every ride, run, and adventure into CyclogenAI.
             Your dashboard, statistics, and AI coach will automatically reflect your real training data.
           </p>
         </motion.div>
@@ -181,14 +174,16 @@ export default function ConnectPage() {
 
             <div className="flex-1">
               <h2 className="font-barlowCondensed text-2xl uppercase tracking-wide text-white">
-                {authUrl ? "Ready to Connect" : loading ? "Checking..." : "Connect Strava"}
+                {loading ? "Connecting..." : authUrl ? "Ready to Connect" : "Connect Strava"}
               </h2>
               <p className="font-dmSans mt-2 text-sm leading-relaxed text-white/40">
-                {authUrl
-                  ? "Click below to authorize CycloAI to read your Strava activities. The link opens in a new tab."
-                  : fetchError
-                    ? "Unable to connect to Strava. Please try again later."
-                    : "Fetching Strava configuration..."}
+                {loading
+                  ? "Fetching Strava authorization URL..."
+                  : authUrl
+                    ? "Click below to authorize CyclogenAI to read your Strava activities. The link opens in a new tab."
+                    : fetchError
+                      ? "Unable to connect to Strava. Please try again later."
+                      : "Click the button to connect your Strava account."}
               </p>
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -200,11 +195,11 @@ export default function ConnectPage() {
                   <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172H17.48l-2.093 4.116zM8.614 17.944l2.089-4.116h3.065L8.614 24l-5.15-10.172h2.058l2.093 4.116z" />
                   </svg>
-                  {loading ? "Loading..." : "Connect with Strava"}
+                  {loading ? "Connecting..." : "Connect with Strava"}
                 </button>
 
                 <span className="font-dmSans text-[11px] text-white/20">
-                  {fetchError ? "Unable to connect to Strava. Please try again later." : "Redirects to strava.com for authorization"}
+                  {fetchError ? "Click again to retry connecting to Strava." : "Redirects to strava.com for authorization"}
                 </span>
               </div>
             </div>
@@ -278,7 +273,7 @@ export default function ConnectPage() {
                 Refresh Button
               </h3>
               <p className="font-dmSans text-sm leading-relaxed text-white/35">
-                Triggers a manual sync that pulls your latest Strava activities into CycloAI.
+                Triggers a manual sync that pulls your latest Strava activities into CyclogenAI.
                 Use it after a ride or whenever you want your dashboard to reflect your newest data.
                 The page will reload automatically after syncing.
               </p>
@@ -370,7 +365,7 @@ export default function ConnectPage() {
             Data & <span className="text-[#FF5500]">Privacy</span>
           </h2>
           <p className="font-dmSans mb-6 text-sm text-white/30">
-            How CycloAI handles your Strava data — transparently.
+            How CyclogenAI handles your Strava data — transparently.
           </p>
 
           <div className="grid gap-6 md:grid-cols-3">
@@ -399,7 +394,7 @@ export default function ConnectPage() {
               <div>
                 <p className="font-dmSans text-sm font-medium text-white/70">Your data stays yours.</p>
                 <p className="font-dmSans mt-1 text-xs leading-relaxed text-white/25">
-                  CycloAI stores your Strava OAuth tokens securely in local configuration files and environment variables.
+                  CyclogenAI stores your Strava OAuth tokens securely in local configuration files and environment variables.
                   Tokens are never exposed client-side or shared. You can revoke access at any time from your Strava settings.
                   We use the minimal OAuth scope required to read your activity data — no write access is requested or used.
                 </p>

@@ -26,6 +26,11 @@ function BikeCard({ bike, onSetActive, onDelete, onEdit }) {
           <span className="font-dmSans text-[9px] font-bold uppercase tracking-[0.12em] text-white">Active</span>
         </div>
       )}
+      {bike.stravaId && !bike.isActive && (
+        <div className="absolute right-0 top-0 rounded-bl-xl rounded-tr-xl bg-[#1e90ff]/20 px-3 py-1">
+          <span className="font-dmSans text-[9px] font-bold uppercase tracking-[0.12em] text-[#1e90ff]">Strava</span>
+        </div>
+      )}
 
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">

@@ -21,7 +21,40 @@ const OnboardingChat = ({ onComplete }) => {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (show) inputRef.current?.focus();
+    const alreadyDone = localStorage.getItem("cyclogenai_onboarding_done") === "true";
+    if (alreadyDone) {
+      setShow(false);
+      onComplete?.();
+      return;
+    }
+    (async () => {
+      const stored = localStorage.getItem("cyclogenai_user");
+      if (stored) {
+        try {
+          const u = JSON.parse(stored);
+          if (u.onboardingSummary) {
+            localStorage.setItem("cyclogenai_onboarding_done", "true");
+            setShow(false);
+            onComplete?.();
+            return;
+          }
+          if (u.email) {
+            try {
+              const userData = await api.get(`/users/${u.email}`);
+              if (userData?.onboardingSummary) {
+                u.onboardingSummary = userData.onboardingSummary;
+                localStorage.setItem("cyclogenai_user", JSON.stringify(u));
+                localStorage.setItem("cyclogenai_onboarding_done", "true");
+                setShow(false);
+                onComplete?.();
+                return;
+              }
+            } catch {}
+          }
+        } catch {}
+      }
+      if (show) inputRef.current?.focus();
+    })();
   }, [step, show]);
 
   const handleSubmit = (e) => {
@@ -44,24 +77,24 @@ const OnboardingChat = ({ onComplete }) => {
       .map(([key, val]) => `${questions.find((q) => q.key === key)?.label}: ${val}`)
       .join("\n");
     try {
-      const stored = localStorage.getItem("cycloai_user");
+      const stored = localStorage.getItem("cyclogenai_user");
       if (stored) {
         const u = JSON.parse(stored);
         if (u.email) {
           await api.post(`/users/${u.email}/onboarding-summary`, { summary });
           u.onboardingSummary = summary;
-          localStorage.setItem("cycloai_user", JSON.stringify(u));
+          localStorage.setItem("cyclogenai_user", JSON.stringify(u));
         }
       }
     } catch {}
     setSaving(false);
     setShow(false);
-    localStorage.setItem("cycloai_onboarding_done", "true");
+    localStorage.setItem("cyclogenai_onboarding_done", "true");
     onComplete?.();
   };
 
   const skip = () => {
-    localStorage.setItem("cycloai_onboarding_done", "true");
+    localStorage.setItem("cyclogenai_onboarding_done", "true");
     setShow(false);
     onComplete?.();
   };

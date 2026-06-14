@@ -64,13 +64,13 @@ const FirstSyncTutorial = ({ onDismiss }) => {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    if (localStorage.getItem("cycloai_tutorial_shown") !== "true") {
+    if (localStorage.getItem("cyclogenai_tutorial_shown") !== "true") {
       setShow(true);
     }
   }, []);
 
   const dismiss = () => {
-    localStorage.setItem("cycloai_tutorial_shown", "true");
+    localStorage.setItem("cyclogenai_tutorial_shown", "true");
     setShow(false);
     onDismiss?.();
   };
@@ -97,7 +97,7 @@ const FirstSyncTutorial = ({ onDismiss }) => {
                 </svg>
               </div>
               <h1 className="font-barlowCondensed text-3xl uppercase tracking-wide text-white">
-                Welcome to <span className="text-[#FF5500]">CycloAI</span>
+                Welcome to <span className="text-[#FF5500]">CyclogenAI</span>
               </h1>
               <p className="mt-2 font-dmSans text-sm text-white/50 max-w-md mx-auto">
                 Your data is synced. Here&apos;s how to get the most out of your training.

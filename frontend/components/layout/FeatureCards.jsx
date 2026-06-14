@@ -17,7 +17,7 @@ const featureCardData = [
   {
     title: "Race Intelligence",
     description:
-      "Input your A-race and CycloAI reverse-engineers your season with sharper pacing and smarter preparation.",
+      "Input your A-race and CyclogenAI reverse-engineers your season with sharper pacing and smarter preparation.",
     icon: (
       <svg className="h-11 w-11 text-accent-orange" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M13 4l6 6-8 8H5v-6l8-8z" />

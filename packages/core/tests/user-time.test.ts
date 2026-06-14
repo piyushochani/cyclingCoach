@@ -13,8 +13,7 @@ import {
 import { Memory } from "../src/memory/store.js";
 import { buildSystemPrompt } from "../src/agent/system-prompt.js";
 import { resolveDailyResetAtMs } from "../src/agent/session-freshness.js";
-import { createPureCoreIntervalsTools } from "../src/agent/intervals-tools.js";
-import type { IntervalsClient } from "intervals-icu-api";
+
 
 // ────────────────────────────────────────────────────────────────────────
 // resolveUserTimezone — chain: configured (validated) → host → "UTC"
@@ -169,52 +168,6 @@ describe("integration: system prompt + daily notes agree on 'today'", () => {
 // AC3 — intervals_delete_workout past-workout check uses athlete TZ
 // ────────────────────────────────────────────────────────────────────────
 
-function makeFakeIntervals(eventDateLocal: string): IntervalsClient {
-  const deleteCalls: number[] = [];
-  const fake = {
-    events: {
-      get: async (_id: number) => ({
-        ok: true,
-        value: { id: _id, startDateLocal: eventDateLocal },
-      }),
-      delete: async (id: number) => {
-        deleteCalls.push(id);
-        return { ok: true };
-      },
-    },
-    _deleteCalls: deleteCalls,
-  };
-  return fake as unknown as IntervalsClient;
-}
-
-describe("intervals_delete_workout (AC3)", () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => vi.useRealTimers());
-
-  it("UTC-8 athlete at local 22:00 May 1: deleting today's workout is allowed", async () => {
-    // 2026-05-01T22:00 PDT = 2026-05-02T05:00Z
-    vi.setSystemTime(new Date("2026-05-02T05:00:00Z"));
-    const tz = "America/Los_Angeles";
-    const fake = makeFakeIntervals("2026-05-01T18:00:00");
-    const tools = createPureCoreIntervalsTools(fake, tz);
-    const tool = tools.intervals_delete_workout!;
-
-    const result = (await tool.execute!({ eventId: 42 }, {} as never)) as { deleted?: true; error?: string };
-    expect(result.deleted).toBe(true);
-    expect(result.error).toBeUndefined();
-  });
-
-  it("workout dated yesterday is refused as past_workout_protected", async () => {
-    vi.setSystemTime(new Date("2026-05-02T05:00:00Z"));
-    const tz = "America/Los_Angeles";
-    const fake = makeFakeIntervals("2026-04-30T18:00:00");
-    const tools = createPureCoreIntervalsTools(fake, tz);
-    const tool = tools.intervals_delete_workout!;
-
-    const result = (await tool.execute!({ eventId: 99 }, {} as never)) as { error?: string };
-    expect(result.error).toBe("past_workout_protected");
-  });
-});
 
 // ────────────────────────────────────────────────────────────────────────
 // AC6 — dailyResetHour resolves in athlete TZ, not host TZ

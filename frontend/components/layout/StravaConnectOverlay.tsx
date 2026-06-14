@@ -73,7 +73,7 @@ export default function StravaConnectOverlay({ children }: { children: React.Rea
 
   const hasPrevSync = useMemo(() => {
     try {
-      const stored = localStorage.getItem("cycloai_user");
+      const stored = localStorage.getItem("cyclogenai_user");
       if (!stored) return false;
       const u = JSON.parse(stored);
       return !!(u.stravaUpdatedAt || u.isStravaUpToDate);

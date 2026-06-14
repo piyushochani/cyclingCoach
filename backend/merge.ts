@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import * as bcrypt from 'bcrypt';
 
-const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/cycloai';
+const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/cyclogenai';
 
 const userSchema = new mongoose.Schema({
   firstName: String,

@@ -25,7 +25,7 @@ const FEATURES = [
   {
     tag: "02 — Intelligence",
     title: "Race-Day\nReadiness",
-    body: "Input a target event and CycloAI maps out the precise path to peak form — pacing, taper, and final-week sharpening included.",
+    body: "Input a target event and CyclogenAI maps out the precise path to peak form — pacing, taper, and final-week sharpening included.",
     accent: "#FF8C00",
     icon: "M13 4l6 6-8 8H5v-6l8-8zM14 5l5 5",
     gradient: "from-[#FF8C00]/20 via-[#FFA94D]/10 to-transparent",
@@ -45,7 +45,7 @@ const STEPS = [
   {
     num: "01",
     title: "Connect your rides",
-    body: "Import your Strava, Wahoo, or Garmin history. CycloAI reads power, HR, cadence, and recovery signals instantly.",
+    body: "Import your Strava, Wahoo, or Garmin history. CyclogenAI reads power, HR, cadence, and recovery signals instantly.",
     img: "C:/Users/piyus/OneDrive/Documents/Workspaces/cyclingCoach/cycling-coach/frontend/images/StravaConnection.webp",
   },
   {
@@ -57,7 +57,7 @@ const STEPS = [
   {
     num: "03",
     title: "Ride, refine, repeat",
-    body: "Every ride makes the model smarter. CycloAI sharpens pacing targets, recovery windows, and next steps automatically.",
+    body: "Every ride makes the model smarter. CyclogenAI sharpens pacing targets, recovery windows, and next steps automatically.",
     img: null,
   },
 ];
@@ -76,7 +76,7 @@ const TESTIMONIALS = [
     avatar: "SK",
   },
   {
-    quote: "Won my first podium at a regional road race. CycloAI had me perfectly peaked.",
+    quote: "Won my first podium at a regional road race. CyclogenAI had me perfectly peaked.",
     name: "James R.",
     role: "Masters cyclist",
     avatar: "JR",
@@ -152,7 +152,7 @@ function Navbar() {
               Log In
             </button>
           </Link>
-          <Link href="/signup" onClick={() => { localStorage.removeItem("cycloai_signed_in"); localStorage.removeItem("cycloai_user"); localStorage.removeItem("cycloai_session_ts"); }}>
+          <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_signed_in"); localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_session_ts"); }}>
             <button
               className="rounded-full px-5 py-2 text-sm font-bold text-black transition hover:scale-[1.03] active:scale-[0.98]"
               style={{ background: "#FF6B00" }}
@@ -233,7 +233,7 @@ function HeroSection() {
             transition={{ duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
             className="mt-5 max-w-lg text-base leading-7 text-white/55 md:text-lg"
           >
-            CycloAI turns your rides, fatigue, recovery, and race goals into a
+            CyclogenAI turns your rides, fatigue, recovery, and race goals into a
             continuously adapting training system built for long-term performance.
           </motion.p>
 
@@ -242,7 +242,7 @@ function HeroSection() {
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-center"
           >
-            <Link href="/signup" onClick={() => { localStorage.removeItem("cycloai_signed_in"); localStorage.removeItem("cycloai_user"); localStorage.removeItem("cycloai_session_ts"); }}>
+            <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_signed_in"); localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_session_ts"); }}>
               <button
                 className="group flex items-center gap-2 rounded-full px-8 py-4 text-base font-bold text-black transition hover:scale-[1.02] active:scale-[0.98] hover:shadow-[0_0_30px_rgba(255,107,0,0.4)]"
                 style={{ background: "#FF6B00" }}
@@ -494,7 +494,7 @@ function PricingSection() {
                 </li>
               ))}
             </ul>
-            <Link href="/signup" onClick={() => { localStorage.removeItem("cycloai_signed_in"); localStorage.removeItem("cycloai_user"); localStorage.removeItem("cycloai_session_ts"); }}>
+            <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_signed_in"); localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_session_ts"); }}>
               <button className="mt-8 w-full rounded-full px-8 py-4 text-base font-bold text-black transition hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] active:scale-[0.98]" style={{ background: "#FF6B00" }}>
                 Start Free Trial
               </button>
@@ -522,7 +522,7 @@ function AboutSection() {
             <span style={{ color: "#FF6B00" }}>athletes.</span>
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-white/40">
-            CycloAI was founded by cyclists who were tired of one-size-fits-all training plans.
+            CyclogenAI was founded by cyclists who were tired of one-size-fits-all training plans.
             We combine sports science with adaptive AI to give every rider a plan that evolves
             as they do — whether you are chasing a podium or just trying to stay consistent.
           </p>
@@ -635,11 +635,11 @@ function CTASection() {
           starts now.
         </h2>
         <p className="mx-auto mt-4 max-w-md text-base leading-7 text-white/45">
-          Join cyclists who use CycloAI to train with purpose, recover with confidence, and race with precision.
+          Join cyclists who use CyclogenAI to train with purpose, recover with confidence, and race with precision.
         </p>
 
         <div className="mt-7 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link href="/signup" onClick={() => { localStorage.removeItem("cycloai_signed_in"); localStorage.removeItem("cycloai_user"); localStorage.removeItem("cycloai_session_ts"); }}>
+          <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_signed_in"); localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_session_ts"); }}>
             <button
               className="group flex items-center gap-2 rounded-full px-9 py-4 text-base font-bold text-black transition hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(255,107,0,0.4)] active:scale-[0.98]"
               style={{ background: "#FF6B00" }}
@@ -677,14 +677,14 @@ function Footer() {
               className="text-xl font-black uppercase tracking-[0.12em] text-white"
               style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
             >
-              CycloAI
+              CyclogenAI
             </span>
           </Link>
           <p className="mt-4 max-w-xs text-sm leading-7 text-white/35">
             AI coaching built for cyclists who want cleaner structure and sharper long-term progression.
           </p>
           <p className="mt-6 text-xs text-white/20">
-            © {new Date().getFullYear()} CycloAI. All rights reserved.
+            © {new Date().getFullYear()} CyclogenAI. All rights reserved.
           </p>
         </div>
 

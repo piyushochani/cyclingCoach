@@ -17,7 +17,7 @@ import { escapeHtmlText } from "./html-escape.js";
 
 const WELCOME_MESSAGE =
   "Welcome to Cycling Coach!\n\n" +
-  "I'm your AI cycling coach, powered by the CycloAI platform. " +
+  "I'm your AI cycling coach, powered by the CyclogenAI platform. " +
   "I can review your training, check your plans, suggest workouts, " +
   "and answer your cycling questions.\n\n" +
   "Commands:\n" +
@@ -93,7 +93,7 @@ async function callBackend(
     return data?.text || "No response from coach.";
   } catch (err) {
     console.error("Failed to reach backend:", err);
-    return "Could not reach the coaching service. Make sure the CycloAI backend is running (cd backend; npm run start) and BACKEND_URL is set correctly.";
+    return "Could not reach the coaching service. Make sure the CyclogenAI backend is running (cd backend; npm run start) and BACKEND_URL is set correctly.";
   }
 }
 

@@ -300,7 +300,10 @@ export default function StatisticsPage() {
 
   const [weeklyGoal, setWeeklyGoal] = useState(() => {
     if (typeof window !== 'undefined') {
-      return parseFloat(localStorage.getItem('cycloai_weekly_goal') || '100');
+      try {
+        const u = JSON.parse(localStorage.getItem('cyclogenai_user') || '{}');
+        return u.weeklyGoalKm ?? 100;
+      } catch { return 100; }
     }
     return 100;
   });
@@ -414,15 +417,21 @@ export default function StatisticsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const val = parseFloat(goalInput);
-                    if (val > 0) {
-                      localStorage.setItem('cycloai_weekly_goal', String(val));
+                    if (!(val > 0)) return;
+                    try {
+                      const u = JSON.parse(localStorage.getItem('cyclogenai_user') || '{}');
+                      const email = u.email;
+                      if (email) {
+                        const updated = await api.put('/users/' + encodeURIComponent(email), { weeklyGoalKm: val });
+                        localStorage.setItem('cyclogenai_user', JSON.stringify(updated));
+                      }
                       setWeeklyGoal(val);
-                    }
+                    } catch (e) { console.error('Failed to save goal', e); }
                     setShowGoalModal(false);
                   }}
-                  className="flex-1 rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200"
+                  className="flex-1 rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200 disabled:opacity-50"
                 >
                   Save Goal
                 </button>

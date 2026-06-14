@@ -10,7 +10,7 @@ const ScheduleRaceButton = ({ onClick }) => {
       onClick={onClick}
       className="relative flex items-center justify-center p-0.5 overflow-hidden text-lg font-bebasNeue text-white bg-accent-orange
                  skew-x-[-15deg] group transition-all duration-300 ease-out shadow-xl
-                 w-full max-w-sm mx-auto h-20" // Large size
+                 w-full max-w-[260px] md:max-w-sm mx-auto h-16 md:h-20"
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
     >

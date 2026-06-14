@@ -176,6 +176,13 @@ export class TrainingContextService {
     ).exec();
   }
 
+  async findAllWeeklyPlans(userId: string): Promise<WeeklyPlan[]> {
+    return this.weeklyPlanModel.find({ user: userId as any })
+      .sort({ year: -1, week: -1 })
+      .lean()
+      .exec();
+  }
+
   async deleteWeeklyPlan(userId: string, relativeWeek: number): Promise<boolean> {
     const result = await this.weeklyPlanModel.findOneAndDelete({
       user: userId as any,

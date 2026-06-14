@@ -16,7 +16,7 @@ export default function GeneralFooter() {
                 <path d="M50 10 L50 90 M15 50 L85 50" stroke="currentColor" strokeWidth="4" />
               </svg>
               <span className="font-barlowCondensed text-lg uppercase tracking-wide text-white/70">
-                CycloAI
+                CyclogenAI
               </span>
             </Link>
             <p className="font-dmSans mt-3 max-w-xs text-[13px] leading-relaxed text-white/25">
@@ -83,7 +83,7 @@ export default function GeneralFooter() {
                 <svg className="mt-0.5 h-4 w-4 shrink-0 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-                <span className="font-dmSans text-[13px] text-white/25">support@cycloai.app</span>
+                <span className="font-dmSans text-[13px] text-white/25">support@cyclogenai.app</span>
               </li>
               <li className="flex items-start gap-2.5">
                 <svg className="mt-0.5 h-4 w-4 shrink-0 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,7 +107,7 @@ export default function GeneralFooter() {
         <div className="mt-10 border-t border-white/[0.04] pt-6">
           <div className="flex flex-col items-center justify-between gap-3 md:flex-row">
             <p className="font-dmSans text-[12px] text-white/15">
-              &copy; {new Date().getFullYear()} CycloAI. All rights reserved.
+              &copy; {new Date().getFullYear()} CyclogenAI. All rights reserved.
             </p>
             <div className="flex items-center gap-4">
               {[

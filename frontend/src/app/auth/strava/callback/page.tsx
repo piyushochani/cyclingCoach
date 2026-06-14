@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "../../../../../lib/api";
 import FirstSyncTutorial from "../../../../../components/layout/FirstSyncTutorial";
+import OnboardingChat from "../../../../../components/layout/OnboardingChat";
 
 type SyncStatus = "idle" | "exchanging" | "storing" | "syncing" | "done" | "error" | "profile";
 
@@ -13,6 +14,7 @@ function StravaCallbackInner() {
   const [status, setStatus] = useState<SyncStatus>("exchanging");
   const [message, setMessage] = useState("Exchanging authorization code for tokens...");
   const [tutorialDone, setTutorialDone] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const [heightCm, setHeightCm] = useState("");
   const [weightKg, setWeightKg] = useState("");
@@ -57,14 +59,17 @@ function StravaCallbackInner() {
       .then(async () => {
         if (cancelled) return;
         try {
-          const stored = localStorage.getItem("cycloai_user");
+          const stored = localStorage.getItem("cyclogenai_user");
           if (stored) {
             const u = JSON.parse(stored);
             if (u.email) {
-              const updated: any = await api.post(`/users/${u.email}/training-start`, {});
-              if (updated?.trainingStart) {
-                u.trainingStart = updated.trainingStart;
-                localStorage.setItem("cycloai_user", JSON.stringify(u));
+              const alreadyDone = localStorage.getItem("cyclogenai_onboarding_done") === "true" || !!u.onboardingSummary;
+              const result: any = await api.post(`/users/${u.email}/training-start`, {});
+              u.trainingStart = new Date().toISOString();
+              localStorage.setItem("cyclogenai_user", JSON.stringify(u));
+              if (!alreadyDone && result?.firstAuth) {
+                setShowOnboarding(true);
+                return;
               }
             }
           }
@@ -83,7 +88,7 @@ function StravaCallbackInner() {
   const saveProfile = async () => {
     setSavingProfile(true);
     try {
-      const stored = localStorage.getItem("cycloai_user");
+      const stored = localStorage.getItem("cyclogenai_user");
       if (stored) {
         const u = JSON.parse(stored);
         if (u.email) {
@@ -104,7 +109,7 @@ function StravaCallbackInner() {
           }
           const updated = await api.put(`/users/${u.email}`, update);
           Object.assign(u, updated);
-          localStorage.setItem("cycloai_user", JSON.stringify(u));
+          localStorage.setItem("cyclogenai_user", JSON.stringify(u));
         }
       }
     } catch {}
@@ -231,7 +236,11 @@ function StravaCallbackInner() {
         </div>
       )}
 
-      {status === "profile" && !tutorialDone && localStorage.getItem("cycloai_tutorial_shown") !== "true" && (
+      {showOnboarding && (
+        <OnboardingChat onComplete={() => { setShowOnboarding(false); setStatus("profile"); }} />
+      )}
+
+      {status === "profile" && !tutorialDone && localStorage.getItem("cyclogenai_tutorial_shown") !== "true" && (
         <FirstSyncTutorial onDismiss={() => setTutorialDone(true)} />
       )}
     </div>

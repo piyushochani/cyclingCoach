@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
-import { getSyncStatus, getLastSyncTimeFormatted, triggerGlobalSync } from '../../lib/useAutoSync';
+import { getSyncStatus, triggerGlobalSync } from '../../lib/useAutoSync';
 
 const navLinks = [
   { name: 'Dashboard', href: '/dashboard' },
@@ -44,7 +44,7 @@ const PostLoginNavbar = () => {
   const router = useRouter();
 
   const loadFromStorage = useCallback(() => {
-    const stored = localStorage.getItem("cycloai_user");
+    const stored = localStorage.getItem("cyclogenai_user");
     if (stored) {
       try {
         const u = JSON.parse(stored);
@@ -60,7 +60,7 @@ const PostLoginNavbar = () => {
 
   const loadNotifCount = useCallback(() => {
     try {
-      const stored = localStorage.getItem("cycloai_notifications");
+      const stored = localStorage.getItem("cyclogenai_notifications");
       if (stored) {
         const list = JSON.parse(stored);
         setNotifCount(list.filter(n => !n.read).length);
@@ -71,6 +71,8 @@ const PostLoginNavbar = () => {
   useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
 
   useEffect(() => { loadNotifCount(); }, [loadNotifCount]);
+
+
 
   useEffect(() => {
     const handler = () => loadFromStorage();
@@ -106,7 +108,11 @@ const PostLoginNavbar = () => {
     if (syncing) return;
     setIsDropdownOpen(false);
     const ok = await triggerGlobalSync();
-    if (ok) setTimeout(() => window.location.reload(), 2000);
+    if (ok) {
+      setTimeout(() => window.location.reload(), 2000);
+    } else {
+      alert('Sync failed. Check your browser console (F12) for details, or try logging out and back in.');
+    }
   };
 
   const handleReauth = async () => {
@@ -120,7 +126,9 @@ const PostLoginNavbar = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('cycloai_signed_in');
+    localStorage.removeItem('cyclogenai_signed_in');
+    localStorage.removeItem('cyclogenai_user');
+    localStorage.removeItem('cyclogenai_onboarding_done');
     router.push('/');
   };
 

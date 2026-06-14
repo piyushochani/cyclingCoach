@@ -83,18 +83,18 @@ const UpcomingRacesTable = () => {
       className="bg-surface-cards rounded-lg p-6 border border-elevation-highlight"
     >
       <h2 className="font-bebasNeue text-2xl text-text-primary mb-4">Upcoming Races</h2>
-      <div className="overflow-x-auto custom-scrollbar">
-        <table className="min-w-full text-left text-sm font-dmSans">
+      <div className="overflow-x-hidden">
+        <table className="w-full text-left text-sm font-dmSans">
           <thead>
             <tr className="border-b border-elevation-highlight">
-              <th className="py-3 px-4 text-text-secondary">Race Name</th>
-              <th className="py-3 px-4 text-text-secondary">Type</th>
-              <th className="py-3 px-4 text-text-secondary">Location</th>
-              <th className="py-3 px-4 text-text-secondary">Distance</th>
-              <th className="py-3 px-4 text-text-secondary">Date / Countdown</th>
-              <th className="py-3 px-4 text-text-secondary">Nutrition Plan</th>
-              <th className="py-3 px-4 text-text-secondary">Priority</th>
-              <th className="py-3 px-4 text-text-secondary">Actions</th>
+              <th className="py-3 px-2 text-text-secondary md:px-4">Race Name</th>
+              <th className="py-3 px-2 text-text-secondary md:px-4 hidden md:table-cell">Type</th>
+              <th className="py-3 px-2 text-text-secondary md:px-4 hidden lg:table-cell">Location</th>
+              <th className="py-3 px-2 text-text-secondary md:px-4 hidden lg:table-cell">Distance</th>
+              <th className="py-3 px-2 text-text-secondary md:px-4">Date / Countdown</th>
+              <th className="py-3 px-2 text-text-secondary md:px-4 hidden lg:table-cell">Nutrition</th>
+              <th className="py-3 px-2 text-text-secondary md:px-4">Priority</th>
+              <th className="py-3 px-2 text-text-secondary md:px-4 hidden lg:table-cell">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -103,13 +103,13 @@ const UpcomingRacesTable = () => {
                 <motion.tr
                   className={`border-b border-elevation-highlight last:border-b-0 hover:bg-bg-dark transition-colors cursor-pointer ${getPriorityColor(race.priority)}`}
                   onClick={() => setExpandedRow(expandedRow === race.id ? null : race.id)}
-                  whileHover={{ backgroundColor: '#1A1C22' }} // Darker bg on hover
+                  whileHover={{ backgroundColor: '#1A1C22' }}
                 >
-                  <td className="py-3 px-4 text-text-primary">{race.name}</td>
-                  <td className="py-3 px-4 text-text-primary">{race.type}</td>
-                  <td className="py-3 px-4 text-text-primary">{race.location}</td>
-                  <td className="py-3 px-4 text-text-primary">{race.distance}</td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-2 text-text-primary md:px-4">{race.name}</td>
+                  <td className="py-3 px-2 text-text-primary md:px-4 hidden md:table-cell">{race.type}</td>
+                  <td className="py-3 px-2 text-text-primary md:px-4 hidden lg:table-cell">{race.location}</td>
+                  <td className="py-3 px-2 text-text-primary md:px-4 hidden lg:table-cell">{race.distance}</td>
+                  <td className="py-3 px-2 md:px-4">
                     <p className={isPast(new Date(race.date)) ? 'text-text-muted' : 'text-text-primary'}>
                       {format(new Date(race.date), 'MMM dd, yyyy')}
                     </p>
@@ -117,9 +117,9 @@ const UpcomingRacesTable = () => {
                       {calculateCountdown(race.date)}
                     </p>
                   </td>
-                  <td className={`py-3 px-4 ${getNutritionStatusColor(race.nutritionPlan)}`}>{race.nutritionPlan}</td>
-                  <td className="py-3 px-4 text-text-primary">{race.priority}</td>
-                  <td className="py-3 px-4">
+                  <td className={`py-3 px-2 md:px-4 hidden lg:table-cell ${getNutritionStatusColor(race.nutritionPlan)}`}>{race.nutritionPlan}</td>
+                  <td className="py-3 px-2 text-text-primary md:px-4">{race.priority}</td>
+                  <td className="py-3 px-2 md:px-4 hidden lg:table-cell">
                     <button className="text-info-blue hover:underline text-sm">Details</button>
                   </td>
                 </motion.tr>

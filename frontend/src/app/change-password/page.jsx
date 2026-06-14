@@ -10,7 +10,7 @@ export default function ChangePasswordPage() {
   const router = useRouter();
 
   const storedUser = typeof window !== "undefined"
-    ? (() => { try { return JSON.parse(localStorage.getItem("cycloai_user") || "{}"); } catch { return {}; } })()
+    ? (() => { try { return JSON.parse(localStorage.getItem("cyclogenai_user") || "{}"); } catch { return {}; } })()
     : {};
 
   const [email] = useState(storedUser.email || "");
@@ -59,7 +59,7 @@ export default function ChangePasswordPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#0A0C0F] px-4">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(124,140,255,0.08),transparent_28%),radial-gradient(circle_at_top_right,rgba(110,231,249,0.06),transparent_24%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,85,0,0.08),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,85,0,0.06),transparent_24%)]" />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -69,13 +69,13 @@ export default function ChangePasswordPage() {
         <div className="rounded-[24px] border border-white/10 bg-[#111318]/90 p-8 shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           <div className="mb-8 text-center">
             <Link href="/dashboard" className="inline-flex items-center gap-2">
-              <svg className="h-8 w-8 text-[#7C8CFF]" viewBox="0 0 100 100" fill="none">
+              <svg className="h-8 w-8 text-[#FF5500]" viewBox="0 0 100 100" fill="none">
                 <circle cx="50" cy="50" r="34" stroke="currentColor" strokeWidth="8" />
                 <circle cx="50" cy="50" r="11" stroke="currentColor" strokeWidth="6" />
                 <path d="M50 9v14M50 77v14M9 50h14M77 50h14M22 22l10 10M68 68l10 10M78 22 68 32M22 78l10-10" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
               </svg>
               <span className="font-barlowCondensed text-2xl uppercase tracking-[0.08em] text-white">
-                CycloAI
+                CyclogenAI
               </span>
             </Link>
           </div>
@@ -100,7 +100,7 @@ export default function ChangePasswordPage() {
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-dmSans text-sm text-white outline-none transition focus:border-[#7C8CFF]/50 focus:bg-white/10"
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-dmSans text-sm text-white outline-none transition focus:border-[#FF5500]/50 focus:bg-white/10"
                 placeholder="Enter current password"
               />
             </div>
@@ -111,7 +111,7 @@ export default function ChangePasswordPage() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-dmSans text-sm text-white outline-none transition focus:border-[#7C8CFF]/50 focus:bg-white/10"
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-dmSans text-sm text-white outline-none transition focus:border-[#FF5500]/50 focus:bg-white/10"
                 placeholder="Min. 6 characters"
               />
             </div>
@@ -122,7 +122,7 @@ export default function ChangePasswordPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-dmSans text-sm text-white outline-none transition focus:border-[#7C8CFF]/50 focus:bg-white/10"
+                    className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 font-dmSans text-sm text-white outline-none transition focus:border-[#FF5500]/50 focus:bg-white/10"
                 placeholder="Re-enter new password"
               />
             </div>
@@ -133,14 +133,14 @@ export default function ChangePasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-[linear-gradient(135deg,#7C8CFF,#6EE7F9)] px-6 py-3.5 font-dmSans text-sm font-semibold text-[#0A0C0F] shadow-[0_18px_40px_rgba(124,140,255,0.25)] transition hover:scale-[1.02] disabled:opacity-50"
+              className="rounded-xl bg-[#FF5500] px-6 py-3.5 font-dmSans text-sm font-semibold text-white shadow-[0_18px_40px_rgba(255,85,0,0.25)] transition hover:bg-[#e04a00] disabled:opacity-50"
             >
               {loading ? "Changing..." : "Change Password"}
             </button>
           </form>
 
           <p className="mt-6 text-center font-dmSans text-sm text-white/40">
-            <Link href="/dashboard" className="text-[#C9D1FF] transition hover:text-white">Back to dashboard</Link>
+            <Link href="/dashboard" className="text-[#FF5500] transition hover:text-white">Back to dashboard</Link>
           </p>
         </div>
       </motion.div>

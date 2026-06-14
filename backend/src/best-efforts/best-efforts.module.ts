@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { BestEffortRecord, BestEffortRecordSchema, Segment, SegmentSchema, SegmentEffort, SegmentEffortSchema } from './best-efforts.schema';
 import { BestEffortsService } from './best-efforts.service';
 import { BestEffortsController } from './best-efforts.controller';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -11,6 +12,7 @@ import { BestEffortsController } from './best-efforts.controller';
       { name: Segment.name, schema: SegmentSchema },
       { name: SegmentEffort.name, schema: SegmentEffortSchema },
     ]),
+    NotificationModule,
   ],
   controllers: [BestEffortsController],
   providers: [BestEffortsService],

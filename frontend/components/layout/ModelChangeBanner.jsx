@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const STORAGE_KEY = "cycloai_model_change_recommendation";
+const STORAGE_KEY = "cyclogenai_model_change_recommendation";
 const SNOOZE_DURATION = 3 * 24 * 60 * 60 * 1000;
 
 function loadRecommendation() {
@@ -100,7 +100,7 @@ const ModelChangeBanner = () => {
                   Periodisation Model Recommendation
                 </p>
                 <p className="font-dmSans text-xs text-white/60">
-                  CycloAI detected that{" "}
+                  CyclogenAI detected that{" "}
                   <span className="text-[#FF5500] font-semibold">{modelLabels[rec.suggestedModel] || rec.suggestedModel}</span>{" "}
                   periodisation may fit your recent training response better than{" "}
                   <span className="text-white/80">{modelLabels[rec.previousModel] || rec.previousModel}.</span>{" "}

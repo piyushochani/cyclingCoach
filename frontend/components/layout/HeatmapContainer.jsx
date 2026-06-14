@@ -21,58 +21,138 @@ const getOrdinal = (day) => {
   return `${day}th`;
 };
 
-const formatDayDate = (dateString) => {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-
+const formatDayDate = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
   const weekday = date.toLocaleDateString("en-US", { weekday: "long" });
   const month = date.toLocaleDateString("en-US", { month: "long" });
   const day = getOrdinal(date.getDate());
-
   return `${weekday} - ${day} ${month}`;
 };
 
-const formatDisplayDate = (dateString) => {
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) return dateString;
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
+const formatDisplayDate = (date) => {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 };
 
-const getDayNumber = (dateString, fallbackIndex) => {
-  const date = new Date(dateString);
-  if (!Number.isNaN(date.getTime())) return date.getDate();
-  return fallbackIndex + 1;
-};
+const monthNames = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
 
-const HeatmapContainer = ({ data, days }) => {
-  const heatmapData = data;
+const HeatmapContainer = ({ activities, days }) => {
   const heatmapDays = days || defaultDays;
+  const [viewDate, setViewDate] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
 
-  const now = new Date();
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+  const prevMonth = () => {
+    setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
 
-  const heatmapTitle = heatmapData
-    ? `${monthNames[now.getMonth()]} – ${monthNames[(now.getMonth() + 1) % 12]}`
-    : "Activity Heatmap";
+  const nextMonth = () => {
+    setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
 
-  const latestActivity = useMemo(() => {
-    if (!heatmapData) return null;
-    const flat = heatmapData.flat().filter((cell) => cell.level > 0);
-    return flat[flat.length - 1] || heatmapData.flat()[0] || null;
+  const heatmapData = useMemo(() => {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1);
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const daysInMonth = lastDayOfMonth.getDate();
+
+    // Monday = 0 ... Sunday = 6
+    const startOffset = (firstDayOfMonth.getDay() + 6) % 7;
+
+    // Map activities for this month only
+    const dayMap = {};
+    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+      const date = new Date(year, month, dayNum);
+      dayMap[dayNum] = { date, activities: [], totalTime: 0, totalDistance: 0 };
+    }
+
+    if (activities) {
+      for (const a of activities) {
+        const d = new Date(a.date);
+        if (d.getFullYear() === year && d.getMonth() === month) {
+          const dayNum = d.getDate();
+          if (dayMap[dayNum]) {
+            dayMap[dayNum].activities.push(a);
+            dayMap[dayNum].totalTime += a.durationSeconds || 0;
+            dayMap[dayNum].totalDistance += a.distance || 0;
+          }
+        }
+      }
+    }
+
+    const cells = [];
+
+    // Leading empty cells
+    for (let i = 0; i < startOffset; i++) {
+      cells.push({ level: -1, details: { empty: true } });
+    }
+
+    // Actual days of the month
+    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+      const day = dayMap[dayNum];
+      const count = day.activities.length;
+      const level = count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : 3;
+      const hours = (day.totalTime / 3600).toFixed(1);
+      const dist = (day.totalDistance / 1000).toFixed(2);
+
+      cells.push({
+        level,
+        details: {
+          date: day.date,
+          dayNumber: dayNum,
+          activities: count,
+          activityIds: day.activities.map((a, i) => a._id || a.id || a.stravaId || `act-${i}`),
+          time: `${hours} hrs`,
+          distance: `${dist} km`,
+          calories: `${(day.totalDistance * 28 / 1000).toFixed(2)} kcal`,
+        },
+      });
+    }
+
+    // Trailing empty cells to complete the last row
+    while (cells.length % 7 !== 0) {
+      cells.push({ level: -1, details: { empty: true } });
+    }
+
+    // Chunk into rows of 7
+    const rows = [];
+    for (let i = 0; i < cells.length; i += 7) {
+      rows.push(cells.slice(i, i + 7));
+    }
+
+    return rows;
+  }, [activities, viewDate]);
+
+  const hasActivityData = useMemo(() => {
+    return heatmapData.some((row) =>
+      row.some((cell) => !cell.details.empty && cell.level > 0)
+    );
   }, [heatmapData]);
 
-  const [selectedDay, setSelectedDay] = useState(latestActivity);
+  const latestActivityDay = useMemo(() => {
+    const flat = heatmapData.flat().filter((cell) => cell.level > 0);
+    return flat.length > 0 ? flat[flat.length - 1] : null;
+  }, [heatmapData]);
+
+  const [selectedDay, setSelectedDay] = useState(null);
 
   useEffect(() => {
-    if (latestActivity && !selectedDay) setSelectedDay(latestActivity);
-  }, [latestActivity, selectedDay]);
+    if (latestActivityDay) {
+      setSelectedDay(latestActivityDay);
+    } else {
+      const firstValid = heatmapData
+        .flat()
+        .find((cell) => cell.details && !cell.details.empty);
+      setSelectedDay(firstValid || null);
+    }
+  }, [heatmapData, latestActivityDay]);
+
+  const heatmapTitle = `${monthNames[viewDate.getMonth()]} ${viewDate.getFullYear()}`;
 
   return (
     <motion.div
@@ -81,22 +161,46 @@ const HeatmapContainer = ({ data, days }) => {
       transition={{ duration: 0.4, delay: 0.14 }}
       className="rounded-[24px] border border-white/10 bg-white/[0.02] p-6 md:p-7"
     >
-      <div className="mb-6">
+      <div className="mb-6 flex flex-col items-center">
         <p className="font-dmSans text-[10px] uppercase tracking-[0.16em] text-white/35">
           Activity Heatmap
         </p>
-        <h2 className="mt-1 font-dmSans text-3xl font-semibold tracking-[-0.02em] text-white">
-          {heatmapTitle}
-        </h2>
+        <div className="mt-2 flex items-center justify-center gap-4">
+          <button
+            onClick={prevMonth}
+            className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-white/[0.03] transition-all hover:border-white/20 hover:bg-white/10 active:scale-95"
+            aria-label="Previous month"
+          >
+            <span className="text-lg text-white/40 transition-colors group-hover:text-white">←</span>
+          </button>
+
+          <div className="w-[280px] flex justify-center">
+            <h2 className="text-center font-dmSans text-3xl font-semibold tracking-[-0.02em] text-white">
+              {heatmapTitle}
+            </h2>
+          </div>
+
+          <button
+            onClick={nextMonth}
+            className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-white/[0.03] transition-all hover:border-white/20 hover:bg-white/10 active:scale-95"
+            aria-label="Next month"
+          >
+            <span className="text-lg text-white/40 transition-colors group-hover:text-white">→</span>
+          </button>
+        </div>
       </div>
 
-      {!heatmapData ? (
-        <div className="flex items-center justify-center py-12 font-dmSans text-sm text-white/30">
-          No activity data yet
+      {!activities || activities.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-2xl">📅</div>
+          <p className="font-dmSans text-sm text-white/30">No ride data yet</p>
+          <p className="font-dmSans text-xs text-white/20 max-w-[260px] text-center">
+            Activities will appear here once synced from Strava. Auto-sync runs every 5 minutes, or use &quot;Refresh Strava Data&quot; in your profile menu.
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 items-center gap-8 xl:grid-cols-[auto_minmax(0,1fr)]">
-          <div className="flex h-full flex-col justify-center">
+        <div className="grid grid-cols-1 items-start gap-8 xl:grid-cols-[auto_minmax(0,1fr)]">
+          <div className="flex flex-col justify-center">
             <div className="mb-3 grid grid-cols-7 gap-2 text-center">
               {heatmapDays.map((day, index) => (
                 <span
@@ -112,22 +216,22 @@ const HeatmapContainer = ({ data, days }) => {
               {heatmapData.map((row, rowIndex) => (
                 <div key={rowIndex} className="grid grid-cols-7 gap-2">
                   {row.map((cell, colIndex) => {
+                    if (cell.details.empty) {
+                      return <div key={`${rowIndex}-${colIndex}`} className="h-9 w-9" />;
+                    }
+
                     const isSelected =
                       selectedDay &&
                       selectedDay.details &&
-                      selectedDay.details.day === cell.details.day;
-
-                    const dayNumber = getDayNumber(
-                      cell.details?.date || cell.details?.day,
-                      rowIndex * 7 + colIndex
-                    );
+                      !selectedDay.details.empty &&
+                      selectedDay.details.dayNumber === cell.details.dayNumber;
 
                     return (
                       <button
                         key={`${rowIndex}-${colIndex}`}
                         type="button"
                         onClick={() => setSelectedDay(cell)}
-                        title={cell.details?.day || cell.details?.date}
+                        title={formatDisplayDate(cell.details.date)}
                         className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
                           isSelected
                             ? "scale-105 border-white/70"
@@ -137,7 +241,7 @@ const HeatmapContainer = ({ data, days }) => {
                         <span
                           className={`flex h-8 w-8 items-center justify-center rounded-full font-dmSans text-[11px] font-medium ${dotClasses[cell.level]}`}
                         >
-                          {dayNumber}
+                          {cell.details.dayNumber}
                         </span>
                       </button>
                     );
@@ -147,10 +251,10 @@ const HeatmapContainer = ({ data, days }) => {
             </div>
           </div>
 
-          {selectedDay && selectedDay.details && (
+          {selectedDay && selectedDay.details && !selectedDay.details.empty && (
             <AnimatePresence mode="wait">
               <motion.div
-                key={selectedDay.details.day}
+                key={selectedDay.details.dayNumber}
                 initial={{ opacity: 0, x: 8 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -8 }}
@@ -163,10 +267,10 @@ const HeatmapContainer = ({ data, days }) => {
                       Selected Day
                     </p>
                     <h3 className="mt-1 font-dmSans text-2xl font-medium text-white">
-                      {formatDisplayDate(selectedDay.details.date || selectedDay.details.day)}
+                      {formatDisplayDate(selectedDay.details.date)}
                     </h3>
                     <p className="mt-1 font-dmSans text-sm text-white/45">
-                      {formatDayDate(selectedDay.details.date || selectedDay.details.day)}
+                      {formatDayDate(selectedDay.details.date)}
                     </p>
                   </div>
 
@@ -197,6 +301,26 @@ const HeatmapContainer = ({ data, days }) => {
                     </div>
                   ))}
                 </div>
+
+                {selectedDay.details.activityIds && selectedDay.details.activityIds.length > 0 && (
+                  <div className="mt-5 space-y-2">
+                    <p className="font-dmSans text-[10px] uppercase tracking-[0.14em] text-white/25">
+                      Launch Coaching Analysis
+                    </p>
+                    {selectedDay.details.activityIds.map((id, idx) => (
+                      <a
+                        key={id}
+                        href={`/activities/${id}`}
+                        className="flex items-center justify-between rounded-xl border border-[#FF7A1A]/20 bg-[#FF7A1A]/5 px-4 py-3 transition-all hover:bg-[#FF7A1A]/10 active:scale-[0.98]"
+                      >
+                        <span className="font-dmSans text-sm font-medium text-white">
+                          View Ride {selectedDay.details.activityIds.length > 1 ? idx + 1 : ''}
+                        </span>
+                        <span className="text-[#FF7A1A]">→</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             </AnimatePresence>
           )}

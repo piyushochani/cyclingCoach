@@ -3,17 +3,54 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
+import { api } from '../../lib/api';
+
+const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+const typeStyles = {
+  rest: { label: 'Rest', color: 'bg-white/10' },
+  recovery: { label: 'Recovery', color: 'bg-blue-400/60' },
+  endurance: { label: 'Endurance', color: 'bg-emerald-500' },
+  tempo: { label: 'Tempo', color: 'bg-amber-500' },
+  threshold: { label: 'Threshold', color: 'bg-orange-500' },
+  intervals: { label: 'Intervals', color: 'bg-red-500' },
+  vo2max: { label: 'VO2 Max', color: 'bg-red-500' },
+  race: { label: 'Race', color: 'bg-purple-500' },
+  long: { label: 'Long Ride', color: 'bg-indigo-500' },
+};
+
+function detectType(type) {
+  if (!type) return typeStyles.rest;
+  const t = type.toLowerCase();
+  if (t.includes('rest') || t.includes('off')) return typeStyles.rest;
+  if (t.includes('recovery')) return typeStyles.recovery;
+  if (t.includes('endurance') || t.includes('base')) return typeStyles.endurance;
+  if (t.includes('tempo')) return typeStyles.tempo;
+  if (t.includes('threshold') || t.includes('ftp')) return typeStyles.threshold;
+  if (t.includes('interval') || t.includes('vo2')) return typeStyles.vo2max;
+  if (t.includes('race') || t.includes('tt')) return typeStyles.race;
+  if (t.includes('long')) return typeStyles.long;
+  return typeStyles.tempo;
+}
 
 const MissionControl = ({ races = [] }) => {
   const [now, setNow] = useState(null);
+  const [plan, setPlan] = useState(null);
+  const [planLoading, setPlanLoading] = useState(true);
 
   useEffect(() => {
-    Promise.resolve().then(() => {
-      setNow(new Date());
-    });
+    setNow(new Date());
+  }, []);
+
+  useEffect(() => {
+    api.get('/training-context/weekly-plan')
+      .then((data) => setPlan(data))
+      .catch(() => {})
+      .finally(() => setPlanLoading(false));
   }, []);
 
   const today = now ? now.getDay() : 0;
+  const todayDisplayIdx = (today + 6) % 7;
 
   const nextRace = useMemo(() => {
     if (!now) return null;
@@ -27,15 +64,13 @@ const MissionControl = ({ races = [] }) => {
     return Math.ceil((new Date(nextRace.date).getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   }, [nextRace, now]);
 
-  const weeklySchedule = [
-    { day: 'Mon', workouts: ['Easy Ride'] },
-    { day: 'Tue', workouts: ['Intervals'] },
-    { day: 'Wed', workouts: ['Rest'] },
-    { day: 'Thu', workouts: ['Tempo'] },
-    { day: 'Fri', workouts: ['Long Ride'] },
-    { day: 'Sat', workouts: ['Race Pace'] },
-    { day: 'Sun', workouts: ['Recovery'] },
-  ];
+  const workoutMap = {};
+  if (plan?.workouts) {
+    for (const w of plan.workouts) {
+      const displayIdx = (w.dayOfWeek + 6) % 7;
+      workoutMap[displayIdx] = w;
+    }
+  }
 
   return (
     <motion.div
@@ -49,7 +84,6 @@ const MissionControl = ({ races = [] }) => {
       {/* Race Countdown Chip */}
       <div className="flex items-center justify-between bg-bg-dark p-3 rounded-md mb-6 border border-chain-link-grey">
         <div className="flex items-center space-x-2">
-          {/* Clock SVG Placeholder */}
           <motion.svg
             className="w-6 h-6 text-accent-orange"
             fill="none"
@@ -72,40 +106,52 @@ const MissionControl = ({ races = [] }) => {
 
       {/* Weekly Schedule Grid */}
       <h3 className="font-bebasNeue text-xl text-text-primary mb-3">Weekly Schedule</h3>
-      <div className="grid grid-cols-7 gap-1 text-center font-dmSans text-sm">
-        {weeklySchedule.map((item, index) => (
-          <div
-            key={item.day}
-            className={`flex flex-col p-2 rounded-md ${
-              index === today -1 // -1 because getDay() is 0-indexed for Sunday
-                ? 'bg-accent-orange/20 border border-accent-orange'
-                : 'bg-bg-dark border border-chain-link-grey'
-            }`}
-          >
-            <p className="font-bebasNeue text-text-primary mb-1">{item.day}</p>
-            <div className="flex flex-col space-y-1">
-              {item.workouts.map((workout, wIndex) => (
-                <motion.span
-                  key={wIndex}
-                  className="bg-elevation-highlight text-text-secondary px-2 py-1 rounded-full text-xs cursor-help"
-                  whileHover={{ scale: 1.05 }}
-                  title={workout} // Tooltip placeholder
-                >
-                  {workout}
-                </motion.span>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      {planLoading ? (
+        <div className="flex items-center justify-center py-6">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#FF6B00] border-t-transparent" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-7 gap-1 text-center font-dmSans text-sm">
+          {dayNames.map((day, displayIdx) => {
+            const isToday = displayIdx === todayDisplayIdx;
+            const workout = workoutMap[displayIdx];
+            const style = workout ? detectType(workout.type) : typeStyles.rest;
+
+            return (
+              <div
+                key={day}
+                className={`flex flex-col items-center gap-1.5 p-2 rounded-md ${
+                  isToday
+                    ? 'bg-accent-orange/20 border border-accent-orange'
+                    : 'bg-bg-dark border border-chain-link-grey'
+                }`}
+              >
+                <p className="font-bebasNeue text-text-primary text-xs">{day}</p>
+                <span className={`h-2 w-2 rounded-full ${style.color}`} />
+                <span className="text-[10px] text-text-secondary leading-tight">
+                  {isToday ? 'Today' : (workout ? style.label : '—')}
+                </span>
+                {workout?.distance && (
+                  <span className="text-[9px] text-white/30">{parseFloat(workout.distance).toFixed(1)} km</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Regenerate Plan Button */}
       <motion.button
-        className="w-full mt-6 py-3 bg-accent-orange text-white font-dmSans rounded-md hover:bg-orange-600 transition-colors"
+        className="w-full mt-6 py-3 bg-accent-orange text-white font-dmSans rounded-md hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
+        onClick={async () => {
+          try {
+            await api.post('/analysis/ensure-plans', {});
+          } catch {}
+        }}
       >
-        Regenerate Plan
+        Generate Weekly Plan
       </motion.button>
     </motion.div>
   );

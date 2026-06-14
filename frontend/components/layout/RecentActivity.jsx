@@ -77,7 +77,7 @@ export default function RecentActivity({ activities = [] }) {
         {recentActivities.length > 0 ? (
           <div>
             {recentActivities.map((activity, index) => {
-              const activityId = activity?.id ?? activity?._id ?? activity?.activityId ?? index;
+              const activityId = activity?._id || activity?.id || activity?.stravaId || `act-${index}`;
               const activityName = activity?.title || activity?.name || "Untitled Activity";
 
               return (

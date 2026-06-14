@@ -35,7 +35,7 @@ export class AuthController {
     }
     const valid = await this.authService.verifyOtp(body.email, body.code, 'signup');
     if (!valid) throw new UnauthorizedException('Invalid or expired OTP');
-    await this.authService.signup(body.email, body.password, {
+    const user = await this.authService.signup(body.email, body.password, {
       firstName: body.firstName,
       lastName: body.lastName,
       heightCm: body.heightCm,
@@ -44,7 +44,19 @@ export class AuthController {
       cyclingYears: body.cyclingYears,
       ftp: body.ftp,
     });
-    return { message: 'Account created successfully' };
+    return {
+      id: user._id,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email,
+      mainSport: user.mainSport,
+      experienceLevel: user.experienceLevel,
+      heightCm: user.heightCm,
+      weightKg: user.weightKg,
+      goal: user.goal,
+      cyclingYears: user.cyclingYears,
+      ftp: user.ftp,
+    };
   }
 
   @Post('login')
@@ -94,6 +106,7 @@ export class AuthController {
       ftp: user.ftp,
       stravaUpdatedAt: user.stravaUpdatedAt,
       isStravaUpToDate: user.isStravaUpToDate,
+      onboardingSummary: (user as any).onboardingSummary || null,
     };
   }
 
@@ -139,6 +152,23 @@ export class AuthController {
     const valid = await this.authService.verifyOtp(body.email, body.code, 'password-reset');
     if (!valid) throw new UnauthorizedException('Invalid or expired OTP');
     await this.authService.updatePassword(body.email, body.password);
-    return { message: 'Password updated successfully' };
+    const user = await this.authService.findUserByEmail(body.email);
+    if (!user) throw new UnauthorizedException('User not found');
+    return {
+      id: user._id,
+      firstName: user.firstName || (user as any).name || '',
+      lastName: user.lastName || '',
+      email: user.email,
+      mainSport: user.mainSport,
+      experienceLevel: user.experienceLevel,
+      heightCm: user.heightCm,
+      weightKg: user.weightKg,
+      goal: user.goal,
+      cyclingYears: user.cyclingYears,
+      ftp: user.ftp,
+      stravaUpdatedAt: user.stravaUpdatedAt,
+      isStravaUpToDate: user.isStravaUpToDate,
+      onboardingSummary: (user as any).onboardingSummary || null,
+    };
   }
 }

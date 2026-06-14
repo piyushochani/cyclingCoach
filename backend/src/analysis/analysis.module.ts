@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AnalysisController } from './analysis.controller';
 import { AnalysisService } from './analysis.service';
@@ -10,6 +10,9 @@ import { EmbeddingService } from './embedding.service';
 import { ActivitySyncPipelineService } from './activity-sync-pipeline.service';
 import { Activity, ActivitySchema } from '../activity/activity.schema';
 import { User, UserSchema } from '../user/user.schema';
+import { NotificationModule } from '../notification/notification.module';
+import { PlanModule } from '../plan/plan.module';
+import { TrainingContextModule } from '../training-context/training-context.module';
 
 @Module({
   imports: [
@@ -17,6 +20,9 @@ import { User, UserSchema } from '../user/user.schema';
       { name: Activity.name, schema: ActivitySchema },
       { name: User.name, schema: UserSchema },
     ]),
+    NotificationModule,
+    PlanModule,
+    forwardRef(() => TrainingContextModule),
   ],
   controllers: [AnalysisController],
   providers: [

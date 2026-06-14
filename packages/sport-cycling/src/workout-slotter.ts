@@ -28,7 +28,7 @@ export interface SlottingConfig {
   isTaper: boolean;
 }
 
-const LONG_RIDE_DEFAULT: DayOfWeek = "sat";
+const LONG_RIDE_DEFAULT: DayOfWeek = "sun";
 const KEY_SESSION_FALLBACK: DayOfWeek = "wed";
 
 export function buildWeekSkeleton(
@@ -39,13 +39,18 @@ export function buildWeekSkeleton(
   sessionsPerWeek: number,
   isTaper: boolean,
 ): WeekSkeleton {
-  const recoveryCount = isTaper ? 3 : Math.max(1, 7 - sessionsPerWeek);
-  const recoveryDays: DayOfWeek[] = [];
   const allDays: DayOfWeek[] = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
-  let idx = allDays.length - 1;
-  for (let i = 0; i < recoveryCount && idx >= 0; i++) {
-    recoveryDays.push(allDays[idx]);
+  // Monday is always rest
+  const recoveryDays: DayOfWeek[] = ["mon"];
+
+  // Fill remaining recovery days from the end, skipping Sunday (long ride day)
+  const recoveryCount = isTaper ? 3 : Math.max(1, 7 - sessionsPerWeek);
+  let idx = allDays.length - 2; // start from sat, skip sun
+  for (let i = 0; i < recoveryCount - 1 && idx >= 1; i++) {
+    if (allDays[idx] !== "mon" && allDays[idx] !== "sun") {
+      recoveryDays.push(allDays[idx]);
+    }
     idx--;
   }
 
@@ -67,16 +72,20 @@ export function buildWeekSkeleton(
 export function slotWorkouts(
   config: SlottingConfig,
 ): WorkoutSlot[] {
-  const { availableDays, sessionsPerWeek, keySessionDay, longRideDay, phase, isTaper } = config;
+  const { availableDays, sessionsPerWeek, keySessionDay, phase, isTaper } = config;
   const slots: WorkoutSlot[] = [];
   const usedDays = new Set<string>();
   const orderedDays = [...availableDays];
 
-  if (orderedDays.length === 0) {
-    orderedDays.push("mon", "wed", "fri");
+  // Monday is always rest — remove from available
+  const filtered = orderedDays.filter((d) => d !== "mon");
+  if (filtered.length === 0) {
+    filtered.push("tue", "wed", "fri");
   }
 
-  if (longRideDay && orderedDays.includes(longRideDay)) {
+  // Sunday is always long ride
+  const longRideDay: DayOfWeek = "sun";
+  if (filtered.includes(longRideDay)) {
     slots.push({
       day: longRideDay,
       workoutType: "long_ride",
@@ -87,7 +96,7 @@ export function slotWorkouts(
   }
 
   const keyDay = keySessionDay ?? KEY_SESSION_FALLBACK;
-  if (keyDay && orderedDays.includes(keyDay) && !usedDays.has(keyDay)) {
+  if (keyDay && filtered.includes(keyDay) && !usedDays.has(keyDay)) {
     slots.push({
       day: keyDay,
       workoutType: deriveKeySessionType(phase),
@@ -97,7 +106,7 @@ export function slotWorkouts(
     usedDays.add(keyDay);
   }
 
-  const remaining = orderedDays.filter((d) => !usedDays.has(d));
+  const remaining = filtered.filter((d) => !usedDays.has(d));
   const remainingCount = Math.max(0, sessionsPerWeek - slots.length);
 
   for (let i = 0; i < Math.min(remainingCount, remaining.length); i++) {

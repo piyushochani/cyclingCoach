@@ -9,7 +9,7 @@ export default function SubscriptionPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem("cycloai_user");
+    const stored = localStorage.getItem("cyclogenai_user");
     if (stored) {
       try {
         setUser(JSON.parse(stored));

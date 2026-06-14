@@ -9,6 +9,8 @@ import PageTransitionWrapper from '../animations/PageTransitionWrapper';
 import AuthGuard from './AuthGuard';
 import StravaConnectOverlay from './StravaConnectOverlay';
 import ModelChangeBanner from './ModelChangeBanner';
+import OnboardingChat from './OnboardingChat';
+import PlanAutoGenerator from './PlanAutoGenerator';
 
 const publicPaths = ['/', '/login', '/signup', '/forgot-password'];
 
@@ -29,6 +31,8 @@ const ClientLayoutWrapper = ({ children }) => {
           </main>
           {!isPublic && <GeneralFooter />}
           {!isPublic && <PaceBotChat />}
+          {!isPublic && pathname !== '/auth/strava/callback' && <OnboardingChat />}
+          {!isPublic && <PlanAutoGenerator />}
         </div>
       </StravaConnectOverlay>
     </AuthGuard>

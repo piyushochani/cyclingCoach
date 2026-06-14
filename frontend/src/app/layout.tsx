@@ -35,7 +35,7 @@ const bebasNeue = Bebas_Neue({
 
 
 export const metadata: Metadata = {
-  title: "CycloAI - Your Ultimate Cycling Training Partner",
+  title: "CyclogenAI - Your Ultimate Cycling Training Partner",
   description: "Advanced AI-powered cycling coaching for personalized training plans, race intelligence, and performance analytics.",
 };
 

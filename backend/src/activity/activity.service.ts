@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Activity } from './activity.schema';
 import { GearService } from '../gear/gear.service';
+
+const CYCLING_FILTER = { sport: { $regex: /ride|cycling|bike|bicycle|velomobile|handcycle/i } };
 
 @Injectable()
 export class ActivityService {
@@ -12,17 +14,29 @@ export class ActivityService {
   ) {}
 
   findAll(): Promise<Activity[]> {
-    return this.activityModel.find().exec();
+    return this.activityModel.find(CYCLING_FILTER).exec();
   }
 
   findAllByUserId(userId: any): Promise<Activity[]> {
-    return this.activityModel.find({ user: userId as any }).exec();
+    return this.activityModel.find({ ...CYCLING_FILTER, user: userId as any }).exec();
   }
 
   async findOne(id: string, userId?: any): Promise<Activity | null> {
-    const filter: any = { _id: id };
-    if (userId) filter.user = userId as any;
-    return this.activityModel.findOne(filter).exec();
+    const userIdFilter = userId ? { user: userId as any } : {};
+    
+    // 1. Try finding by MongoDB _id
+    if (Types.ObjectId.isValid(id)) {
+      const act = await this.activityModel.findOne({ _id: id, ...userIdFilter }).exec();
+      if (act) return act;
+    }
+
+    // 2. Fallback: Try finding by Strava ID (if the id is numeric)
+    const stravaId = parseInt(id, 10);
+    if (!isNaN(stravaId)) {
+      return this.activityModel.findOne({ stravaId, ...userIdFilter }).exec();
+    }
+
+    return null;
   }
 
   async create(activity: Partial<Activity>): Promise<Activity> {

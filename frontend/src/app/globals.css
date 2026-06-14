@@ -25,6 +25,12 @@ body {
   background-color: var(--bg-dark);
   color: var(--text-primary);
   font-family: var(--font-dm-sans);
+  scrollbar-gutter: stable;
+  overflow-x: hidden;
+}
+
+html {
+  overflow-x: hidden;
 }
 
 @keyframes flagWave {

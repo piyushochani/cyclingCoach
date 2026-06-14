@@ -95,6 +95,18 @@ export class User extends Document {
 
   @Prop({ default: null })
   telegramChatId: string;
+
+  @Prop({ default: 100 })
+  weeklyGoalKm: number;
+
+  @Prop({ type: Object, default: null })
+  selectedCoach: Record<string, any>;
+
+  @Prop({ type: [Object], default: [] })
+  customCoaches: Record<string, any>[];
+
+  @Prop({ default: true })
+  autoSyncEnabled: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

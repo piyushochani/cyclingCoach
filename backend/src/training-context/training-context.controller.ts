@@ -75,6 +75,12 @@ export class TrainingContextController {
 
   // ── Weekly Plan ──
 
+  @Get('weekly-plans')
+  getAllWeeklyPlans(@UserId() userId: string) {
+    if (!userId) throw new UnauthorizedException('User ID required');
+    return this.service.findAllWeeklyPlans(userId);
+  }
+
   @Get('weekly-plan')
   getWeeklyPlan(
     @Query('relativeWeek') relativeWeek: string,

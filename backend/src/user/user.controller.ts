@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Param, Body, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
@@ -30,8 +30,12 @@ export class UserController {
   }
 
   @Post(':email/training-start')
-  setTrainingStart(@Param('email') email: string) {
-    return this.userService.update(email, { trainingStart: new Date() });
+  async setTrainingStart(@Param('email') email: string) {
+    const user = await this.userService.findOne(email);
+    if (!user) throw new NotFoundException('User not found');
+    const firstAuth = !user.trainingStart && !user.onboardingSummary;
+    await this.userService.update(email, { trainingStart: new Date() });
+    return { firstAuth };
   }
 
   @Post(':email/onboarding-summary')

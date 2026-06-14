@@ -33,7 +33,7 @@ const LandingNavbar = () => {
       transition={{ duration: 0.3 }}
       className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between p-4 px-8"
     >
-      {/* CycloAI Logo */}
+      {/* CyclogenAI Logo */}
       <Link href="/">
         <motion.div className="flex items-center cursor-pointer">
           {/* Spinning Chainring SVG Placeholder */}
@@ -47,7 +47,7 @@ const LandingNavbar = () => {
             <path d="M50 10 L50 90 M15 50 L85 50" stroke="currentColor" strokeWidth="4" />
           </motion.svg>
           <span className="font-barlowCondensed text-2xl text-text-primary uppercase tracking-wide">
-            CycloAI
+            CyclogenAI
           </span>
         </motion.div>
       </Link>
@@ -63,7 +63,7 @@ const LandingNavbar = () => {
             Log In
           </motion.button>
         </Link>
-        <Link href="/signup" onClick={() => { localStorage.removeItem("cycloai_signed_in"); localStorage.removeItem("cycloai_user"); localStorage.removeItem("cycloai_session_ts"); }}>
+        <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_signed_in"); localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_session_ts"); }}>
           <motion.button
             whileHover={{ scale: 1.05, backgroundColor: '#E55C00' }}
             whileTap={{ scale: 0.95 }}

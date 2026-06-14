@@ -1,9 +1,9 @@
-CYCLOAI PERIODISATION AND PLANNING INSTRUCTIONS
+CYCLOGENAI PERIODISATION AND PLANNING INSTRUCTIONS
 ==============================================
 
 Goal
 ----
-Build a safe, scalable, and intelligent training-planning architecture for CycloAI where core training structure is deterministic, athlete history influences model selection, and the LLM is used only for user-facing narrative and explanation.
+Build a safe, scalable, and intelligent training-planning architecture for CyclogenAI where core training structure is deterministic, athlete history influences model selection, and the LLM is used only for user-facing narrative and explanation.
 
 Core Principle
 --------------
@@ -178,7 +178,7 @@ Notification Rule
 Use a fixed in-app notification for model change recommendations.
 
 Example notification:
-"CycloAI detected that your recent training response matches a block periodisation model better than your current linear setup. Recommended change starting next week. Apply now?"
+"CyclogenAI detected that your recent training response matches a block periodisation model better than your current linear setup. Recommended change starting next week. Apply now?"
 
 Suggested actions:
 - Apply change
@@ -276,7 +276,7 @@ The LLM is good at:
 - adapting tone based on athlete type
 - proposing fallback advice after missed sessions
 
-Best Final Recommendation for CycloAI
+Best Final Recommendation for CyclogenAI
 -------------------------------------
 Use this final architecture:
 

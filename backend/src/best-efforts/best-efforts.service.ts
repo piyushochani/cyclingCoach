@@ -6,6 +6,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
 import { BestEffortRecord, Segment, SegmentEffort } from './best-efforts.schema';
+import { NotificationService } from '../notification/notification.service';
 
 const DISTANCE_BUCKETS = [
   { label: '5 km', minKm: 0, maxKm: 7.5 },
@@ -38,6 +39,7 @@ export class BestEffortsService {
   constructor(
     @InjectModel(BestEffortRecord.name) private bestEffortModel: Model<BestEffortRecord>,
     @InjectModel(Segment.name) private segmentModel: Model<Segment>,
+    private readonly notificationService: NotificationService,
     @InjectModel(SegmentEffort.name) private segmentEffortModel: Model<SegmentEffort>,
   ) {
     this.loadConfig();
@@ -178,6 +180,16 @@ export class BestEffortsService {
           previousBest: old ? old.time : undefined,
           isNew,
         });
+
+        if (isNew) {
+          this.notificationService.createBestEffortNotification(
+            String(userId._id || userId),
+            `Fastest ${bucket.label}`,
+            `${(matches[i].avgSpeed * 3.6).toFixed(1)} km/h avg`,
+            matches[i].activityId,
+            matches[i].activityName,
+          ).catch(() => {});
+        }
       }
     }
   }
@@ -216,6 +228,16 @@ export class BestEffortsService {
         previousBest: old ? old.distance : undefined,
         isNew,
       });
+
+      if (isNew) {
+        this.notificationService.createBestEffortNotification(
+          String(userId._id || userId),
+          'Longest Ride',
+          `${((a.distance || 0) / 1000).toFixed(1)} km`,
+          String(a.id),
+          a.name || 'Unknown',
+        ).catch(() => {});
+      }
     }
   }
 

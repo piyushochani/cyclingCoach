@@ -6,6 +6,9 @@ export class Bike extends Document {
   @Prop({ required: true })
   name: string;
 
+  @Prop({ type: String, default: null })
+  stravaId: string | null;
+
   @Prop({ required: true, default: Date.now })
   dateAdded: Date;
 

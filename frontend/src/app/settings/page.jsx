@@ -94,7 +94,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem("cycloai_user") || "{}");
+      const stored = JSON.parse(localStorage.getItem("cyclogenai_user") || "{}");
       setUser(stored);
       setFirstName(stored.firstName || "");
       setLastName(stored.lastName || "");
@@ -142,7 +142,7 @@ export default function SettingsPage() {
 
     try {
       const updated = await api.put(`/users/${user.email}`, payload);
-      localStorage.setItem("cycloai_user", JSON.stringify({ ...user, ...payload }));
+      localStorage.setItem("cyclogenai_user", JSON.stringify({ ...user, ...payload }));
       setUser({ ...user, ...payload });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -271,7 +271,7 @@ export default function SettingsPage() {
             <div className="mt-4 space-y-2">
               <div className="flex justify-between">
                 <span className="font-dmSans text-sm text-white/40">App</span>
-                <span className="font-dmSans text-sm text-white/70">CycloAI</span>
+                <span className="font-dmSans text-sm text-white/70">CyclogenAI</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-dmSans text-sm text-white/40">Version</span>

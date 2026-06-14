@@ -12,91 +12,28 @@ import HeatmapContainer from "../../../components/layout/HeatmapContainer";
 import WeeklyGraph from "../../../components/layout/WeeklyGraph";
 import WeatherWidget from "../../../components/layout/WeatherWidget";
 import RecentActivity from "../../../components/layout/RecentActivity";
-import OnboardingChat from "../../../components/layout/OnboardingChat";
-
-
-function buildHeatmapData(activities) {
-  if (!activities || activities.length === 0) return null;
-  const now = new Date();
-  const start = new Date(now);
-  start.setDate(start.getDate() - 34);
-  const dayMap = {};
-  for (let d = new Date(start); d <= now; d.setDate(d.getDate() + 1)) {
-    const key = d.toDateString();
-    dayMap[key] = { date: new Date(d), activities: [], totalTime: 0, totalDistance: 0 };
-  }
-  for (const a of activities) {
-    const d = new Date(a.date);
-    const key = d.toDateString();
-    if (dayMap[key]) {
-      dayMap[key].activities.push(a);
-      dayMap[key].totalTime += a.durationSeconds || 0;
-      dayMap[key].totalDistance += a.distance || 0;
-    }
-  }
-  const days = Object.values(dayMap).sort((a, b) => a.date - b.date);
-  const rows = [];
-  for (let r = 0; r < 5; r++) {
-    const row = [];
-    for (let c = 0; c < 7; c++) {
-      const idx = r * 7 + c;
-      if (idx < days.length) {
-        const day = days[idx];
-        const count = day.activities.length;
-        const level = count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : 3;
-        const hours = (day.totalTime / 3600).toFixed(1);
-        const dist = (day.totalDistance / 1000).toFixed(2);
-        row.push({
-          level,
-          details: {
-            day: day.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-            activities: count,
-            time: `${hours} hrs`,
-            distance: `${dist} km`,
-            calories: `${(day.totalDistance * 28 / 1000).toFixed(2)} kcal`,
-          },
-        });
-      } else {
-        row.push({ level: 0, details: { day: "", activities: 0, time: "0 hrs", distance: "0 km", calories: "0 kcal" } });
-      }
-    }
-    rows.push(row);
-  }
-  return rows;
-}
 
 const DashboardPage = () => {
   const pathname = usePathname();
   const [activities, setActivities] = useState([]);
   const [stats, setStats] = useState(null);
   const [races, setRaces] = useState([]);
-  const [plans, setPlans] = useState([]);
   const [weeklyPlan, setWeeklyPlan] = useState(null);
-  const [user, setUser] = useState(null);
   const [syncInfo, setSyncInfo] = useState(null);
-  const { status: syncStatus, lastSynced } = useAutoSync();
+  useAutoSync();
 
   useEffect(() => {
-    const stored = localStorage.getItem("cycloai_user");
-    if (stored) {
-      try {
-        const u = JSON.parse(stored);
-        setUser({ firstName: u.firstName || u.name || "", lastName: u.lastName || "", email: u.email || "", goal: u.goal || "", profileImage: u.profileImage || "", description: u.description || "" });
-      } catch {}
-    }
     Promise.all([
-      api.get('/stats').catch(() => null),
-      api.get('/activities').catch(() => []),
-      api.get('/races').catch(() => []),
-      api.get('/plans').catch(() => []),
-      api.get('/training-context/weekly-plan').catch(() => null),
-      api.get('/sync/status').catch(() => null),
+      api.get('/stats').catch((e) => { console.warn('Stats API failed:', e); return null; }),
+      api.get('/activities').catch((e) => { console.warn('Activities API failed:', e); return []; }),
+      api.get('/races').catch((e) => { console.warn('Races API failed:', e); return []; }),
+      api.get('/training-context/weekly-plan').catch((e) => { console.warn('Weekly plan API failed:', e); return null; }),
+      api.get('/sync/status').catch((e) => { console.warn('Sync status API failed:', e); return null; }),
     ])
-      .then(([statsData, activitiesData, racesData, plansData, weeklyPlanData, syncData]) => {
+      .then(([statsData, activitiesData, racesData, weeklyPlanData, syncData]) => {
         setStats(statsData);
         setActivities(activitiesData);
         setRaces(racesData);
-        setPlans(plansData);
         setWeeklyPlan(weeklyPlanData);
         setSyncInfo(syncData);
       });
@@ -106,13 +43,12 @@ const DashboardPage = () => {
     ? [
         { label: "Distance", value: (stats.totalDistance / 1000).toFixed(2), unit: "KM", accent: "→" },
         { label: "Time", value: (stats.totalDuration / 3600).toFixed(1), unit: "HRS", accent: "◷" },
+        { label: "Elevation", value: stats.totalElevation >= 1000 ? (stats.totalElevation / 1000).toFixed(1) : stats.totalElevation.toFixed(0), unit: stats.totalElevation >= 1000 ? "KM" : "M", accent: "⟋" },
         { label: "Activities", value: stats.activityCount.toString(), unit: "", accent: "◈" },
         { label: "Races Played", value: races.length.toString(), unit: "", accent: "⬡" },
-        { label: "Avg / Week", value: stats.activityCount > 4 ? ((stats.totalDistance / 1000) / (stats.activityCount / 4)).toFixed(2) : "0", unit: "KM", accent: "∿" },
+        { label: "Avg / Week", value: stats.activityCount > 0 ? ((stats.totalDistance / 1000) / Math.max(stats.activityCount, 1) * 4).toFixed(1) : "0", unit: "KM", accent: "∿" },
       ]
     : null, [stats, races]);
-
-  const heatmapData = useMemo(() => buildHeatmapData(activities), [activities]);
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -143,49 +79,6 @@ const DashboardPage = () => {
 
           <div className="flex flex-col items-end gap-2">
             <WeatherWidget />
-            {syncStatus !== "idle" && (
-              <div className={`flex items-center gap-2 self-start rounded-full border px-3 py-1.5 md:self-auto ${
-                syncStatus === "syncing" ? "border-[#FF5500]/30 bg-[#FF5500]/10" :
-                syncStatus === "success" ? "border-green-500/30 bg-green-500/10" :
-                "border-red-500/30 bg-red-500/10"
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${
-                  syncStatus === "syncing" ? "bg-[#FF5500] animate-pulse" :
-                  syncStatus === "success" ? "bg-green-500" :
-                  "bg-red-500"
-                }`} />
-                <span className={`font-dmSans text-[10px] uppercase tracking-[0.14em] ${
-                  syncStatus === "syncing" ? "text-[#FF5500]" :
-                  syncStatus === "success" ? "text-green-400" :
-                  "text-red-400"
-                }`}>
-                  {syncStatus === "syncing" ? "Syncing..." :
-                   syncStatus === "success" ? "Synced" :
-                   "Sync Failed"}
-                </span>
-              </div>
-            )}
-            {syncInfo && (
-              <div className={`flex items-center gap-2 self-start rounded-full border px-3 py-1.5 md:self-auto ${
-                syncInfo.isUpToDate
-                  ? "border-green-500/30 bg-green-500/10"
-                  : "border-amber-500/30 bg-amber-500/10"
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${
-                  syncInfo.isUpToDate ? "bg-green-500" : "bg-amber-500"
-                }`} />
-                <span className={`font-dmSans text-[10px] uppercase tracking-[0.14em] ${
-                  syncInfo.isUpToDate ? "text-green-400" : "text-amber-400"
-                }`}>
-                  {syncInfo.isUpToDate ? "All rides synced" : "Needs refresh"}
-                </span>
-                {syncInfo.updatedAt && (
-                  <span className="font-dmSans text-[9px] text-white/30">
-                    {new Date(syncInfo.updatedAt).toLocaleDateString()}
-                  </span>
-                )}
-              </div>
-            )}
             {syncInfo?.rateLimitExhausted && (
               <div className="flex items-center gap-2 self-start rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1.5 md:self-auto">
                 <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
@@ -199,13 +92,13 @@ const DashboardPage = () => {
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="flex flex-col gap-5">
-                <WeeklyGoalCard activities={activities} />
+            <WeeklyGoalCard activities={activities} />
             <WeeklyScheduleCard plan={weeklyPlan} />
           </div>
 
           <div className="flex flex-col gap-5">
             <StatsYearCard stats={statCards} />
-            <HeatmapContainer data={heatmapData} />
+            <HeatmapContainer activities={activities} />
           </div>
         </div>
 
@@ -215,8 +108,6 @@ const DashboardPage = () => {
         <div className="mt-6">
           <RecentActivity activities={activities} />
         </div>
-
-        <OnboardingChat />
       </motion.main>
     </div>
   );

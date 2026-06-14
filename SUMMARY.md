@@ -1,7 +1,7 @@
-# CycloAI Development Summary
+# CyclogenAI Development Summary
 
 ## Goal
-Build a complete training-planning architecture for CycloAI, fix LLM quota/key exhaustion, show only real notifications from backend, and unify all chat interfaces behind a single backend agent.
+Build a complete training-planning architecture for CyclogenAI, fix LLM quota/key exhaustion, show only real notifications from backend, and unify all chat interfaces behind a single backend agent.
 
 ## Constraints & Preferences
 - The day user first syncs = Week 0; past weeks have negative indexing (-1, -2, etc.)

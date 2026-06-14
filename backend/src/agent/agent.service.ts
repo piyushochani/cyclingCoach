@@ -1,21 +1,42 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { join } from 'path';
-import { homedir } from 'os';
-import { existsSync, readFileSync } from 'fs';
-import { parse as parseYaml } from 'yaml';
 import { AgentMemoryService } from './agent-memory.service';
 import { AgentChatStoreService } from './agent-chat-store.service';
+import { FaqService } from './faq.service';
 import { AgentMemory } from './agent-memory.schema';
 import { User } from '../user/user.schema';
 import { Activity } from '../activity/activity.schema';
+import { Bike, Equipment } from '../gear/gear.schema';
 import { TrainingContextService } from '../training-context/training-context.service';
 import { EmbeddingService } from '../analysis/embedding.service';
 import { PineconeClient } from '../analysis/pinecone-client';
+import {
+  buildActivitySummary,
+  buildAthleteProfile,
+  buildMonthSummary,
+  contextBlocksForIntent,
+  mergeAthleteContext,
+} from './agent-athlete-context';
+import {
+  buildGreetingReply,
+  classifyIntent,
+  shouldLoadAgentMemory,
+  shouldSearchFaq,
+  shouldUseRag,
+  toolNamesForIntent,
+} from './agent-intent';
 import { createAgentTools, ToolDefinition, ToolDeps } from './agent-tools';
-import { buildAgentSystemPrompt } from './agent-system-prompt';
+import { buildAgentSystemPrompt, buildCompactAgentSystemPrompt } from './agent-system-prompt';
 import { logKeyHealth } from '../common/gemini-key-validator';
+import { groqChatCompletion } from '../common/groq-client';
+import {
+  getGeminiModel,
+  getLlmProvider,
+  isGeminiQuotaError,
+  loadChatApiKeys,
+  loadGroqConfig,
+} from '../common/llm-config';
 
 const MAX_STEPS = 10;
 const MAX_HISTORY_MESSAGES = 30;
@@ -45,9 +66,12 @@ export class AgentService {
     private readonly trainingContext: TrainingContextService,
     private readonly embedder: EmbeddingService,
     private readonly pinecone: PineconeClient,
+    private readonly faqService: FaqService,
     @InjectModel(AgentMemory.name) private memoryModel: Model<AgentMemory>,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Activity.name) private activityModel: Model<Activity>,
+    @InjectModel(Bike.name) private bikeModel: Model<Bike>,
+    @InjectModel(Equipment.name) private equipmentModel: Model<Equipment>,
   ) {
     this.tools = createAgentTools();
     this.loadApiKeys();
@@ -55,38 +79,9 @@ export class AgentService {
   }
 
   private loadApiKeys(): void {
-    let keys: string[] = [];
-    let model = 'gemini-2.0-flash-lite';
-
-    const rawKeys = process.env.GOOGLE_GENERATIVE_AI_API_KEY || '';
-    if (rawKeys) {
-      keys = rawKeys.split(',').map((k) => k.trim()).filter(Boolean);
-    }
-
-    if (keys.length === 0) {
-      const configPaths = [
-        join(homedir(), '.cycling-coach', 'config.yaml'),
-        join(homedir(), '.config', 'cycling-coach', 'config.yaml'),
-        join(homedir(), '.enduragent', 'cycling-coach', 'config.yaml'),
-      ];
-      for (const p of configPaths) {
-        if (existsSync(p)) {
-          try {
-            const raw = readFileSync(p, 'utf-8');
-            const c = parseYaml(raw) as any;
-            if (c?.llm?.api_key) {
-              keys = String(c.llm.api_key).split(',').map((k: string) => k.trim()).filter(Boolean);
-              if (c.llm.model) model = c.llm.model;
-              break;
-            }
-          } catch {}
-        }
-      }
-    }
-
-    this.apiKeys = keys;
-    this.model = model;
-    this.configured = keys.length > 0;
+    this.apiKeys = loadChatApiKeys();
+    this.model = getGeminiModel('gemini-2.0-flash-lite');
+    this.configured = this.apiKeys.length > 0 || loadGroqConfig() !== null;
   }
 
   private buildToolDeps(userId: string): ToolDeps {
@@ -109,30 +104,150 @@ export class AgentService {
       },
       activity: {
         getRecentActivities: async (limit: number) => {
-          return this.activityModel.find({ user: userId as any })
+          return this.activityModel.find({ 
+            user: userId as any,
+            sport: { $regex: /ride|cycling|bike|bicycle|velomobile|handcycle/i }
+          })
             .sort({ date: -1 })
             .limit(limit)
             .lean()
             .exec();
         },
       },
+      strava: {
+        getAuthUrl: async () => {
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+            return `${baseUrl}/strava/auth-url`;
+          } catch {
+            return 'http://localhost:3001/strava/auth-url';
+          }
+        },
+        getSyncStatus: async () => {
+          const user = await this.userModel.findById(userId as any).lean().exec();
+          if (!user) return { connected: false };
+          return {
+            connected: !!(user as any).stravaAccessToken,
+            lastSyncAt: (user as any).lastSyncAt || null,
+            stravaConnectedAt: (user as any).stravaConnectedAt || null,
+            totalActivities: (user as any).totalActivities || 0,
+            totalDistance: (user as any).totalDistance || 0,
+          };
+        },
+        triggerSync: async () => {
+          return 'Sync triggered. New activities will appear shortly. You can also run a full sync from Settings > Strava.';
+        },
+      },
+      gear: {
+        listBikes: async () => {
+          return this.bikeModel.find({ user: userId as any }).lean().exec();
+        },
+        addBike: async (name: string, isActive?: boolean) => {
+          if (isActive) {
+            await this.bikeModel.updateMany({ user: userId as any }, { isActive: false }).exec();
+          }
+          const bike = new this.bikeModel({ name, user: userId as any, isActive: isActive || false, dateAdded: new Date() });
+          return bike.save();
+        },
+        setActiveBike: async (id: string) => {
+          await this.bikeModel.updateMany({ user: userId as any }, { isActive: false }).exec();
+          await this.bikeModel.findByIdAndUpdate(id, { isActive: true }).exec();
+        },
+        listEquipment: async () => {
+          return this.equipmentModel.find({ user: userId as any }).lean().exec();
+        },
+        addEquipment: async (name: string, type?: string, notes?: string) => {
+          const eq = new this.equipmentModel({ name, type: type || 'other', notes: notes || '', user: userId as any, dateAdded: new Date() });
+          return eq.save();
+        },
+      },
+      faqSearch: (query: string, k?: number) => this.faqService.search(query, k || 5),
     };
   }
 
   async chat(userId: string, message: string, chatId?: string): Promise<{ text: string }> {
     if (!this.configured) {
-      return { text: 'AI analysis is not configured. Please set GOOGLE_GENERATIVE_AI_API_KEY in your environment.' };
+      return { text: 'AI analysis is not configured. Please set GOOGLE_GENERATIVE_AI_API_KEY or GROQ_API_KEY in your environment.' };
     }
 
+    this.apiKeys = loadChatApiKeys();
+    const provider = getLlmProvider();
     const cid = chatId || 'default';
     const tz = 'UTC';
+    const intent = classifyIntent(message);
+
+    if (intent === 'greeting') {
+      const { firstName } = await buildAthleteProfile(this.userModel, userId);
+      const text = buildGreetingReply(firstName);
+      await this.chatStore.appendMessage(userId, cid, 'user', message);
+      await this.chatStore.appendMessage(userId, cid, 'assistant', text);
+      return { text };
+    }
+
     const { messages: history } = await this.chatStore.load(userId, cid);
 
-    const memoryContext = await this.memoryService.getContext(userId);
+    const { profile } = await buildAthleteProfile(this.userModel, userId);
+    const { loadActivities, loadPlan } = contextBlocksForIntent(intent);
+    const extraBlocks: string[] = [];
 
-    const retrievedContext = await this.retrieveContext(message);
+    if (loadActivities) {
+      const summary = await buildActivitySummary(this.activityModel, userId, 5);
+      if (summary) extraBlocks.push(summary);
+    }
 
-    const systemPrompt = buildAgentSystemPrompt(memoryContext, tz, retrievedContext);
+    if (loadPlan) {
+      try {
+        const plan = await this.trainingContext.getCurrentWeekPlan(userId);
+        if (plan) {
+          extraBlocks.push(`Current weekly plan:\n${JSON.stringify(plan, null, 2)}`);
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to load weekly plan: ${err}`);
+      }
+    }
+
+    if (intent === 'month') {
+      try {
+        const monthSummary = await buildMonthSummary(this.activityModel, userId);
+        extraBlocks.push(monthSummary);
+      } catch (err) {
+        this.logger.warn(`Month summary failed: ${err}`);
+      }
+    }
+
+    let agentMemory = '';
+    if (shouldLoadAgentMemory(intent)) {
+      agentMemory = await this.memoryService.getContext(userId);
+    }
+
+    let retrievedContext = '';
+    if (shouldUseRag(intent)) {
+      retrievedContext = await this.retrieveContext(message);
+    }
+
+    let faqContext = '';
+    if (shouldSearchFaq(intent)) {
+      try {
+        const faqResults = await this.faqService.search(message, 3);
+        if (faqResults.length > 0) {
+          faqContext = '# FAQ Knowledge\n\nThe following are relevant answers from the app FAQ. Use them to answer the athlete\'s question about how the app works:\n\n' +
+            faqResults.map((r) => `Q: ${r.chunk.question}\nA: ${r.chunk.content}\n`).join('\n');
+        }
+      } catch (err) {
+        this.logger.warn(`FAQ search failed: ${err}`);
+      }
+    }
+
+    const athleteContext = mergeAthleteContext(profile, agentMemory, extraBlocks);
+    const systemPrompt = buildAgentSystemPrompt(athleteContext, tz, retrievedContext, intent, faqContext);
+    const groqSystemPrompt = buildCompactAgentSystemPrompt(athleteContext, tz, retrievedContext, intent, faqContext);
+
+    const allowedToolNames = toolNamesForIntent(intent);
+    const toolDeclarations = allowedToolNames.length === 0
+      ? []
+      : this.tools
+          .filter((t) => allowedToolNames.includes(t.declaration.name))
+          .map((t) => t.declaration);
 
     const recentHistory = history.slice(-MAX_HISTORY_MESSAGES);
 
@@ -146,22 +261,28 @@ export class AgentService {
       parts: [{ text: message }],
     });
 
-    const toolDeclarations = this.tools.map((t) => t.declaration);
-
     let stepCount = 0;
     let finalText = '';
 
     while (stepCount < MAX_STEPS) {
       stepCount++;
 
-      let result = await this.callGemini(systemPrompt, geminiHistory, toolDeclarations);
-
-      if (!result) {
-        result = await this.callGroq(systemPrompt, geminiHistory, toolDeclarations);
+      let result: any = null;
+      if (provider === 'groq') {
+        result = await this.callGroq(groqSystemPrompt, geminiHistory, toolDeclarations);
+        if (!result) {
+          result = await this.callGemini(systemPrompt, geminiHistory, toolDeclarations);
+        }
+      } else {
+        result = await this.callGemini(systemPrompt, geminiHistory, toolDeclarations);
+        if (!result) {
+          this.logger.warn('Gemini unavailable — falling back to Groq');
+          result = await this.callGroq(groqSystemPrompt, geminiHistory, toolDeclarations);
+        }
       }
 
       if (!result) {
-        finalText = 'Sorry, the AI service is currently unavailable.';
+        finalText = 'Sorry, the AI service is currently unavailable. Gemini quota may be exhausted — Groq fallback also failed.';
         break;
       }
 
@@ -268,9 +389,9 @@ export class AgentService {
     history: GeminiMessage[],
     toolDeclarations: Record<string, any>[],
   ): Promise<any> {
-    if (!this.configured || this.apiKeys.length === 0) return null;
+    if (this.apiKeys.length === 0) return null;
 
-    const currentModel = process.env.GOOGLE_LLM_MODEL || this.model;
+    const currentModel = getGeminiModel(this.model);
 
     const body: any = {
       contents: history,
@@ -301,14 +422,19 @@ export class AgentService {
         );
 
         if (response.status === 429) {
-          const errBody = await response.text().catch(() => 'unknown');
+          const errBody = await response.text().catch(() => '');
           this.logger.warn(`Agent LLM 429 on key ${(attempt % this.apiKeys.length) + 1}: ${errBody.slice(0, 200)}`);
+          if (isGeminiQuotaError(response.status, errBody)) {
+            this.logger.warn('Gemini daily quota exhausted — skipping remaining keys');
+            return null;
+          }
           continue;
         }
 
         if (!response.ok) {
           const errText = await response.text();
-          this.logger.error(`Gemini API error: ${response.status} ${errText}`);
+          this.logger.error(`Gemini API error: ${response.status} ${errText.slice(0, 200)}`);
+          if (attempt < maxAttempts - 1) continue;
           return null;
         }
 
@@ -328,10 +454,7 @@ export class AgentService {
     history: GeminiMessage[],
     toolDeclarations: Record<string, any>[],
   ): Promise<any> {
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) return null;
-
-    const groqModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+    if (!loadGroqConfig()) return null;
 
     const messages: any[] = [
       { role: 'system', content: systemPrompt },
@@ -385,69 +508,34 @@ export class AgentService {
       : undefined;
 
     const body: any = {
-      model: groqModel,
       messages,
       temperature: 0.7,
-      max_tokens: 2048,
+      max_tokens: 1024,
     };
     if (tools?.length) body.tools = tools;
 
-    const maxRetries = 3;
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${groqKey}`,
-          },
-          body: JSON.stringify(body),
-        });
+    const data = await groqChatCompletion(this.logger, body);
+    if (!data) return null;
 
-        if (response.status === 429 || response.status === 413) {
-          const wait = 60_000;
-          this.logger.warn(`Groq rate limited (${response.status}), waiting 60s (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise((r) => setTimeout(r, wait));
-          continue;
-        }
+    const choice = data.choices?.[0];
+    if (!choice?.message) return null;
 
-        if (!response.ok) {
-          const errText = await response.text().catch(() => '');
-          this.logger.error(`Groq API error: ${response.status} ${errText.slice(0, 200)}`);
-          return null;
+    const parts: any[] = [];
+    if (choice.message.content) {
+      parts.push({ text: choice.message.content });
+    }
+    if (choice.message.tool_calls) {
+      for (const tc of choice.message.tool_calls) {
+        if (tc.type === 'function') {
+          let args: Record<string, any> = {};
+          try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
+          parts.push({
+            functionCall: { name: tc.function.name, args },
+          });
         }
-
-        const data = await response.json();
-        const choice = data.choices?.[0];
-        if (!choice?.message) return null;
-
-        const parts: any[] = [];
-        if (choice.message.content) {
-          parts.push({ text: choice.message.content });
-        }
-        if (choice.message.tool_calls) {
-          for (const tc of choice.message.tool_calls) {
-            if (tc.type === 'function') {
-              let args: Record<string, any> = {};
-              try { args = JSON.parse(tc.function.arguments || '{}'); } catch {}
-              parts.push({
-                functionCall: { name: tc.function.name, args },
-              });
-            }
-          }
-        }
-
-        return { candidates: [{ content: { parts } }] };
-      } catch (err) {
-        if (attempt === maxRetries - 1) {
-          this.logger.error(`Groq call failed: ${err}`);
-          return null;
-        }
-        this.logger.warn(`Groq call failed (attempt ${attempt + 1}), retrying: ${err}`);
-        await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
       }
     }
 
-    return null;
+    return { candidates: [{ content: { parts } }] };
   }
 }

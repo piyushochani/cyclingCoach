@@ -99,55 +99,56 @@ function FilterSelect({ label, value, onChange, options }) {
 function ActivityRow({ activity, index }) {
   const meta = getSportMeta(activity.sport);
   const [hovered, setHovered] = useState(false);
+  const activityId = activity?._id || activity?.id || activity?.stravaId || `act-${index}`;
 
   return (
-    <motion.div
-      variants={fadeUp}
-      initial="hidden"
-      animate="show"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="grid cursor-pointer grid-cols-[56px_minmax(0,1.5fr)_100px_105px_85px_100px] gap-3 border-b border-white/[0.03] px-4 py-3.5 transition-all duration-200 md:grid-cols-[72px_minmax(0,1.5fr)_110px_120px_100px_110px]"
-      style={{ background: hovered ? "rgba(255,85,0,0.03)" : "transparent" }}
-    >
-      <div className="flex flex-col gap-1">
-        <span className="text-lg leading-none">{meta.icon}</span>
-        <span
-          className="text-[8px] font-extrabold uppercase tracking-[0.14em] md:text-[9px]"
-          style={{ color: meta.color }}
-        >
-          {meta.label}
-        </span>
-      </div>
+    <Link href={`/activities/${activityId}`} className="block no-underline">
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="show"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className="grid cursor-pointer grid-cols-[56px_minmax(0,1.5fr)_100px_105px_85px_100px] gap-3 border-b border-white/[0.03] px-4 py-3.5 transition-all duration-200 md:grid-cols-[72px_minmax(0,1.5fr)_110px_120px_100px_110px]"
+        style={{ background: hovered ? "rgba(255,85,0,0.03)" : "transparent" }}
+      >
+        <div className="flex flex-col gap-1">
+          <span className="text-lg leading-none">{meta.icon}</span>
+          <span
+            className="text-[8px] font-extrabold uppercase tracking-[0.14em] md:text-[9px]"
+            style={{ color: meta.color }}
+          >
+            {meta.label}
+          </span>
+        </div>
 
-      <div className="min-w-0">
-        <Link href={`/activities/${activity._id || activity.id}`} className="no-underline">
-          <p className="truncate text-sm font-semibold text-white leading-tight hover:text-[#FF5500] transition-colors duration-200">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-white leading-tight transition-colors duration-200" style={{ color: hovered ? "#FF5500" : "white" }}>
             {activity.title || activity.name || "Untitled Activity"}
           </p>
-        </Link>
-        <p className="mt-1 text-[11px] text-white/20">{formatDate(activity.date)}</p>
-      </div>
+          <p className="mt-1 text-[11px] text-white/20">{formatDate(activity.date)}</p>
+        </div>
 
-      <span className="font-jetbrainsMono text-sm font-bold text-white/90">
-        {formatDistance(activity.distance)} km
-      </span>
-
-      <span className="font-jetbrainsMono text-[13px] text-white/70">
-        {formatDuration(activity.durationSeconds)}
-      </span>
-
-      <span className="font-jetbrainsMono text-[13px] text-white/35">
-        {((activity.elevation ?? activity.elevationGain) || 0).toFixed(2)} m
-      </span>
-
-      <span className="flex items-center gap-1.5 text-xs text-white/20">
-        <span className="hidden md:inline">{formatDate(activity.date)}</span>
-        <span className="inline md:hidden text-white/15">
-          {formatPace(activity.distance, activity.durationSeconds)}
+        <span className="font-jetbrainsMono text-sm font-bold text-white/90">
+          {formatDistance(activity.distance)} km
         </span>
-      </span>
-    </motion.div>
+
+        <span className="font-jetbrainsMono text-[13px] text-white/70">
+          {formatDuration(activity.durationSeconds)}
+        </span>
+
+        <span className="font-jetbrainsMono text-[13px] text-white/35">
+          {((activity.elevation ?? activity.elevationGain) || 0).toFixed(2)} m
+        </span>
+
+        <span className="flex items-center gap-1.5 text-xs text-white/20">
+          <span className="hidden md:inline">{formatDate(activity.date)}</span>
+          <span className="inline md:hidden text-white/15">
+            {formatPace(activity.distance, activity.durationSeconds)}
+          </span>
+        </span>
+      </motion.div>
+    </Link>
   );
 }
 

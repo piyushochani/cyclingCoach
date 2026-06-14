@@ -3,16 +3,21 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { api } from "./api";
 
-const SYNC_INTERVAL_MS = 2 * 60 * 60 * 1000;
-const STORAGE_KEY = "cycloai_last_sync";
-const STORAGE_STATUS_KEY = "cycloai_sync_status";
-const AUTO_SYNC_ENABLED_KEY = "cycloai_auto_sync_enabled";
+const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+const STORAGE_KEY = "cyclogenai_last_sync";
+const STORAGE_STATUS_KEY = "cyclogenai_sync_status";
+const AUTO_SYNC_ENABLED_KEY = "cyclogenai_auto_sync_enabled";
 
 export type SyncStatus = "idle" | "syncing" | "success" | "error";
 
 export function isAutoSyncEnabled(): boolean {
   if (typeof window === "undefined") return true;
   try {
+    const raw = localStorage.getItem("cyclogenai_user");
+    if (raw) {
+      const u = JSON.parse(raw);
+      if (u.autoSyncEnabled !== undefined) return u.autoSyncEnabled;
+    }
     const val = localStorage.getItem(AUTO_SYNC_ENABLED_KEY);
     return val === null ? true : val === "true";
   } catch {
@@ -22,6 +27,15 @@ export function isAutoSyncEnabled(): boolean {
 
 export function setAutoSyncEnabled(enabled: boolean) {
   try {
+    const raw = localStorage.getItem("cyclogenai_user");
+    if (raw) {
+      const u = JSON.parse(raw);
+      u.autoSyncEnabled = enabled;
+      localStorage.setItem("cyclogenai_user", JSON.stringify(u));
+      if (u.email) {
+        api.put('/users/' + encodeURIComponent(u.email), { autoSyncEnabled: enabled }).catch(() => {});
+      }
+    }
     localStorage.setItem(AUTO_SYNC_ENABLED_KEY, String(enabled));
     window.dispatchEvent(new CustomEvent("auto-sync-toggle", { detail: enabled }));
   } catch {}
@@ -64,6 +78,30 @@ function setLastSyncTime(ts: number) {
 export async function triggerGlobalSync(): Promise<boolean> {
   const current = getSyncStatus();
   if (current === "syncing") return false;
+
+  try {
+    const stored = localStorage.getItem("cyclogenai_user");
+    if (!stored) { console.error("Sync failed: no user in localStorage"); throw new Error("Not logged in"); }
+    const localUser = JSON.parse(stored);
+
+    if (localUser.email && !localUser._id && !localUser.id) {
+      try {
+        const fresh = await api.get(`/users/${localUser.email}`);
+        Object.assign(localUser, fresh);
+        localStorage.setItem("cyclogenai_user", JSON.stringify(localUser));
+      } catch (e) {
+        console.warn("Could not refresh user data from backend:", e);
+      }
+    }
+
+    const id = localUser._id || localUser.id;
+    if (!id) { console.error("Sync failed: user has no _id or id in localStorage"); throw new Error("User ID missing — log out and log in again"); }
+  } catch (e) {
+    setSyncStatus("error");
+    setTimeout(() => setSyncStatus("idle"), 6000);
+    return false;
+  }
+
   setSyncStatus("syncing");
   try {
     await api.post("/sync/refresh", {});
@@ -71,20 +109,20 @@ export async function triggerGlobalSync(): Promise<boolean> {
     const now = Date.now();
     setLastSyncTime(now);
     setSyncStatus("success");
-    // Refresh stored user with updated sync fields
     try {
       const syncStatus: any = await api.get("/sync/status");
-      const stored = localStorage.getItem("cycloai_user");
+      const stored = localStorage.getItem("cyclogenai_user");
       if (stored) {
         const user = JSON.parse(stored);
         user.stravaUpdatedAt = syncStatus.updatedAt;
         user.isStravaUpToDate = syncStatus.isUpToDate;
-        localStorage.setItem("cycloai_user", JSON.stringify(user));
+        localStorage.setItem("cyclogenai_user", JSON.stringify(user));
       }
     } catch {}
     setTimeout(() => setSyncStatus("idle"), 4000);
     return true;
-  } catch {
+  } catch (e) {
+    console.error("Sync refresh failed:", e);
     setSyncStatus("error");
     setTimeout(() => setSyncStatus("idle"), 6000);
     return false;
@@ -96,8 +134,7 @@ async function triggerIncrementalSync(): Promise<boolean> {
   if (current === "syncing") return false;
   try {
     await api.post("/sync/incremental", {});
-    const now = Date.now();
-    setLastSyncTime(now);
+    setLastSyncTime(Date.now());
     return true;
   } catch {
     return false;
@@ -119,54 +156,37 @@ export function useAutoSync() {
   }, []);
 
   useEffect(() => {
+    // Sync immediately on mount (sign-in)
     const last = getLastSync();
-    const elapsed = Date.now() - last;
-    const enabled = isAutoSyncEnabled();
-    const shouldAutoSync = enabled && last !== 0 && elapsed > SYNC_INTERVAL_MS;
-
-    if (shouldAutoSync) {
-      triggerIncrementalSync();
+    if (!last || Date.now() - last > SYNC_INTERVAL_MS) {
+      triggerGlobalSync().then(() => {
+        window.dispatchEvent(new CustomEvent("notifications-updated"));
+      });
     }
 
+    // Sync every 5 min (analysis happens on backend when new activities found)
     const interval = setInterval(() => {
-      const lastCheck = getLastSync();
-      if (enabled && Date.now() - lastCheck > SYNC_INTERVAL_MS) {
-        triggerIncrementalSync();
-      }
+      triggerIncrementalSync().then((ok) => {
+        if (ok) window.dispatchEvent(new CustomEvent("notifications-updated"));
+      });
     }, SYNC_INTERVAL_MS);
 
     timerRef.current = interval;
 
     const onStatusChange = (e: Event) => {
-      const detail = (e as CustomEvent).detail as SyncStatus;
-      setStatus(detail);
+      setStatus((e as CustomEvent).detail as SyncStatus);
     };
     const onCompleted = () => {
       setLastSynced(getLastSyncTimeFormatted());
     };
-    const onToggle = () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      const stillEnabled = isAutoSyncEnabled();
-      if (stillEnabled) {
-        const newInterval = setInterval(() => {
-          const lastCheck = getLastSync();
-          if (Date.now() - lastCheck > SYNC_INTERVAL_MS) {
-            triggerIncrementalSync();
-          }
-        }, SYNC_INTERVAL_MS);
-        timerRef.current = newInterval;
-      }
-    };
 
     window.addEventListener("sync-status-change", onStatusChange);
     window.addEventListener("sync-completed", onCompleted);
-    window.addEventListener("auto-sync-toggle", onToggle);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       window.removeEventListener("sync-status-change", onStatusChange);
       window.removeEventListener("sync-completed", onCompleted);
-      window.removeEventListener("auto-sync-toggle", onToggle);
     };
   }, [getLastSync]);
 

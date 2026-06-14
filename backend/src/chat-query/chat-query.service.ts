@@ -3,6 +3,8 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../user/user.schema';
 import { logKeyHealth } from '../common/gemini-key-validator';
+import { callGroqSimple } from '../common/groq-client';
+import { getGeminiModel, isGeminiQuotaError, loadChatApiKeys } from '../common/llm-config';
 
 @Injectable()
 export class ChatQueryService {
@@ -25,7 +27,7 @@ export class ChatQueryService {
     if (isWriteRequest) {
       return {
         answer:
-          "I can only read your data here. To make changes to your plan or data, please use the CycloAI web dashboard at http://localhost:3000/dashboard.",
+          "I can only read your data here. To make changes to your plan or data, please use the CyclogenAI web dashboard at http://localhost:3000/dashboard.",
       };
     }
 
@@ -48,12 +50,16 @@ export class ChatQueryService {
       "Do NOT suggest changes to their plan or data — they must use the web dashboard for that.\n\n" +
       contextParts.join('\n');
 
-    const rawKeys = process.env.GOOGLE_GENERATIVE_AI_API_KEY || '';
-    const apiKeys = rawKeys.split(',').map((k) => k.trim()).filter(Boolean);
-    
-    if (apiKeys.length === 0) return { answer: 'AI service is not configured.' };
-
     const fullPrompt = systemPrompt + '\n\nUser question: ' + message;
+    const apiKeys = loadChatApiKeys();
+    
+    if (apiKeys.length === 0) {
+      const groqAnswer = await callGroqSimple(this.logger, fullPrompt, { temperature: 0.3, maxTokens: 512 });
+      if (groqAnswer) return { answer: groqAnswer };
+      return { answer: 'AI service is not configured.' };
+    }
+
+    const model = getGeminiModel();
 
     // Try Gemini first
     const maxAttempts = apiKeys.length * 2;
@@ -61,7 +67,7 @@ export class ChatQueryService {
       const key = apiKeys[attempt % apiKeys.length];
       try {
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${key}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -75,10 +81,13 @@ export class ChatQueryService {
         );
 
         if (response.status === 429) {
+          const errBody = await response.text().catch(() => '');
           this.logger.warn(`Chat query rate limited — quota likely exhausted for key`);
-          if (attempt === maxAttempts - 1) {
-            return { answer: 'Sorry, the AI service is currently at its quota limit. Please try again later.' };
+          if (isGeminiQuotaError(response.status, errBody)) {
+            this.logger.warn('Gemini quota exhausted — falling back to Groq');
+            break;
           }
+          if (attempt === maxAttempts - 1) break;
           continue;
         }
 
@@ -97,68 +106,15 @@ export class ChatQueryService {
       } catch (err) {
         this.logger.error(`Chat query failed (attempt ${attempt + 1}): ${err}`);
         if (attempt === maxAttempts - 1) {
-          const groqAnswer = await this.callGroqFallback(fullPrompt);
-          if (groqAnswer) return { answer: groqAnswer };
-          return { answer: 'Sorry, something went wrong.' };
+          break;
         }
         await new Promise((r) => setTimeout(r, 1000));
       }
     }
 
-    // Fallback to Groq if Gemini failed
-    const groqAnswer = await this.callGroqFallback(fullPrompt);
+    const groqAnswer = await callGroqSimple(this.logger, fullPrompt, { temperature: 0.3, maxTokens: 512 });
     if (groqAnswer) return { answer: groqAnswer };
 
     return { answer: 'Sorry, the AI service is currently unavailable.' };
-  }
-
-  private async callGroqFallback(prompt: string): Promise<string | null> {
-    const groqKey = process.env.GROQ_API_KEY;
-    if (!groqKey) return null;
-
-    const groqModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-
-    const maxRetries = 3;
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${groqKey}`,
-          },
-          body: JSON.stringify({
-            model: groqModel,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.3,
-            max_tokens: 512,
-          }),
-        });
-
-        if (response.status === 429 || response.status === 413) {
-          const wait = 60_000;
-          this.logger.warn(`Groq fallback rate limited (${response.status}), waiting 60s (attempt ${attempt + 1}/${maxRetries})`);
-          await new Promise((r) => setTimeout(r, wait));
-          continue;
-        }
-
-        if (!response.ok) {
-          const errText = await response.text().catch(() => '');
-          this.logger.error(`Groq fallback error: ${response.status} ${errText.slice(0, 200)}`);
-          return null;
-        }
-
-        const data = await response.json();
-        return data?.choices?.[0]?.message?.content || null;
-      } catch (err) {
-        if (attempt === maxRetries - 1) {
-          this.logger.error(`Groq fallback failed: ${err}`);
-          return null;
-        }
-        await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
-      }
-    }
-
-    return null;
   }
 }

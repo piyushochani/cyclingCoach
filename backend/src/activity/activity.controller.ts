@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { UserId } from '../common/user-id.decorator';
 import { ActivityService } from './activity.service';
+import { Types } from 'mongoose';
 
 @Controller('activities')
 export class ActivityController {
@@ -13,9 +14,18 @@ export class ActivityController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @UserId() userId: string) {
+  async findOne(@Param('id') id: string, @UserId() userId: string) {
+    console.log(`[ActivityController] findOne called for ID: "${id}" by user: ${userId}`);
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.activityService.findOne(id, userId);
+    if (id === 'undefined' || id === 'null' || !id) {
+      console.warn(`[ActivityController] Rejected findOne call with invalid ID: "${id}"`);
+      throw new BadRequestException('Activity ID is missing or invalid');
+    }
+    const activity = await this.activityService.findOne(id, userId);
+    if (!activity) {
+      console.warn(`[ActivityController] Activity not found for ID: "${id}"`);
+    }
+    return activity;
   }
 
   @Post()

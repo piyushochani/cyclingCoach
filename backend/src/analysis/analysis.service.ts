@@ -9,6 +9,8 @@ import { ContextBuilderService } from './context-builder.service';
 import { DataProcessorService, computeHRZoneBoundaries } from './data-processor.service';
 import { User } from '../user/user.schema';
 import { logKeyHealth } from '../common/gemini-key-validator';
+import { callGroqSimple } from '../common/groq-client';
+import { isGeminiQuotaError } from '../common/llm-config';
 
 const DAILY_PROMPT = `# Daily Review
 
@@ -336,12 +338,14 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
 }
 
 - dayOfWeek: 0=Monday through 6=Sunday
-- Include 1-2 rest days, 1 long ride, and appropriate intensity distribution
+- IMPORTANT: Monday (dayOfWeek=0) MUST always be a rest day
+- IMPORTANT: Sunday (dayOfWeek=6) MUST always be the long ride day
+- Include appropriate intensity distribution throughout the week
 - Distance in kilometers (not meters)
 - Match the athlete's recent training volume and goals
 - Output ONLY the JSON object, no markdown or commentary`;
 
-    const raw = await this.callLLM(prompt, { temperature: 0.2 });
+    const raw = await this.callLLM(prompt, { temperature: 0.2, keyType: 'plan' });
 
     if (raw.startsWith('Sorry,') || raw.startsWith('AI analysis is not configured') || raw.startsWith('No analysis')) {
       return { workouts: [], coachNotes: raw };
@@ -363,17 +367,28 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
     }
   }
 
-  private async callLLM(prompt: string, opts?: { temperature?: number; maxTokens?: number }): Promise<string> {
+  private async callLLM(prompt: string, opts?: { temperature?: number; maxTokens?: number; keyType?: string }): Promise<string> {
     let apiKeys: string[] = [];
     let model = process.env.GOOGLE_LLM_MODEL || 'gemini-2.0-flash-lite';
 
-    // 1. Try sync-specific keys first (background ops use separate pool)
-    const rawKeys = process.env.GOOGLE_GENERATIVE_AI_SYNC_API_KEYS || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '';
+    // 1. Try dedicated key pool first based on keyType
+    let rawKeys = '';
+    if (opts?.keyType === 'plan') {
+      rawKeys = process.env.GOOGLE_GENERATIVE_AI_PLAN_API_KEYS || '';
+    }
+    // 2. Fall back to sync keys
+    if (!rawKeys) {
+      rawKeys = process.env.GOOGLE_GENERATIVE_AI_SYNC_API_KEYS || '';
+    }
+    // 3. Fall back to main key
+    if (!rawKeys) {
+      rawKeys = process.env.GOOGLE_GENERATIVE_AI_API_KEY || '';
+    }
     if (rawKeys) {
       apiKeys = rawKeys.split(',').map((k) => k.trim()).filter(Boolean);
     }
 
-    // 2. Fallback to config.yaml if env keys are missing
+    // 4. Fallback to config.yaml if env keys are missing
     if (apiKeys.length === 0) {
       const configPaths = [
         join(homedir(), '.cycling-coach', 'config.yaml'),
@@ -431,13 +446,22 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
         );
 
         if (response.status === 429) {
+          const errBody = await response.text().catch(() => '');
           this.logger.warn(`LLM rate limited — quota likely exhausted for key`);
+          if (isGeminiQuotaError(response.status, errBody)) {
+            this.logger.warn('Gemini quota exhausted — falling back to Groq');
+            const groqAnswer = await callGroqSimple(this.logger, prompt, { temperature, maxTokens });
+            if (groqAnswer) return groqAnswer;
+            return 'Sorry, the AI analysis service is currently unavailable due to API quota limits. Please try again later or add more API keys.';
+          }
           if (!usedFallback) {
             usedFallback = true;
             this.logger.warn(`Falling back to ${fallbackModel} with different key`);
             await new Promise((r) => setTimeout(r, 2000));
             continue;
           }
+          const groqAnswer = await callGroqSimple(this.logger, prompt, { temperature, maxTokens });
+          if (groqAnswer) return groqAnswer;
           return 'Sorry, the AI analysis service is currently unavailable due to API quota limits. Please try again later or add more API keys.';
         }
 
