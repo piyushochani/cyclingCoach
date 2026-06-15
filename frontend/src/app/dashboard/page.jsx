@@ -37,7 +37,7 @@ const DashboardPage = () => {
         setWeeklyPlan(weeklyPlanData);
         setSyncInfo(syncData);
       });
-  }, [pathname]);
+  }, []);
 
   const statCards = useMemo(() => stats
     ? [

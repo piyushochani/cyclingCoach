@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Param, Body, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { UserId } from '../common/user-id.decorator';
 import { ActivityService } from './activity.service';
+import { CreateActivityDto, UpdateActivityDto } from './dto/activity.dto';
 import { Types } from 'mongoose';
 
 @Controller('activities')
@@ -24,18 +25,19 @@ export class ActivityController {
     const activity = await this.activityService.findOne(id, userId);
     if (!activity) {
       console.warn(`[ActivityController] Activity not found for ID: "${id}"`);
+      throw new NotFoundException(`Activity with ID ${id} not found`);
     }
     return activity;
   }
 
   @Post()
-  create(@Body() activityData: any, @UserId() userId: string) {
+  create(@Body() activityData: CreateActivityDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.activityService.create({ ...activityData, user: userId });
+    return this.activityService.create({ ...activityData, user: userId as any });
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() data: any, @UserId() userId: string) {
+  update(@Param('id') id: string, @Body() data: UpdateActivityDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
     return this.activityService.update(id, data, userId);
   }

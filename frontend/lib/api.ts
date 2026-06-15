@@ -8,32 +8,82 @@ class ApiError extends Error {
   }
 }
 
-function getUserHeaders(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
+const cache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 10000;
+
+export function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem('cyclogenai_user');
-    if (!raw) return {};
-    const user = JSON.parse(raw);
-    const id = user._id || user.id;
-    return id ? { 'X-User-Id': id } : {};
+    return localStorage.getItem('cyclogenai_token');
   } catch {
-    return {};
+    return null;
   }
 }
 
+export function setToken(token: string) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('cyclogenai_token', token);
+}
+
+export function clearToken() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('cyclogenai_token');
+}
+
+function getAuthHeaders(): Record<string, string> {
+  const token = getToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const headers = { 'Content-Type': 'application/json', ...getUserHeaders(), ...options?.headers };
+  const method = options?.method || 'GET';
+  const isCacheable = method === 'GET';
+  const token = getToken();
+  const cacheKey = `${path}_${token || 'anon'}`;
+
+  if (isCacheable) {
+    const cached = cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data;
+    }
+  }
+
+  const headers = { ...getAuthHeaders(), ...options?.headers };
   const res = await fetch(`${API_BASE}${path}`, {
-    cache: 'no-store', // Always fetch fresh data from the server
+    cache: 'no-store',
     ...options,
     headers,
   });
+
+  if (res.status === 401) {
+    clearToken();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('cyclogenai_signed_in');
+      localStorage.removeItem('cyclogenai_user');
+      window.location.href = '/login';
+    }
+    throw new ApiError('Session expired', 401);
+  }
+
   if (!res.ok) {
     let msg = `API error: ${res.statusText}`;
     try { const b = await res.json(); if (b.message) msg = b.message; } catch {}
     throw new ApiError(msg, res.status);
   }
-  return res.json();
+
+  const data = await res.json();
+
+  if (isCacheable) {
+    cache.set(cacheKey, { data, timestamp: Date.now() });
+  } else {
+    cache.clear();
+  }
+
+  return data;
 }
 
 export const api = {

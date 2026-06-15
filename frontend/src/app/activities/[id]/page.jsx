@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { MapContainer, TileLayer, Polyline } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import dynamic from 'next/dynamic';
 import {
   LineChart,
   Line,
@@ -17,6 +16,12 @@ import {
   Cell
 } from 'recharts';
 import { api } from '../../../../lib/api';
+import { useParams } from 'next/navigation';
+import 'leaflet/dist/leaflet.css';
+
+const MapContainer = dynamic(() => import('react-leaflet').then(m => ({ default: m.MapContainer })), { ssr: false });
+const TileLayer = dynamic(() => import('react-leaflet').then(m => ({ default: m.TileLayer })), { ssr: false });
+const Polyline = dynamic(() => import('react-leaflet').then(m => ({ default: m.Polyline })), { ssr: false });
 
 const formatTime = (seconds) => {
   if (!seconds) return '0:00';
@@ -27,8 +32,9 @@ const formatTime = (seconds) => {
   return `${m}:${s.toString().padStart(2, '0')}`;
 };
 
-const SingleActivityPage = ({ params }) => {
-  const activityId = params.id === 'undefined' || params.id === 'null' ? null : params.id;
+const SingleActivityPage = () => {
+  const params = useParams();
+  const activityId = params?.id === 'undefined' || params?.id === 'null' ? null : params?.id;
   const [activity, setActivity] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -229,7 +235,7 @@ const SingleActivityPage = ({ params }) => {
 
           <div className="space-y-8">
             <div className="h-[320px] overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.02]">
-              {route ? (
+              {route && route.length > 0 ? (
                 <MapContainer
                   center={route[0]}
                   zoom={12}

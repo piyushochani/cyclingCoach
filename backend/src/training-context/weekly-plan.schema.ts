@@ -22,6 +22,15 @@ class WorkoutDay {
 
   @Prop({ default: '' })
   notes: string;
+
+  @Prop({ default: 'medium', enum: ['low', 'medium', 'high'] })
+  importance: string;
+
+  @Prop({ default: false })
+  completed: boolean;
+
+  @Prop({ type: Date, default: null })
+  completedAt: Date | null;
 }
 
 const WorkoutDaySchema = SchemaFactory.createForClass(WorkoutDay);

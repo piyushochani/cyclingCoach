@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
 import { UserModule } from './user/user.module';
 import { ActivityModule } from './activity/activity.module';
@@ -19,10 +21,39 @@ import { SubscriptionModule } from './subscription/subscription.module';
 import { NotificationModule } from './notification/notification.module';
 import { AgentModule } from './agent/agent.module';
 import { GeminiStatusModule } from './gemini-status/gemini-status.module';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
-  imports: [DatabaseModule, UserModule, ActivityModule, RaceModule, StatsModule, PlanModule, AuthModule, EmailModule, SyncModule, StravaAuthModule, BestEffortsModule, ExpenseModule, GearModule, AnalysisModule, TrainingContextModule, SubscriptionModule, ChatQueryModule, NotificationModule, AgentModule, GeminiStatusModule],
+  imports: [
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 100,
+    }]),
+    DatabaseModule,
+    UserModule,
+    ActivityModule,
+    RaceModule,
+    StatsModule,
+    PlanModule,
+    AuthModule,
+    EmailModule,
+    SyncModule,
+    StravaAuthModule,
+    BestEffortsModule,
+    ExpenseModule,
+    GearModule,
+    AnalysisModule,
+    TrainingContextModule,
+    SubscriptionModule,
+    ChatQueryModule,
+    NotificationModule,
+    AgentModule,
+    GeminiStatusModule
+  ],
   controllers: [],
-  providers: [],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+  ],
 })
 export class AppModule {}

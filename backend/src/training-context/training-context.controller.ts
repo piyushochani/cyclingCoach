@@ -111,6 +111,15 @@ export class TrainingContextController {
     return this.service.upsertWeeklyPlan(userId, body.relativeWeek, data);
   }
 
+  @Post('weekly-plan/complete')
+  toggleWorkoutCompletion(
+    @Body() body: { relativeWeek: number; dayOfWeek: number; completed: boolean; workoutIndex?: number },
+    @UserId() userId: string,
+  ) {
+    if (!userId) throw new UnauthorizedException('User ID required');
+    return this.service.toggleWorkoutCompletion(userId, body.relativeWeek ?? 0, body.dayOfWeek, body.completed, body.workoutIndex);
+  }
+
   @Delete('weekly-plan')
   deleteWeeklyPlan(
     @Query('relativeWeek') relativeWeek: string,

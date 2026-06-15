@@ -152,7 +152,7 @@ function Navbar() {
               Log In
             </button>
           </Link>
-          <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_signed_in"); localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_session_ts"); }}>
+          <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_token"); }}>
             <button
               className="rounded-full px-5 py-2 text-sm font-bold text-black transition hover:scale-[1.03] active:scale-[0.98]"
               style={{ background: "#FF6B00" }}
@@ -242,7 +242,7 @@ function HeroSection() {
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="mt-7 flex flex-col gap-4 sm:flex-row sm:items-center"
           >
-            <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_signed_in"); localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_session_ts"); }}>
+            <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_token"); }}>
               <button
                 className="group flex items-center gap-2 rounded-full px-8 py-4 text-base font-bold text-black transition hover:scale-[1.02] active:scale-[0.98] hover:shadow-[0_0_30px_rgba(255,107,0,0.4)]"
                 style={{ background: "#FF6B00" }}
@@ -494,7 +494,7 @@ function PricingSection() {
                 </li>
               ))}
             </ul>
-            <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_signed_in"); localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_session_ts"); }}>
+            <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_token"); }}>
               <button className="mt-8 w-full rounded-full px-8 py-4 text-base font-bold text-black transition hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] active:scale-[0.98]" style={{ background: "#FF6B00" }}>
                 Start Free Trial
               </button>
@@ -639,7 +639,7 @@ function CTASection() {
         </p>
 
         <div className="mt-7 flex flex-col items-center justify-center gap-4 sm:flex-row">
-          <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_signed_in"); localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_session_ts"); }}>
+          <Link href="/signup" onClick={() => { localStorage.removeItem("cyclogenai_user"); localStorage.removeItem("cyclogenai_token"); }}>
             <button
               className="group flex items-center gap-2 rounded-full px-9 py-4 text-base font-bold text-black transition hover:scale-[1.03] hover:shadow-[0_0_40px_rgba(255,107,0,0.4)] active:scale-[0.98]"
               style={{ background: "#FF6B00" }}

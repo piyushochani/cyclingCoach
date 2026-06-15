@@ -30,9 +30,9 @@ export class ActivityService {
       if (act) return act;
     }
 
-    // 2. Fallback: Try finding by Strava ID (if the id is numeric)
-    const stravaId = parseInt(id, 10);
-    if (!isNaN(stravaId)) {
+    // 2. Fallback: Try finding by Strava ID (only if the id is purely numeric)
+    if (/^\d+$/.test(id)) {
+      const stravaId = parseInt(id, 10);
       return this.activityModel.findOne({ stravaId, ...userIdFilter }).exec();
     }
 

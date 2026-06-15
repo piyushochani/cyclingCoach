@@ -183,6 +183,19 @@ export class TrainingContextService {
       .exec();
   }
 
+  async toggleWorkoutCompletion(userId: string, relativeWeek: number, dayOfWeek: number, completed: boolean, workoutIndex?: number): Promise<WeeklyPlan | null> {
+    const plan = await this.weeklyPlanModel.findOne({ user: userId as any, relativeWeek }).exec();
+    if (!plan) return null;
+    const dayWorkouts = plan.workouts.filter((w) => w.dayOfWeek === dayOfWeek);
+    const workout = workoutIndex != null ? dayWorkouts[workoutIndex] : dayWorkouts[0];
+    if (workout) {
+      workout.completed = completed;
+      workout.completedAt = (completed ? new Date() : null) as any;
+    }
+    plan.updatedAt = new Date();
+    return plan.save();
+  }
+
   async deleteWeeklyPlan(userId: string, relativeWeek: number): Promise<boolean> {
     const result = await this.weeklyPlanModel.findOneAndDelete({
       user: userId as any,

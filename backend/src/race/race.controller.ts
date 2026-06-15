@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UnauthorizedException } from '@nestjs/common';
 import { UserId } from '../common/user-id.decorator';
 import { RaceService } from './race.service';
+import { CreateRaceDto, UpdateRaceDto } from './dto/race.dto';
 
 @Controller('races')
 export class RaceController {
@@ -19,13 +20,13 @@ export class RaceController {
   }
 
   @Post()
-  create(@Body() raceData: any, @UserId() userId: string) {
+  create(@Body() raceData: CreateRaceDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.raceService.create({ ...raceData, user: userId });
+    return this.raceService.create({ ...raceData, user: userId as any });
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() raceData: any, @UserId() userId: string) {
+  update(@Param('id') id: string, @Body() raceData: UpdateRaceDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
     return this.raceService.update(id, raceData, userId);
   }

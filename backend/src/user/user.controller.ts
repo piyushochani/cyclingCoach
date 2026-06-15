@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Param, Body, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { UpdateUserDto } from './dto/user.dto';
 
 @Controller('users')
 export class UserController {
@@ -25,7 +26,7 @@ export class UserController {
   }
 
   @Put(':email')
-  update(@Param('email') email: string, @Body() userData: any) {
+  update(@Param('email') email: string, @Body() userData: UpdateUserDto) {
     return this.userService.update(email, userData);
   }
 

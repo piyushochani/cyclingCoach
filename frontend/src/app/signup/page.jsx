@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { api } from "../../../lib/api";
+import { api, setToken } from "../../../lib/api";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -46,14 +46,14 @@ export default function SignupPage() {
     if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
     setLoading(true);
     try {
-      const user = await api.post("/auth/signup-verify", {
+      const res = await api.post("/auth/signup-verify", {
         email, code, password,
         firstName,
         lastName,
       });
-      localStorage.setItem("cyclogenai_signed_in", "true");
+      const { token, ...user } = res;
+      setToken(token);
       localStorage.setItem("cyclogenai_user", JSON.stringify(user));
-      localStorage.setItem("cyclogenai_session_ts", String(Date.now()));
       localStorage.removeItem("cyclogenai_onboarding_done");
       router.replace("/dashboard");
     } catch (err) {
@@ -83,11 +83,7 @@ export default function SignupPage() {
         <div className="rounded-[24px] border border-white/10 bg-[#111318]/90 p-6 shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           <div className="mb-8 text-center">
             <Link href="/" className="inline-flex items-center gap-2">
-              <svg className="h-8 w-8 text-[#FF5500]" viewBox="0 0 100 100" fill="none">
-                <circle cx="50" cy="50" r="34" stroke="currentColor" strokeWidth="8" />
-                <circle cx="50" cy="50" r="11" stroke="currentColor" strokeWidth="6" />
-                <path d="M50 9v14M50 77v14M9 50h14M77 50h14M22 22l10 10M68 68l10 10M78 22 68 32M22 78l10-10" stroke="currentColor" strokeWidth="4.5" strokeLinecap="round" />
-              </svg>
+              <img src="/images/cyclogen_logo.png" alt="Cyclogen" className="h-8 w-auto" />
               <span className="font-barlowCondensed text-2xl uppercase tracking-[0.08em] text-white">
                 CyclogenAI
               </span>

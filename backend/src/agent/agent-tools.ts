@@ -238,6 +238,64 @@ export function createAgentTools(): ToolDefinition[] {
 
     {
       declaration: {
+        name: 'update_weekly_plan',
+        description: 'Modify the current weekly training plan. Lets you change workout types, distances, swap days, or adjust the schedule based on the athlete\'s preferences, fatigue, weather, or schedule changes. Always read the current plan first with get_weekly_plan before modifying.',
+        parameters: {
+          type: 'object',
+          properties: {
+            relativeWeek: {
+              type: 'integer',
+              description: 'The relative week to update. Defaults to 0 (current week).',
+            },
+            workouts: {
+              type: 'array',
+              description: 'Array of workout day modifications. Include only the days that need to change. Each entry must include dayOfWeek (0=Monday, 6=Sunday) and fields to update.',
+              items: {
+                type: 'object',
+                properties: {
+                  dayOfWeek: { type: 'integer', description: '0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 4=Friday, 5=Saturday, 6=Sunday' },
+                  type: { type: 'string', description: 'Workout type: rest, recovery, endurance, tempo, threshold, intervals, vo2max, race, long' },
+                  distance: { type: 'number', description: 'Distance in km (0 for rest days)' },
+                  zoneBreakdown: { type: 'string', description: 'Optional zone breakdown e.g. "Z2 60min"' },
+                  terrain: { type: 'string', description: 'Optional terrain: Flat, Rolling, Hilly, Mountainous' },
+                  notes: { type: 'string', description: 'Optional coach notes for this day' },
+                  importance: { type: 'string', enum: ['low', 'medium', 'high'], description: 'How important this workout is. High = key sessions (threshold, intervals, VO2max), Medium = endurance/tempo, Low = recovery/optional.' },
+                },
+                required: ['dayOfWeek'],
+              },
+            },
+          },
+          required: ['workouts'],
+        },
+      },
+      execute: async (args, deps) => {
+        const rw = args.relativeWeek ?? 0;
+        const currentPlan = await deps.trainingContext.getWeeklyPlan(rw);
+        const existingWorkouts = currentPlan?.workouts || [];
+        const updatedWorkouts = existingWorkouts.map((w: any) => {
+          const mod = args.workouts.find((m: any) => m.dayOfWeek === w.dayOfWeek);
+          return mod ? { ...w, ...mod } : w;
+        });
+        for (const mod of args.workouts) {
+          if (!updatedWorkouts.find((w: any) => w.dayOfWeek === mod.dayOfWeek)) {
+            updatedWorkouts.push({
+              dayOfWeek: mod.dayOfWeek,
+              type: mod.type || 'rest',
+              distance: mod.distance || 0,
+              zoneBreakdown: mod.zoneBreakdown || '',
+              terrain: mod.terrain || '',
+              weather: '',
+              notes: mod.notes || '',
+            });
+          }
+        }
+        const result = await deps.trainingContext.upsertWeeklyPlan(rw, { workouts: updatedWorkouts });
+        return { saved: true, plan: result };
+      },
+    },
+
+    {
+      declaration: {
         name: 'faq_search',
         description: 'Search the CyclogenAI FAQ for answers about how to use the app, troubleshooting, features, or where to find things in the interface. Use this for any "how do I…" or "where is…" or "what is…" questions about the app itself.',
         parameters: {

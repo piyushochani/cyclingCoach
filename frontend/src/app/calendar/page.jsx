@@ -19,143 +19,59 @@ import {
 } from "date-fns";
 import WeeklyScheduleCard from "../../../components/layout/WeekScheduleCard";
 import { getTrainingWeek } from "../../../components/ui/PaceBotChat";
+import { api } from "../../../lib/api";
+
+const WORKOUT_LABELS = {
+  rest: 'Rest', recovery: 'Recovery', endurance: 'Endurance',
+  tempo: 'Tempo', threshold: 'Threshold', intervals: 'Intervals',
+  vo2max: 'VO2 Max', race: 'Race Simulation', long: 'Long Ride',
+  gym: 'Gym / Strength', mobility: 'Mobility', stretching: 'Stretching',
+};
+
+function formatDuration(seconds) {
+  if (!seconds) return '—';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function mapActivity(a) {
+  return {
+    id: a._id,
+    date: a.date ? a.date.slice(0, 10) : '',
+    title: a.name,
+    type: a.sport_type || a.type || 'Ride',
+    distance: a.distance ? (a.distance / 1000) : 0,
+    duration: formatDuration(a.durationSeconds),
+    elevation: a.elevationGain || 0,
+  };
+}
+
+const WORKOUT_EMOJI = { Ride: '🚴', Run: '🏃', Walk: '🚶', Swim: '🏊', Workout: '🏋️', VirtualRide: '🚴' };
+
+function defaultDayDetail() {
+  return {
+    title: 'Recovery / Unstructured',
+    focus: 'Freshness',
+    target: 'Easy movement or full rest',
+    duration: '45m',
+    distance: 'Optional',
+    elevation: 'Low',
+    notes: 'Stay loose and prioritize recovery.',
+    route: 'Flat Route',
+    approxDistance: 'Optional',
+    rideType: 'Recovery',
+    zones: 'Z1',
+    breakup: [{ zone: 'Z1 Recovery', time: 45 }],
+    importance: 2,
+    importanceLabel: 'Low Importance',
+  };
+}
 
 function openChat(command) {
   window.dispatchEvent(new CustomEvent("openai-chat", { detail: { command } }));
 }
-
-const monthActivities = [
-  {
-    id: 1,
-    date: "2026-05-04",
-    title: "Endurance Ride",
-    type: "Ride",
-    distance: 82.4,
-    duration: "2h 41m",
-    elevation: 640,
-  },
-  {
-    id: 2,
-    date: "2026-05-08",
-    title: "VO2 Session",
-    type: "Ride",
-    distance: 41.2,
-    duration: "1h 19m",
-    elevation: 302,
-  },
-  {
-    id: 3,
-    date: "2026-05-12",
-    title: "Recovery Spin",
-    type: "Ride",
-    distance: 24.8,
-    duration: "52m",
-    elevation: 110,
-  },
-  {
-    id: 4,
-    date: "2026-05-17",
-    title: "Hill Repeats",
-    type: "Ride",
-    distance: 58.1,
-    duration: "1h 58m",
-    elevation: 920,
-  },
-  {
-    id: 5,
-    date: "2026-05-17",
-    title: "Evening Walk",
-    type: "Walk",
-    distance: 4.1,
-    duration: "39m",
-    elevation: 18,
-  },
-  {
-    id: 6,
-    date: "2026-05-21",
-    title: "Tempo Ride",
-    type: "Ride",
-    distance: 63.7,
-    duration: "2h 03m",
-    elevation: 510,
-  },
-  {
-    id: 7,
-    date: "2026-05-22",
-    title: "Openers",
-    type: "Ride",
-    distance: 28.3,
-    duration: "54m",
-    elevation: 145,
-  },
-];
-
-const todayPlanData = {
-  "2026-05-21": {
-    title: "Tempo Ride",
-    focus: "Controlled aerobic pressure",
-    target: "2 x 20 min tempo",
-    duration: "2h 00m",
-    distance: "60–68 km",
-    elevation: "400–600 m",
-    notes: "Hold smooth cadence, stay below threshold, no sprint finish.",
-    route: "Rolling",
-    approxDistance: "60–68 km",
-    rideType: "Tempo",
-    zones: "Z2, Z3, Z4",
-    breakup: [
-      { zone: "Z2 Warmup", time: 25 },
-      { zone: "Z3 Tempo Block 1", time: 20 },
-      { zone: "Z2 Easy Spin", time: 10 },
-      { zone: "Z3 Tempo Block 2", time: 20 },
-      { zone: "Z1 Cooldown", time: 15 },
-    ],
-    importance: 4,
-    importanceLabel: "Important",
-  },
-  "2026-05-22": {
-    title: "Openers",
-    focus: "Pre-race activation",
-    target: "45–60 min with 3 short bursts",
-    duration: "55m",
-    distance: "25–30 km",
-    elevation: "Low",
-    notes: "Keep it light, sharp, and fresh. Finish wanting more.",
-    route: "Flat Route",
-    approxDistance: "25–30 km",
-    rideType: "Openers",
-    zones: "Z1, Z2, Z4",
-    breakup: [
-      { zone: "Z2 Warmup", time: 30 },
-      { zone: "Z4 Threshold", time: 8 },
-      { zone: "Z2 Recovery", time: 10 },
-      { zone: "Z5 Bursts", time: 4 },
-      { zone: "Z1 Cooldown", time: 8 },
-    ],
-    importance: 5,
-    importanceLabel: "Highly Important",
-  },
-  "2026-05-23": {
-    title: "Long Endurance",
-    focus: "Durability",
-    target: "Zone 2 aerobic base",
-    duration: "3h 45m",
-    distance: "95–115 km",
-    elevation: "700–1000 m",
-    notes: "Fuel early, keep effort steady, avoid long threshold efforts.",
-    route: "Rolling",
-    approxDistance: "95–115 km",
-    rideType: "Endurance",
-    zones: "Z2",
-    breakup: [
-      { zone: "Z2 Steady", time: 180 },
-      { zone: "Z1 Easy", time: 20 },
-      { zone: "Z2 Finish", time: 25 },
-    ],
-    importance: 4,
-    importanceLabel: "Important",
-  },
-};
 
 const weekDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
@@ -180,14 +96,28 @@ const weatherPreview = {
 };
 
 const TrainingCalendarPage = () => {
-  const [currentMonth, setCurrentMonth] = useState(new Date("2026-05-01"));
-  const [selectedDay, setSelectedDay] = useState(new Date("2026-05-22"));
-  const [focusedDay, setFocusedDay] = useState(new Date("2026-05-22"));
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState(new Date());
+  const [focusedDay, setFocusedDay] = useState(new Date());
   const [isBreakupOpen, setIsBreakupOpen] = useState(false);
+  const [activities, setActivities] = useState([]);
+  const [weeklyPlan, setWeeklyPlan] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     document.body.style.overflow = isBreakupOpen ? "hidden" : "";
   }, [isBreakupOpen]);
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/activities').catch(() => []),
+      api.get('/training-context/weekly-plan?relativeWeek=0').catch(() => null),
+    ]).then(([acts, plan]) => {
+      setActivities(Array.isArray(acts) ? acts.map(mapActivity) : []);
+      setWeeklyPlan(plan);
+      setLoading(false);
+    });
+  }, []);
 
   const calendarDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
@@ -196,16 +126,16 @@ const TrainingCalendarPage = () => {
   }, [currentMonth]);
 
   const activitiesThisMonth = useMemo(() => {
-    return monthActivities.filter((a) =>
-      isSameMonth(new Date(a.date), currentMonth)
+    return activities.filter((a) =>
+      a.date && isSameMonth(new Date(a.date), currentMonth)
     );
-  }, [currentMonth]);
+  }, [activities, currentMonth]);
 
   const selectedDayActivities = useMemo(() => {
-    return monthActivities.filter((a) =>
-      isSameDay(new Date(a.date), selectedDay)
+    return activities.filter((a) =>
+      a.date && isSameDay(new Date(a.date), selectedDay)
     );
-  }, [selectedDay]);
+  }, [activities, selectedDay]);
 
   const monthlyStats = useMemo(() => {
     const totalActivities = activitiesThisMonth.length;
@@ -225,25 +155,52 @@ const TrainingCalendarPage = () => {
     };
   }, [activitiesThisMonth]);
 
-  const currentFocusedKey = format(focusedDay, "yyyy-MM-dd");
-  const todayDetail = todayPlanData[currentFocusedKey] || {
-    title: "Recovery / Unstructured",
-    focus: "Freshness",
-    target: "Easy movement or full rest",
-    duration: "45m",
-    distance: "Optional",
-    elevation: "Low",
-    notes: "Stay loose and prioritize recovery.",
-    route: "Flat Route",
-    approxDistance: "Optional",
-    rideType: "Recovery",
-    zones: "Z1",
-    breakup: [
-      { zone: "Z1 Recovery", time: 45 },
-    ],
-    importance: 2,
-    importanceLabel: "Low Importance",
-  };
+  const todayDetail = useMemo(() => {
+    const dayOfWeek = (focusedDay.getDay() + 6) % 7;
+    const planWorkout = weeklyPlan?.workouts?.find(w => w.dayOfWeek === dayOfWeek);
+    if (planWorkout) {
+      const label = WORKOUT_LABELS[planWorkout.type] || planWorkout.type;
+      const importanceMap = { low: 2, medium: 3, high: 5 };
+      const imp = importanceMap[planWorkout.importance] || 3;
+      const impLabel = { low: 'Low Importance', medium: 'Medium Importance', high: 'High Importance' };
+      return {
+        title: label,
+        focus: planWorkout.notes || 'General preparation',
+        target: planWorkout.type === 'rest' ? 'Full rest & recovery' : `${label} session`,
+        duration: '—',
+        distance: planWorkout.distance ? `${planWorkout.distance.toFixed(0)} km` : '—',
+        elevation: '—',
+        notes: planWorkout.notes || 'Follow the planned workout.',
+        route: planWorkout.terrain || '—',
+        approxDistance: planWorkout.distance ? `${planWorkout.distance.toFixed(0)} km` : '—',
+        rideType: label,
+        zones: '—',
+        breakup: [{ zone: label, time: 60 }],
+        importance: imp,
+        importanceLabel: impLabel[planWorkout.importance] || 'Medium Importance',
+      };
+    }
+    const dayActivity = activities.find(a => a.date && isSameDay(new Date(a.date), focusedDay));
+    if (dayActivity) {
+      return {
+        title: dayActivity.title,
+        focus: 'Completed ride',
+        target: dayActivity.type,
+        duration: dayActivity.duration,
+        distance: `${dayActivity.distance.toFixed(1)} km`,
+        elevation: `${dayActivity.elevation} m`,
+        notes: 'Review in activity details for full analysis.',
+        route: '—',
+        approxDistance: `${dayActivity.distance.toFixed(1)} km`,
+        rideType: dayActivity.type,
+        zones: '—',
+        breakup: [{ zone: dayActivity.type, time: 60 }],
+        importance: 3,
+        importanceLabel: 'Completed',
+      };
+    }
+    return defaultDayDetail();
+  }, [weeklyPlan, activities, focusedDay]);
 
   return (
     <motion.div
@@ -321,7 +278,7 @@ const TrainingCalendarPage = () => {
                   {calendarDays.map((day) => {
                     const inCurrentMonth = isSameMonth(day, currentMonth);
                     const today = isToday(day);
-                    const count = monthActivities.filter((a) => isSameDay(new Date(a.date), day)).length;
+                    const count = activities.filter((a) => a.date && isSameDay(new Date(a.date), day)).length;
                     const isSelected = isSameDay(day, selectedDay);
 
                     return (
@@ -349,11 +306,11 @@ const TrainingCalendarPage = () => {
                         <div className="flex flex-1 items-center justify-center">
                           {count > 0 ? (
                             <div className="flex flex-wrap justify-center gap-0.5">
-                              {monthActivities
-                                .filter((a) => isSameDay(new Date(a.date), day))
+                              {activities
+                                .filter((a) => a.date && isSameDay(new Date(a.date), day))
                                 .map((a) => (
                                   <span key={a.id} className="text-[20px] leading-none" title={a.type}>
-                                    {a.type === "Ride" ? "🚴" : a.type === "Run" ? "🏃" : a.type === "Walk" ? "🚶" : "🏋️"}
+                                    {WORKOUT_EMOJI[a.type] || '🚴'}
                                   </span>
                                 ))}
                             </div>

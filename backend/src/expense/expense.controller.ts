@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UnauthorizedException } from '@nestjs/common';
 import { UserId } from '../common/user-id.decorator';
 import { ExpenseService } from './expense.service';
+import { CreateExpenseDto, UpdateExpenseDto } from './dto/expense.dto';
 
 @Controller('expenses')
 export class ExpenseController {
@@ -13,13 +14,13 @@ export class ExpenseController {
   }
 
   @Post()
-  create(@Body() expenseData: any, @UserId() userId: string) {
+  create(@Body() expenseData: CreateExpenseDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.expenseService.create({ ...expenseData, user: userId });
+    return this.expenseService.create({ ...expenseData, user: userId as any });
   }
 
   @Put(':id')
-  update(@Param('id') id: string, @Body() expenseData: any, @UserId() userId: string) {
+  update(@Param('id') id: string, @Body() expenseData: UpdateExpenseDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
     return this.expenseService.update(id, expenseData, userId);
   }

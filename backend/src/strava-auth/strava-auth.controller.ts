@@ -1,6 +1,8 @@
 import { Controller, Get, Post, Body } from '@nestjs/common';
 import { StravaAuthService } from './strava-auth.service';
+import { Public } from '../common/public.decorator';
 
+@Public()
 @Controller('strava')
 export class StravaAuthController {
   constructor(private readonly stravaAuthService: StravaAuthService) {}

@@ -2,10 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { getToken } from '../../lib/api';
 
 const publicPaths = ['/', '/login', '/signup', '/forgot-password'];
-const SESSION_KEY = 'cyclogenai_session_ts';
-const SESSION_DURATION_MS = 24 * 60 * 60 * 1000;
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -19,24 +18,12 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const signedIn = localStorage.getItem('cyclogenai_signed_in') === 'true';
-    if (!signedIn) {
+    const token = getToken();
+    if (!token) {
       router.replace('/login');
       return;
     }
 
-    const lastVisit = parseInt(localStorage.getItem(SESSION_KEY) || '0', 10);
-    const now = Date.now();
-
-    if (lastVisit > 0 && now - lastVisit > SESSION_DURATION_MS) {
-      localStorage.removeItem('cyclogenai_signed_in');
-      localStorage.removeItem('cyclogenai_user');
-      localStorage.removeItem(SESSION_KEY);
-      router.replace('/login');
-      return;
-    }
-
-    localStorage.setItem(SESSION_KEY, String(now));
     setChecked(true);
   }, [pathname, router]);
 

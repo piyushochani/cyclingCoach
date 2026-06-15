@@ -1,53 +1,52 @@
-// frontend/components/layout/ScheduleRaceModal.jsx
 "use client";
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import CyclistLoader from '../animations/CyclistLoader';
 import { api } from '../../lib/api';
 
+const TERRAIN_OPTIONS = ["", "Flat", "Rolling", "Hilly", "Mountainous"];
+
 const ScheduleRaceModal = ({ isOpen, onClose }) => {
-  const [formData, setFormData] = useState({
-    raceName: '',
-    raceType: 'Road Race',
-    date: '',
-    location: '',
-    distance: '',
-    elevation: '',
-    priority: 'Medium',
-    conditions: 'Clear',
-    description: '',
-    goal: '',
+  const [form, setForm] = useState({
+    name: "", date: new Date().toISOString().split("T")[0],
+    city: "", distance: "", elevationGain: "", priority: "B",
+    time: "", terrain: "", weather: "", expectations: "", description: "",
   });
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+  const handleChange = (field) => (e) => {
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
+    if (!form.name.trim()) {
+      setError('Race name is required');
+      return;
+    }
+    setLoading(true);
     try {
       await api.post('/races', {
-        name: formData.raceName,
-        type: formData.raceType,
-        date: formData.date,
-        location: formData.location,
-        distance: parseFloat(formData.distance) || 0,
-        elevationGain: parseFloat(formData.elevation) || 0,
-        priority: formData.priority === 'A-Race' ? 'A' : formData.priority.charAt(0),
-        weather: formData.conditions,
-        description: formData.description,
+        name: form.name.trim(),
+        date: form.date,
+        location: form.city.trim(),
+        distance: parseFloat(form.distance) || 0,
+        elevationGain: parseFloat(form.elevationGain) || 0,
+        priority: form.priority,
+        time: form.time,
+        terrain: form.terrain,
+        weather: form.weather,
+        story: form.expectations,
+        description: form.description,
+        completed: false,
       });
       onClose();
     } catch (err) {
       setError(err.message || 'Failed to schedule race');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -58,119 +57,95 @@ const ScheduleRaceModal = ({ isOpen, onClose }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[10000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 md:p-8"
+          style={{
+            position: "fixed", inset: 0, zIndex: 10000,
+            background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) { onClose(); } }}
         >
           <motion.div
-            initial={{ scale: 0.8, y: 50 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.8, y: 50 }}
-            transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-            className="relative w-full max-w-2xl bg-surface-cards rounded-lg shadow-xl border-l-8 border-accent-orange p-6 md:p-8 overflow-y-auto max-h-[90vh]"
+            initial={{ scale: 0.92, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.92, opacity: 0 }}
+            style={{
+              background: "#0D0D0D", border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 16, padding: "1.5rem", width: "100%", maxWidth: 560,
+              maxHeight: "85vh", overflowY: "auto",
+            }}
           >
-            {isLoading && (
-              <CyclistLoader isLoading={isLoading} progress={progress} message="Setting Race Target..." />
-            )}
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 text-text-secondary hover:text-accent-orange transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+              <h2 style={{ fontFamily: "'Bebas Neue', 'Impact', sans-serif", fontSize: "1.6rem", fontWeight: 400, letterSpacing: "0.04em", margin: 0, color: "#fff" }}>
+                SCHEDULE <span style={{ color: "#FF5500" }}>RACE</span>
+              </h2>
+              <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.3)", fontSize: 20, cursor: "pointer", padding: 0, lineHeight: 1 }}>
+                {"\u2715"}
+              </button>
+            </div>
 
-            <h2 className="font-bebasNeue text-4xl text-text-primary mb-6 text-center">
-              SCHEDULE <span className="text-accent-orange">NEW RACE</span>
-            </h2>
-
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Race Name */}
-              <div>
-                <label htmlFor="raceName" className="block text-sm font-dmSans text-text-secondary mb-2">Race Name</label>
-                <input type="text" id="raceName" name="raceName" value={formData.raceName} onChange={handleChange} required
-                       className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none" />
-              </div>
-              {/* Race Type */}
-              <div>
-                <label htmlFor="raceType" className="block text-sm font-dmSans text-text-secondary mb-2">Race Type</label>
-                <select id="raceType" name="raceType" value={formData.raceType} onChange={handleChange}
-                        className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none">
-                  <option>Road Race</option>
-                  <option>Time Trial</option>
-                  <option>Crit</option>
-                  <option>MTB</option>
-                  <option>Gravel</option>
-                  <option>Triathlon</option>
-                  <option>Duathlon</option>
-                </select>
-              </div>
-              {/* Date */}
-              <div>
-                <label htmlFor="date" className="block text-sm font-dmSans text-text-secondary mb-2">Date</label>
-                <input type="date" id="date" name="date" value={formData.date} onChange={handleChange} required
-                       className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none" />
-              </div>
-              {/* Location */}
-              <div>
-                <label htmlFor="location" className="block text-sm font-dmSans text-text-secondary mb-2">Location</label>
-                <input type="text" id="location" name="location" value={formData.location} onChange={handleChange}
-                       className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none" />
-              </div>
-              {/* Distance */}
-              <div>
-                <label htmlFor="distance" className="block text-sm font-dmSans text-text-secondary mb-2">Distance (KM)</label>
-                <input type="number" id="distance" name="distance" value={formData.distance} onChange={handleChange}
-                       className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none" />
-              </div>
-              {/* Elevation */}
-              <div>
-                <label htmlFor="elevation" className="block text-sm font-dmSans text-text-secondary mb-2">Elevation (M)</label>
-                <input type="number" id="elevation" name="elevation" value={formData.elevation} onChange={handleChange}
-                       className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none" />
-              </div>
-              {/* Priority */}
-              <div>
-                <label htmlFor="priority" className="block text-sm font-dmSans text-text-secondary mb-2">Priority</label>
-                <select id="priority" name="priority" value={formData.priority} onChange={handleChange}
-                        className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none">
-                  <option>Low</option>
-                  <option>Medium</option>
-                  <option>High</option>
-                  <option>A-Race</option>
-                </select>
-              </div>
-              {/* Conditions */}
-              <div>
-                <label htmlFor="conditions" className="block text-sm font-dmSans text-text-secondary mb-2">Expected Conditions</label>
-                <input type="text" id="conditions" name="conditions" value={formData.conditions} onChange={handleChange}
-                       className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none" />
-              </div>
-              {/* Description */}
-              <div className="md:col-span-2">
-                <label htmlFor="description" className="block text-sm font-dmSans text-text-secondary mb-2">Description</label>
-                <textarea id="description" name="description" value={formData.description} onChange={handleChange} rows="3"
-                          className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none"></textarea>
-              </div>
-              {/* Goal */}
-              <div className="md:col-span-2">
-                <label htmlFor="goal" className="block text-sm font-dmSans text-text-secondary mb-2">Race Goal</label>
-                <textarea id="goal" name="goal" value={formData.goal} onChange={handleChange} rows="2"
-                          className="w-full p-3 rounded-md bg-bg-dark text-text-primary border border-chain-link-grey focus:border-accent-orange focus:ring-1 focus:ring-accent-orange outline-none"></textarea>
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={labelStyle}>Race Name</label>
+                  <input value={form.name} onChange={handleChange("name")} placeholder="e.g. Tour of Flanders Sportive" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Date</label>
+                  <input type="date" value={form.date} onChange={handleChange("date")} style={{ ...inputStyle, colorScheme: "dark" }} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Priority</label>
+                  <select value={form.priority} onChange={handleChange("priority")} style={{ ...inputStyle, appearance: "none" }}>
+                    {["A", "B", "C", "D"].map((p) => (<option key={p} value={p} style={{ background: "#080808" }}>{p}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>City</label>
+                  <input value={form.city} onChange={handleChange("city")} placeholder="City / region" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Terrain</label>
+                  <select value={form.terrain} onChange={handleChange("terrain")} style={{ ...inputStyle, appearance: "none" }}>
+                    {TERRAIN_OPTIONS.map((t) => (<option key={t} value={t} style={{ background: "#080808" }}>{t || "Any"}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Distance (km)</label>
+                  <input type="number" step="0.1" value={form.distance} onChange={handleChange("distance")} placeholder="0" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Elevation (m)</label>
+                  <input type="number" value={form.elevationGain} onChange={handleChange("elevationGain")} placeholder="0" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Expected Time</label>
+                  <input value={form.time} onChange={handleChange("time")} placeholder="e.g. 4:12:00" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Expected Weather</label>
+                  <input value={form.weather} onChange={handleChange("weather")} placeholder="e.g. Sunny, 22\u00b0C" style={inputStyle} />
+                </div>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={labelStyle}>What do you expect from this race?</label>
+                  <textarea value={form.expectations} onChange={handleChange("expectations")} rows={2} placeholder="Your goal, target time, position aim, or outcome you're hoping for..." style={{ ...inputStyle, resize: "none" }} />
+                </div>
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <label style={labelStyle}>Describe the race</label>
+                  <textarea value={form.description} onChange={handleChange("description")} rows={2} placeholder="Previous experiences on this route, known strong competitors, course characteristics, anything to be aware of..." style={{ ...inputStyle, resize: "none" }} />
+                </div>
               </div>
 
-              {error && <p className="md:col-span-2 text-red-400 text-sm text-center">{error}</p>}
+              {error && <p style={{ margin: 0, fontSize: 12, color: "#E74C3C" }}>{error}</p>}
 
-              {/* Submit Button */}
-              <div className="md:col-span-2 flex justify-center mt-4">
-                <motion.button
-                  type="submit"
-                  className="skew-x-[-15deg] px-10 py-4 bg-accent-orange text-white font-dmSans text-xl relative group overflow-hidden shadow-lg"
-                  whileHover={{ scale: 1.02, backgroundColor: '#E55C00' }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={isLoading}
-                >
-                  <span className="block skew-x-[15deg] group-hover:skew-x-0 transition-transform duration-300">
-                    {isLoading ? 'Saving...' : 'LOCK IN TARGET'} &rarr;
-                  </span>
-                </motion.button>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button type="button" onClick={onClose}
+                  style={{ padding: "10px 18px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "transparent", color: "rgba(255,255,255,0.6)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={loading}
+                  style={{ padding: "10px 18px", borderRadius: 10, background: "#FF5500", color: "#fff", fontSize: 13, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", border: "none", cursor: "pointer", opacity: loading ? 0.6 : 1 }}>
+                  {loading ? "Saving..." : "Schedule Race"}
+                </button>
               </div>
             </form>
           </motion.div>
@@ -178,6 +153,17 @@ const ScheduleRaceModal = ({ isOpen, onClose }) => {
       )}
     </AnimatePresence>
   );
+};
+
+const labelStyle = {
+  fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase",
+  color: "rgba(255,255,255,0.38)", display: "block", marginBottom: 4,
+};
+
+const inputStyle = {
+  width: "100%", background: "#080808", color: "#fff",
+  border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10,
+  padding: "10px 14px", fontSize: 14, outline: "none", boxSizing: "border-box",
 };
 
 export default ScheduleRaceModal;

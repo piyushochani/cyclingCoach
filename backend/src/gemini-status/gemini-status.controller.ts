@@ -1,6 +1,8 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { getAllKeyStatuses, validateGeminiKey } from '../common/gemini-key-validator';
+import { Public } from '../common/public.decorator';
 
+@Public()
 @Controller('gemini')
 export class GeminiStatusController {
   @Get('status')

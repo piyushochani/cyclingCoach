@@ -1,15 +1,40 @@
 import { Controller, Post, Body, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { SyncService } from '../sync/sync.service';
+import { Public } from '../common/public.decorator';
 
 const SYNC_MONTHS = parseInt(process.env.STRAVA_SYNC_MONTHS || '6', 10);
 
+@Public()
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly syncService: SyncService,
+    private readonly jwtService: JwtService,
   ) {}
+
+  private generateToken(user: any): string {
+    return this.jwtService.sign({ sub: user._id, email: user.email });
+  }
+
+  private userResponse(user: any) {
+    return {
+      token: this.generateToken(user),
+      id: user._id,
+      firstName: user.firstName || (user as any).name || '',
+      lastName: user.lastName || '',
+      email: user.email,
+      mainSport: user.mainSport,
+      experienceLevel: user.experienceLevel,
+      heightCm: user.heightCm,
+      weightKg: user.weightKg,
+      goal: user.goal,
+      cyclingYears: user.cyclingYears,
+      ftp: user.ftp,
+    };
+  }
 
   @Post('signup-request')
   async signupRequest(@Body() body: { email: string }) {
@@ -44,19 +69,7 @@ export class AuthController {
       cyclingYears: body.cyclingYears,
       ftp: body.ftp,
     });
-    return {
-      id: user._id,
-      firstName: user.firstName || '',
-      lastName: user.lastName || '',
-      email: user.email,
-      mainSport: user.mainSport,
-      experienceLevel: user.experienceLevel,
-      heightCm: user.heightCm,
-      weightKg: user.weightKg,
-      goal: user.goal,
-      cyclingYears: user.cyclingYears,
-      ftp: user.ftp,
-    };
+    return this.userResponse(user);
   }
 
   @Post('login')
@@ -65,7 +78,6 @@ export class AuthController {
     const user = await this.authService.login(body.email, body.password);
     if (!user) throw new UnauthorizedException('Invalid email or password');
 
-    // Auto-sync on login
     if (user.stravaUpdatedAt) {
       const cutoff = new Date(Date.now() - SYNC_MONTHS * 30 * 24 * 3600 * 1000);
       const lastActivity = await this.syncService.getLatestActivityDate(user._id as any);
@@ -93,17 +105,7 @@ export class AuthController {
     }
 
     return {
-      id: user._id,
-      firstName: user.firstName || (user as any).name || '',
-      lastName: user.lastName || '',
-      email: user.email,
-      mainSport: user.mainSport,
-      experienceLevel: user.experienceLevel,
-      heightCm: user.heightCm,
-      weightKg: user.weightKg,
-      goal: user.goal,
-      cyclingYears: user.cyclingYears,
-      ftp: user.ftp,
+      ...this.userResponse(user),
       stravaUpdatedAt: user.stravaUpdatedAt,
       isStravaUpToDate: user.isStravaUpToDate,
       onboardingSummary: (user as any).onboardingSummary || null,
@@ -155,17 +157,7 @@ export class AuthController {
     const user = await this.authService.findUserByEmail(body.email);
     if (!user) throw new UnauthorizedException('User not found');
     return {
-      id: user._id,
-      firstName: user.firstName || (user as any).name || '',
-      lastName: user.lastName || '',
-      email: user.email,
-      mainSport: user.mainSport,
-      experienceLevel: user.experienceLevel,
-      heightCm: user.heightCm,
-      weightKg: user.weightKg,
-      goal: user.goal,
-      cyclingYears: user.cyclingYears,
-      ftp: user.ftp,
+      ...this.userResponse(user),
       stravaUpdatedAt: user.stravaUpdatedAt,
       isStravaUpToDate: user.isStravaUpToDate,
       onboardingSummary: (user as any).onboardingSummary || null,

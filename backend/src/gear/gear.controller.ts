@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, UnauthorizedException } from '@nestjs/common';
 import { UserId } from '../common/user-id.decorator';
 import { GearService } from './gear.service';
+import { CreateBikeDto, UpdateBikeDto, CreateEquipmentDto, UpdateEquipmentDto } from './dto/gear.dto';
 
 @Controller('gear')
 export class GearController {
@@ -13,13 +14,13 @@ export class GearController {
   }
 
   @Post('bikes')
-  createBike(@Body() data: any, @UserId() userId: string) {
+  createBike(@Body() data: CreateBikeDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
     return this.gearService.createBike(data, userId);
   }
 
   @Put('bikes/:id')
-  updateBike(@Param('id') id: string, @Body() data: any, @UserId() userId: string) {
+  updateBike(@Param('id') id: string, @Body() data: UpdateBikeDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
     return this.gearService.updateBike(id, data, userId);
   }
@@ -37,13 +38,13 @@ export class GearController {
   }
 
   @Post('equipment')
-  createEquipment(@Body() data: any, @UserId() userId: string) {
+  createEquipment(@Body() data: CreateEquipmentDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
     return this.gearService.createEquipment(data, userId);
   }
 
   @Put('equipment/:id')
-  updateEquipment(@Param('id') id: string, @Body() data: any, @UserId() userId: string) {
+  updateEquipment(@Param('id') id: string, @Body() data: UpdateEquipmentDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
     return this.gearService.updateEquipment(id, data, userId);
   }

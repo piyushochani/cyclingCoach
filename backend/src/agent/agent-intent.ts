@@ -56,13 +56,13 @@ export function shouldSearchFaq(intent: ChatIntent): boolean {
 const TOOL_NAMES_BY_INTENT: Record<ChatIntent, string[]> = {
   greeting: [],
   activities: ['list_activities'],
-  plan: ['get_weekly_plan', 'plan_load'],
+  plan: ['get_weekly_plan', 'plan_load', 'update_weekly_plan'],
   zones: ['calculate_zones'],
-  month: [],
+  month: ['get_weekly_plan', 'update_weekly_plan'],
   strava: ['strava_connect', 'strava_sync', 'strava_status'],
   gear: ['gear_list_bikes', 'gear_add_bike', 'gear_set_active_bike'],
   faq: ['faq_search'],
-  general: [],
+  general: ['update_weekly_plan'],
 };
 
 export function toolNamesForIntent(intent: ChatIntent): string[] {
