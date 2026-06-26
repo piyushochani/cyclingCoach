@@ -2,12 +2,15 @@ import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import express from 'express';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const server = express();
   server.use(express.json({ limit: '10mb' }));
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
+
+  app.use(helmet());
 
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,

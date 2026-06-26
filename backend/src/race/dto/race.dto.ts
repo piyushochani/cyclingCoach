@@ -35,6 +35,21 @@ export class CreateRaceDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  terrain?: string;
+
+  @IsOptional()
+  @IsString()
+  story?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  completed?: boolean;
 }
 
 export class UpdateRaceDto extends CreateRaceDto {}

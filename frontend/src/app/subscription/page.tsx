@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import { api } from "../../../lib/api";
 
@@ -21,20 +22,27 @@ export default function SubscriptionPage() {
   const isPro = user?.subscriptionTier === "pro";
 
   return (
-    <div className="min-h-screen bg-[#060709] text-white">
-      <div className="mx-auto max-w-4xl px-6 py-20 md:px-10 md:py-28">
-        <div className="mb-12 text-center">
-          <p className="text-xs font-bold uppercase tracking-[0.28em] text-white/30">
+    <div className="min-h-screen bg-black text-white">
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute left-[62%] top-[-8%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.06)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-10%] left-[-5%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.04)_0%,transparent_72%)]" />
+      </div>
+
+      <motion.main
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
+      >
+        <div className="mb-8 border-b border-white/10 pb-6 text-center">
+          <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Subscription
           </p>
-          <h1
-            className="mt-3 text-5xl font-black uppercase leading-none tracking-tight text-white md:text-7xl"
-            style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
-          >
+          <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
             {isPro ? "You are on" : "Upgrade to"}{" "}
-            <span style={{ color: "#FF6B00" }}>Pro</span>
+            <span className="text-[#FF5500]">Pro</span>
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-white/40">
+          <p className="mx-auto mt-3 max-w-xl font-dmSans text-sm text-white/50">
             {isPro
               ? "Your subscription is active. Enjoy full access to all features."
               : "Unlock AI training plans, race-day tools, and performance analytics."}
@@ -102,7 +110,7 @@ export default function SubscriptionPage() {
             </p>
           </div>
         </div>
-      </div>
+      </motion.main>
     </div>
   );
 }

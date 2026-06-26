@@ -65,6 +65,9 @@ export class Activity extends Document {
   @Prop({ type: MongooseSchema.Types.Mixed, default: null })
   rawStreams: Record<string, any> | null;
 
+  @Prop({ type: String, default: null })
+  polyline: string | null;
+
   @Prop({ type: MongooseSchema.Types.Mixed, default: null })
   processed: Record<string, any> | null;
 

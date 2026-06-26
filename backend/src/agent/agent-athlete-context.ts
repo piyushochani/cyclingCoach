@@ -1,6 +1,7 @@
 import { Model } from 'mongoose';
 import { User } from '../user/user.schema';
 import { Activity } from '../activity/activity.schema';
+import { Race } from '../race/race.schema';
 import { ChatIntent } from './agent-intent';
 
 export async function buildAthleteProfile(
@@ -153,6 +154,39 @@ function formatWeekLabel(weekStart: Date, rides: any[]): string {
   end.setDate(end.getDate() + 6);
   const endStr = end.toISOString().split('T')[0];
   return `Week of ${start} – ${endStr}`;
+}
+
+export async function buildRaceContext(
+  raceModel: Model<Race>,
+  userId: string,
+  limit = 10,
+): Promise<string> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const races = await raceModel
+    .find({ user: userId as any, date: { $gte: today } })
+    .sort({ date: 1 })
+    .limit(limit)
+    .lean()
+    .exec();
+
+  if (!races.length) return '';
+
+  const now = new Date();
+  const lines = races.map((r: any) => {
+    const date = r.date ? new Date(r.date).toISOString().split('T')[0] : '?';
+    const daysUntil = Math.round((new Date(r.date).getTime() - now.getTime()) / 86400000);
+    const when = daysUntil <= 0 ? 'today/tomorrow' : `in ${daysUntil} days`;
+
+    const parts = [`- ${r.name} (${when})`, `  Date: ${date} | Type: ${r.type || '?'} | Terrain: ${r.terrain || '?'}`];
+    parts.push(`  Location: ${r.location || '?'} | Distance: ${r.distance ? `${r.distance} km` : '?'} | Elevation: ${r.elevationGain ? `${r.elevationGain} m` : '?'} | Priority: ${r.priority || '?'}`);
+    if (r.story) parts.push(`  Rider's goal/expectations: ${r.story}`);
+    if (r.description) parts.push(`  Course description: ${r.description}`);
+    return parts.join('\n');
+  });
+
+  return `## Upcoming Races\n\nThe following races are on the athlete's calendar:\n\n${lines.join('\n\n')}`;
 }
 
 export function contextBlocksForIntent(intent: ChatIntent): {

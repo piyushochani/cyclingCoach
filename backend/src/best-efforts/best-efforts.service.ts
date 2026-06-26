@@ -5,15 +5,11 @@ import { readFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
-import { BestEffortRecord, Segment, SegmentEffort } from './best-efforts.schema';
+import { BestEffortRecord, Segment, SegmentEffort, BestEffortsSyncStatus } from './best-efforts.schema';
 import { NotificationService } from '../notification/notification.service';
 
-const DISTANCE_BUCKETS = [
-  { label: '5 km', minKm: 0, maxKm: 7.5 },
-  { label: '10 km', minKm: 7.5, maxKm: 15 },
-  { label: '20 km', minKm: 15, maxKm: 30 },
-  { label: '50 km', minKm: 30, maxKm: 75 },
-  { label: '100 km', minKm: 75, maxKm: 150 },
+const STRAVA_BEST_EFFORT_NAMES = [
+  '1,000m', '5,000m', '10,000m', '20,000m', '30,000m', '40,000m', '50,000m',
 ] as const;
 
 const CYCLING_SPORTS = ['cycling', 'bike', 'ride', 'bicycle'];
@@ -41,11 +37,83 @@ export class BestEffortsService {
     @InjectModel(Segment.name) private segmentModel: Model<Segment>,
     private readonly notificationService: NotificationService,
     @InjectModel(SegmentEffort.name) private segmentEffortModel: Model<SegmentEffort>,
+    @InjectModel(BestEffortsSyncStatus.name) private syncStatusModel: Model<BestEffortsSyncStatus>,
   ) {
     this.loadConfig();
   }
 
+  async getCachedResults(userId: any) {
+    return this.getStoredResults(userId);
+  }
+
+  async getSyncStatus(userId: any) {
+    if (!userId) return { status: 'idle', lastSyncAt: null, hasNewData: false };
+    const status = await this.syncStatusModel.findOne({ user: userId as any }).exec();
+    if (!status) return { status: 'idle', lastSyncAt: null, hasNewData: false };
+    return {
+      status: status.status,
+      lastSyncAt: status.lastSyncAt || null,
+      hasNewData: status.hasNewData || false,
+      error: status.error || null,
+    };
+  }
+
+  async triggerBackgroundSync(userId: any): Promise<{ status: string }> {
+    if (!userId) return { status: 'error' };
+
+    const existing = await this.syncStatusModel.findOne({ user: userId as any }).exec();
+    if (existing && existing.status === 'syncing') {
+      return { status: 'syncing' };
+    }
+
+    await this.syncStatusModel.updateOne(
+      { user: userId as any },
+      { $set: { status: 'syncing', error: null, hasNewData: false, user: userId as any } },
+      { upsert: true },
+    ).exec();
+
+    this.runBackgroundSync(userId).catch(() => {});
+
+    return { status: 'syncing' };
+  }
+
+  private async runBackgroundSync(userId: any) {
+    try {
+      const before = await this.getStoredResults(userId);
+      await this.compute(userId);
+      const after = await this.getStoredResults(userId);
+
+      const hasNewData = JSON.stringify(before) !== JSON.stringify(after);
+
+      await this.syncStatusModel.updateOne(
+        { user: userId as any },
+        { $set: { status: 'idle', lastSyncAt: new Date(), hasNewData } },
+      ).exec();
+    } catch (err: any) {
+      this.logger.error(`Background sync failed: ${err.message}`);
+      await this.syncStatusModel.updateOne(
+        { user: userId as any },
+        { $set: { status: 'idle', error: err.message, lastSyncAt: new Date() } },
+      ).exec();
+    }
+  }
+
   private loadConfig() {
+    // 1. Try environment variables first
+    const envClientId = process.env.STRAVA_CLIENT_ID;
+    const envClientSecret = process.env.STRAVA_CLIENT_SECRET;
+    if (envClientId && envClientSecret) {
+      this.config = {
+        clientId: envClientId,
+        clientSecret: envClientSecret,
+        accessToken: process.env.STRAVA_ACCESS_TOKEN || '',
+        refreshToken: process.env.STRAVA_REFRESH_TOKEN || '',
+        expiresAt: parseInt(process.env.STRAVA_EXPIRES_AT || '0', 10),
+      };
+      return;
+    }
+
+    // 2. Fallback to config.yaml
     const configPaths = [
       join(homedir(), '.cycling-coach', 'config.yaml'),
       join(homedir(), '.config', 'cycling-coach', 'config.yaml'),
@@ -114,84 +182,20 @@ export class BestEffortsService {
     }
   }
 
-  async compute(userId?: any): Promise<{
-    fastest: Record<string, any[]>;
-    longestRides: any[];
-    segments: { koms: any[]; top10: any[]; all: any[] };
-  }> {
-    const userIdObj = userId as any;
-    const empty = { fastest: {}, longestRides: [], segments: { koms: [], top10: [], all: [] } };
-
-    if (!userId) return empty;
-
-    const activities: any[] = await this.stravaFetch('/athlete/activities?per_page=50');
-    if (!activities || !Array.isArray(activities)) {
-      return this.getStoredResults(userIdObj);
+  private async compute(userId: any) {
+    const allActivities: any[] = [];
+    for (let page = 1; page <= 4; page++) {
+      const batch = await this.stravaFetch(`/athlete/activities?per_page=50&page=${page}`);
+      if (!batch || !Array.isArray(batch) || batch.length === 0) break;
+      allActivities.push(...batch);
     }
 
-    const cyclingActivities = activities.filter((a) => isCyclingSport(a.type || ''));
+    if (allActivities.length === 0) return;
 
-    await this.storeFastestEfforts(cyclingActivities, userIdObj);
-    await this.storeLongestRides(cyclingActivities, userIdObj);
-    await this.syncSegmentEfforts(cyclingActivities, userIdObj);
+    const cyclingActivities = allActivities.filter((a) => isCyclingSport(a.type || ''));
 
-    return this.getStoredResults(userIdObj);
-  }
-
-  private async storeFastestEfforts(activities: any[], userId: any) {
-    const oldRecords = await this.bestEffortModel.find({ user: userId, category: 'fastest' }).exec();
-    const oldMap = new Map<string, any>();
-    for (const r of oldRecords) {
-      oldMap.set(`${r.label}-${r.rank}`, r);
-    }
-
-    await this.bestEffortModel.deleteMany({ user: userId, category: 'fastest' }).exec();
-
-    for (const bucket of DISTANCE_BUCKETS) {
-      const distanceMeters = bucket.minKm * 1000;
-      const matches = activities
-        .filter((a) => {
-          const d = (a.distance || 0);
-          return d >= bucket.minKm * 1000 && d < bucket.maxKm * 1000;
-        })
-        .map((a) => ({
-          time: a.moving_time || a.elapsed_time || 0,
-          distance: a.distance || 0,
-          avgSpeed: (a.distance && (a.moving_time || a.elapsed_time))
-            ? (a.distance) / ((a.moving_time || a.elapsed_time))
-            : 0,
-          date: a.start_date_local || a.start_date || '',
-          activityName: a.name || 'Unknown',
-          activityId: String(a.id),
-        }))
-        .sort((a, b) => b.avgSpeed - a.avgSpeed)
-        .slice(0, 5);
-
-      for (let i = 0; i < matches.length; i++) {
-        const key = `${bucket.label}-${i + 1}`;
-        const old = oldMap.get(key);
-        const isNew = old ? matches[i].time < old.time : false;
-        await this.bestEffortModel.create({
-          ...matches[i],
-          label: bucket.label,
-          rank: i + 1,
-          category: 'fastest',
-          user: userId,
-          previousBest: old ? old.time : undefined,
-          isNew,
-        });
-
-        if (isNew) {
-          this.notificationService.createBestEffortNotification(
-            String(userId._id || userId),
-            `Fastest ${bucket.label}`,
-            `${(matches[i].avgSpeed * 3.6).toFixed(1)} km/h avg`,
-            matches[i].activityId,
-            matches[i].activityName,
-          ).catch(() => {});
-        }
-      }
-    }
+    await this.storeLongestRides(cyclingActivities, userId);
+    await this.syncSegmentEfforts(cyclingActivities, userId);
   }
 
   private async storeLongestRides(activities: any[], userId: any) {
@@ -245,54 +249,107 @@ export class BestEffortsService {
     for (const act of activities) {
       if (!isCyclingSport(act.type || '')) continue;
       const detail = await this.stravaFetch(`/activities/${act.id}?include_all_efforts=true`);
-      if (!detail?.segment_efforts) continue;
+      if (!detail) continue;
 
-      for (const se of detail.segment_efforts) {
-        try {
-          const seg = se.segment;
-          if (seg) {
-            await this.segmentModel.updateOne(
-              { stravaId: seg.id, user: userId },
+      if (detail.segment_efforts) {
+        for (const se of detail.segment_efforts) {
+          try {
+            const seg = se.segment;
+            if (seg) {
+              await this.segmentModel.updateOne(
+                { stravaId: seg.id, user: userId },
+                {
+                  $set: {
+                    stravaId: seg.id,
+                    name: seg.name || 'Unknown',
+                    distance: seg.distance || 0,
+                    elevationGain: seg.total_elevation_gain || 0,
+                    city: seg.city || '',
+                    state: seg.state || '',
+                    country: seg.country || '',
+                    user: userId,
+                  },
+                },
+                { upsert: true },
+              ).exec();
+            }
+
+            await this.segmentEffortModel.updateOne(
+              { stravaId: se.id, user: userId },
               {
                 $set: {
-                  stravaId: seg.id,
-                  name: seg.name || 'Unknown',
-                  distance: seg.distance || 0,
-                  elevationGain: seg.total_elevation_gain || 0,
-                  city: seg.city || '',
-                  state: seg.state || '',
-                  country: seg.country || '',
+                  stravaId: se.id,
+                  segmentStravaId: seg?.id || 0,
+                  name: se.name || 'Unknown',
+                  elapsedTime: se.elapsed_time || 0,
+                  movingTime: se.moving_time || 0,
+                  startDate: se.start_date || '',
+                  distance: se.distance || 0,
+                  komRank: se.kom_rank != null ? se.kom_rank : null,
+                  prRank: se.pr_rank != null ? se.pr_rank : null,
+                  isKom: se.kom_rank === 1,
+                  isPr: se.pr_rank === 1,
+                  activityId: String(se.activity?.id || ''),
+                  activityName: se.activity?.name || '',
+                  segmentName: seg?.name || '',
                   user: userId,
                 },
               },
               { upsert: true },
             ).exec();
-          }
+          } catch {}
+        }
+      }
 
-          await this.segmentEffortModel.updateOne(
-            { stravaId: se.id, user: userId },
-            {
-              $set: {
-                stravaId: se.id,
-                segmentStravaId: seg?.id || 0,
-                name: se.name || 'Unknown',
-                elapsedTime: se.elapsed_time || 0,
-                movingTime: se.moving_time || 0,
-                startDate: se.start_date || '',
-                distance: se.distance || 0,
-                komRank: se.kom_rank != null ? se.kom_rank : null,
-                prRank: se.pr_rank != null ? se.pr_rank : null,
-                isKom: se.kom_rank === 1,
-                isPr: se.pr_rank === 1,
-                activityId: String(se.activity?.id || ''),
-                activityName: se.activity?.name || '',
-                segmentName: seg?.name || '',
-                user: userId,
-              },
-            },
-            { upsert: true },
-          ).exec();
-        } catch {}
+      if (detail.best_efforts) {
+        const existingRecords = await this.bestEffortModel.find({ user: userId, category: 'strava_best' }).exec();
+        const existingMap = new Map<string, any>();
+        for (const r of existingRecords) {
+          const t = r.time || 0;
+          const existing = existingMap.get(r.label);
+          if (!existing || t < existing.time) {
+            existingMap.set(r.label, r);
+          }
+        }
+
+        for (const be of detail.best_efforts) {
+          if (!STRAVA_BEST_EFFORT_NAMES.includes(be.name)) continue;
+          const label = be.name;
+          const candidateTime = be.elapsed_time || 0;
+          const existing = existingMap.get(label);
+          if (!existing || candidateTime < existing.time) {
+            existingMap.set(label, {
+              label,
+              time: candidateTime,
+              distance: be.distance || 0,
+              avgSpeed: be.distance && candidateTime ? be.distance / candidateTime : 0,
+              date: be.start_date || '',
+              activityName: detail.name || 'Unknown',
+              activityId: String(detail.id),
+              category: 'strava_best',
+              user: userId,
+              previousBest: existing?.time || null,
+              isNew: existing ? candidateTime < existing.time : true,
+            });
+          }
+        }
+
+        await this.bestEffortModel.deleteMany({ user: userId, category: 'strava_best' }).exec();
+
+        let rank = 1;
+        const sorted = [...existingMap.values()].sort((a, b) => (b.distance || 0) - (a.distance || 0));
+        for (const entry of sorted) {
+          await this.bestEffortModel.create({ ...entry, rank: rank++ });
+          if (entry.isNew) {
+            this.notificationService.createBestEffortNotification(
+              String(userId._id || userId),
+              `Best Effort: ${entry.label}`,
+              `${(entry.time / 60).toFixed(1)} min`,
+              entry.activityId,
+              entry.activityName,
+            ).catch(() => {});
+          }
+        }
       }
     }
   }
@@ -300,23 +357,22 @@ export class BestEffortsService {
   private async getStoredResults(userId: any) {
     const filter = { user: userId as any };
 
-    const fastestRecords = await this.bestEffortModel.find({ ...filter, category: 'fastest' }).sort({ rank: 1 }).exec();
-    const fastest: Record<string, any[]> = {};
-    for (const bucket of DISTANCE_BUCKETS) {
-      fastest[bucket.label] = fastestRecords
-        .filter((r) => r.label === bucket.label)
-        .map((r) => ({
-          id: r._id.toString(),
-          name: r.activityName,
-          time: r.time,
-          date: r.date,
-          distance: r.distance,
-          avgSpeed: r.avgSpeed,
-          rank: r.rank,
-          isNew: r.isNew || false,
-          previousBest: r.previousBest || null,
-        }));
+    let bestEffortRecords = await this.bestEffortModel.find({ ...filter, category: 'strava_best' }).sort({ rank: 1 }).exec();
+    if (bestEffortRecords.length === 0) {
+      bestEffortRecords = await this.bestEffortModel.find({ ...filter, category: 'fastest' }).sort({ rank: 1 }).exec();
     }
+    const bestEfforts = bestEffortRecords.map((r) => ({
+      id: r._id.toString(),
+      label: r.label,
+      name: r.activityName,
+      time: r.time,
+      date: r.date,
+      distance: r.distance,
+      avgSpeed: r.avgSpeed,
+      rank: r.rank,
+      isNew: r.isNew || false,
+      previousBest: r.previousBest || null,
+    }));
 
     const longestRecords = await this.bestEffortModel.find({ ...filter, category: 'longest' }).sort({ rank: 1 }).exec();
     const longestRides = longestRecords.map((r) => ({
@@ -352,6 +408,6 @@ export class BestEffortsService {
     const koms = allEfforts.filter((e) => e.isKom).map(mapEffort);
     const top10 = allEfforts.filter((e) => e.komRank != null && e.komRank <= 10).map(mapEffort);
 
-    return { fastest, longestRides, segments: { koms, top10, all } };
+    return { bestEfforts, longestRides, segments: { koms, top10, all } };
   }
 }

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../../../lib/api";
+import Loader from "../../../components/ui/Loader";
 
 const EQUIPMENT_TYPES = ["tyre", "tube", "chain", "cassette", "brake pad", "cable", "pedal", "saddle", "helmet", "shoes", "clothing", "other"];
 
@@ -219,34 +220,33 @@ export default function GearsPage() {
   const totalBikeKm = bikes.reduce((s, b) => s + (b.distanceUsed || 0), 0);
 
   return (
-    <div className="min-h-screen bg-[#080808]">
+    <div className="min-h-screen bg-black">
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute left-[55%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.05)_0%,transparent_70%)]" />
-        <div className="absolute bottom-[-8%] right-[-5%] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.03)_0%,transparent_70%)]" />
+        <div className="absolute left-[62%] top-[-8%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.06)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-10%] left-[-5%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.04)_0%,transparent_72%)]" />
       </div>
 
-      <div className="relative z-[1] mx-auto max-w-[1200px] px-4 pb-20 pt-10 md:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: -14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-10"
-        >
+      <motion.main
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
+      >
+        <div className="mb-8 border-b border-white/10 pb-6">
           <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Equipment
           </p>
-          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
+          <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
             Your <span className="text-[#FF5500]">Gear</span>
           </h1>
-          <div className="mt-3 h-[2px] w-10 rounded-full bg-[#FF5500]" />
-          <p className="font-dmSans mt-3 text-sm text-white/30">
+          <p className="mt-3 font-dmSans text-sm text-white/50">
             Track your bikes and equipment. Distance is logged automatically to the active bike when you record activities.
           </p>
-        </motion.div>
+        </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FF5500] border-t-transparent" />
+            <Loader size={32} />
           </div>
         ) : (
           <>
@@ -443,7 +443,7 @@ export default function GearsPage() {
             </div>
           </>
         )}
-      </div>
+      </motion.main>
     </div>
   );
 }

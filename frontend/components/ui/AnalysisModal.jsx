@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
+import Loader from './Loader';
 
 const typeLabels = {
   daily: 'Daily Review',
@@ -107,7 +108,7 @@ export default function AnalysisModal({ isOpen, onClose, type, activities, previ
             <div className="flex-1 overflow-y-auto px-6 py-5 custom-scrollbar">
               {loading && !analysis ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
-                  <div className="h-7 w-7 animate-spin rounded-full border-2 border-[#FF5500] border-t-transparent" />
+                  <Loader size={28} />
                   <p className="font-dmSans text-sm text-white/30">Analyzing your training...</p>
                   <p className="font-dmSans text-xs text-white/20">Reviewing {activities?.length || 0} activities</p>
                 </div>

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
@@ -8,6 +8,8 @@ import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Otp.name) private otpModel: Model<Otp>,
@@ -36,7 +38,7 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await this.otpModel.create({ email, code, type, expiresAt });
     this.emailService.sendOtpEmail(email, code, type).catch((err) => {
-      console.error(`Failed to send OTP email to ${email}:`, err.message);
+      this.logger.error(`Failed to send OTP email: ${err.message}`);
     });
     return code;
   }
@@ -85,7 +87,7 @@ export class AuthService {
     user.passwordHash = passwordHash;
     await user.save();
     await this.emailService.sendPasswordChangeNotification(email, user.firstName).catch((err) => {
-      console.error(`Failed to send password change email to ${email}:`, err.message);
+      this.logger.error(`Failed to send password change email: ${err.message}`);
     });
     return user;
   }

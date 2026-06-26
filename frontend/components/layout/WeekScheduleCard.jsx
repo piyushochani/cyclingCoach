@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { api } from "../../lib/api";
+import Loader from "../ui/Loader";
 
 const dayNames = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
@@ -190,16 +191,17 @@ const WeeklyScheduleCard = ({ plan: initialPlan }) => {
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#FF6B00] border-t-transparent" />
+          <Loader size={24} />
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
-          {dayNames.map((day, displayIdx) => {
+              {dayNames.map((day, displayIdx) => {
             const isToday = displayIdx === todayDisplayIdx && isCurrentWeek;
             const workout = workoutMap[displayIdx];
             const style = workout ? detectWorkoutType(workout.type) : workoutTypeStyles.rest;
             const duration = workout?.distance ? formatDuration(workout.distance, workout.type) : null;
             const zone = workout?.zoneBreakdown ? extractHighestZone(workout.zoneBreakdown) : null;
+            const description = workout?.notes || null;
 
             return (
               <motion.div
@@ -233,17 +235,24 @@ const WeeklyScheduleCard = ({ plan: initialPlan }) => {
                             : "text-white/35"
                       }`}
                     >
-                      {isToday ? "Today" : workout ? style.label : "—"}
+                      {isToday ? "Today" : style.label}
                     </span>
-                    {workout && (
+                    {description ? (
+                      <span className="font-dmSans text-[11px] text-white/40 mt-0.5 leading-relaxed">
+                        {description}
+                      </span>
+                    ) : workout ? (
                       <span className="font-dmSans text-[11px] text-white/30 mt-0.5">
                         {zone ? `${zone} ` : ""}{duration || ""}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0 ml-3">
+                  {workout?.completed && (
+                    <span className="text-emerald-400 text-xs mr-0.5">✓</span>
+                  )}
                   <span
                     className={`h-2 w-2 rounded-full ${
                       isToday

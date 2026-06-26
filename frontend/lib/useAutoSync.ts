@@ -105,7 +105,7 @@ export async function triggerGlobalSync(): Promise<boolean> {
   setSyncStatus("syncing");
   try {
     await api.post("/sync/refresh", {});
-    await api.get("/best-efforts");
+    api.post("/best-efforts/refresh", {}).catch(() => {});
     const now = Date.now();
     setLastSyncTime(now);
     setSyncStatus("success");

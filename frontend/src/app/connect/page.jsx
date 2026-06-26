@@ -128,32 +128,30 @@ export default function ConnectPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#080808]">
+    <div className="min-h-screen bg-black">
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute left-[50%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.05)_0%,transparent_70%)]" />
-        <div className="absolute bottom-[-12%] right-[-5%] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.03)_0%,transparent_70%)]" />
+        <div className="absolute left-[62%] top-[-8%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.06)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-10%] left-[-5%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.04)_0%,transparent_72%)]" />
       </div>
 
-      <div className="relative z-[1] mx-auto max-w-[1200px] px-4 pb-20 pt-10 md:px-8">
-        {/* Hero */}
-        <motion.div
-          initial={{ opacity: 0, y: -14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-12"
-        >
+      <motion.main
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
+      >
+        <div className="mb-8 border-b border-white/10 pb-6">
           <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Integration
           </p>
-          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
+          <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
             Connect With <span className="text-[#FF5500]">Strava</span>
           </h1>
-          <div className="mt-3 h-[2px] w-10 rounded-full bg-[#FF5500]" />
-          <p className="font-dmSans mt-4 max-w-2xl text-sm leading-relaxed text-white/40">
+          <p className="mt-3 font-dmSans text-sm text-white/50">
             Link your Strava account to bring every ride, run, and adventure into CyclogenAI.
             Your dashboard, statistics, and AI coach will automatically reflect your real training data.
           </p>
-        </motion.div>
+        </div>
 
         {/* Big Connection Card */}
         <motion.div
@@ -402,7 +400,7 @@ export default function ConnectPage() {
             </div>
           </div>
         </motion.div>
-      </div>
+      </motion.main>
     </div>
   );
 }

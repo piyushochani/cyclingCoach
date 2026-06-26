@@ -142,32 +142,26 @@ export default function ExpensesPage() {
   const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#080808",
-        padding: "2.5rem 1.5rem 5rem",
-        fontFamily: "'DM Sans', sans-serif",
-        color: "#fff",
-      }}
-    >
-      <div style={{ maxWidth: 1120, margin: "0 auto" }}>
-        <motion.div
-          initial={{ opacity: 0, y: -14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          style={{ marginBottom: "2.5rem" }}
-        >
+    <div className="min-h-screen bg-black">
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute left-[62%] top-[-8%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.06)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-10%] left-[-5%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.04)_0%,transparent_72%)]" />
+      </div>
+
+      <motion.main
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
+      >
+        <div className="mb-8 border-b border-white/10 pb-6">
           <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Finance
           </p>
-
-          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
-            YOUR <span style={{ color: "#FF5500" }}>EXPENSES</span>
+          <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
+            YOUR <span className="text-[#FF5500]">EXPENSES</span>
           </h1>
-
-          <div style={{ width: 36, height: 2, background: "#FF5500", marginBottom: 14, borderRadius: 2 }} />
-        </motion.div>
+        </div>
 
         <motion.div
           initial={{ opacity: 0, y: 10 }}
@@ -746,7 +740,7 @@ export default function ExpensesPage() {
             </>
           )}
         </motion.div>
-      </div>
+      </motion.main>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { FaqController } from './faq.controller';
 import { User, UserSchema } from '../user/user.schema';
 import { Activity, ActivitySchema } from '../activity/activity.schema';
 import { Bike, BikeSchema, Equipment, EquipmentSchema } from '../gear/gear.schema';
+import { Race, RaceSchema } from '../race/race.schema';
 import { TrainingContextModule } from '../training-context/training-context.module';
 import { AnalysisModule } from '../analysis/analysis.module';
 
@@ -23,6 +24,7 @@ import { AnalysisModule } from '../analysis/analysis.module';
       { name: Activity.name, schema: ActivitySchema },
       { name: Bike.name, schema: BikeSchema },
       { name: Equipment.name, schema: EquipmentSchema },
+      { name: Race.name, schema: RaceSchema },
     ]),
     forwardRef(() => TrainingContextModule),
     forwardRef(() => AnalysisModule),

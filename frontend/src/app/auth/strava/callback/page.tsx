@@ -56,8 +56,9 @@ function StravaCallbackInner() {
         setMessage("First sync in progress...");
         return api.post("/sync/refresh", {});
       })
-      .then(async () => {
+      .then(async (syncResult) => {
         if (cancelled) return;
+        api.post("/best-efforts/refresh", {}).catch(() => {});
         try {
           const stored = localStorage.getItem("cyclogenai_user");
           if (stored) {

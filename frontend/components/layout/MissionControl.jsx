@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../../lib/api';
+import Loader from '../ui/Loader';
 
 const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -108,7 +109,7 @@ const MissionControl = ({ races = [] }) => {
       <h3 className="font-bebasNeue text-xl text-text-primary mb-3">Weekly Schedule</h3>
       {planLoading ? (
         <div className="flex items-center justify-center py-6">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#FF6B00] border-t-transparent" />
+          <Loader size={20} />
         </div>
       ) : (
         <div className="grid grid-cols-7 gap-1 text-center font-dmSans text-sm">

@@ -66,10 +66,13 @@ export default function ForgotPasswordPage() {
         className="relative w-full max-w-md"
       >
         <div className="rounded-[24px] border border-[#FF5500]/15 bg-[#111318]/95 p-8 shadow-[0_0_60px_rgba(255,85,0,0.08)] backdrop-blur-xl">
-          <div className="mb-8 flex justify-center">
+          <div className="mb-8 flex flex-col items-center">
             <Link href="/">
               <img src="/images/cyclogen_logo.png" alt="Cyclogen" className="h-15 w-40" />
             </Link>
+            <div className="mt-3">
+              <Link href="/" className="font-dmSans text-xs text-white/30 transition hover:text-white/50">&larr; Back to home</Link>
+            </div>
           </div>
 
           {step === 0 ? (

@@ -53,11 +53,11 @@ export default function LoginPage() {
         <div className="rounded-[24px] border border-white/10 bg-[#111318]/90 p-8 shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           <div className="mb-8 text-center">
             <Link href="/" className="inline-flex items-center gap-2">
-              <img src="/images/cyclogen_logo.png" alt="Cyclogen" className="h-8 w-auto" />
-              <span className="font-barlowCondensed text-2xl uppercase tracking-[0.08em] text-white">
-                CyclogenAI
-              </span>
+              <img src="/images/cyclogen_logo.png" alt="Cyclogen" className="h-15 w-40" />
             </Link>
+            <div className="mt-3">
+              <Link href="/" className="font-dmSans text-xs text-white/30 transition hover:text-white/50">&larr; Back to home</Link>
+            </div>
           </div>
 
           <h1 className="font-barlowCondensed text-3xl uppercase tracking-[0.04em] text-white">
@@ -97,9 +97,17 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl px-6 py-3 text-sm font-semibold bg-[#FF5500] hover:bg-[#FF5500]/90 text-white transition-all duration-200 disabled:opacity-50"
+              className="relative overflow-hidden rounded-xl bg-[#FF5500] px-6 py-3.5 font-dmSans text-sm font-semibold text-white shadow-[0_8px_30px_rgba(255,85,0,0.3)] transition hover:bg-[#e04a00] active:scale-[0.98] disabled:opacity-50"
             >
-              {loading ? "Logging in..." : "Log In"}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Logging in...
+                </span>
+              ) : "Log In"}
             </button>
           </form>
 

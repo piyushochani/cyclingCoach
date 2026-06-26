@@ -8,6 +8,7 @@ import { AgentMemory } from './agent-memory.schema';
 import { User } from '../user/user.schema';
 import { Activity } from '../activity/activity.schema';
 import { Bike, Equipment } from '../gear/gear.schema';
+import { Race } from '../race/race.schema';
 import { TrainingContextService } from '../training-context/training-context.service';
 import { EmbeddingService } from '../analysis/embedding.service';
 import { PineconeClient } from '../analysis/pinecone-client';
@@ -15,6 +16,7 @@ import {
   buildActivitySummary,
   buildAthleteProfile,
   buildMonthSummary,
+  buildRaceContext,
   contextBlocksForIntent,
   mergeAthleteContext,
 } from './agent-athlete-context';
@@ -72,6 +74,7 @@ export class AgentService {
     @InjectModel(Activity.name) private activityModel: Model<Activity>,
     @InjectModel(Bike.name) private bikeModel: Model<Bike>,
     @InjectModel(Equipment.name) private equipmentModel: Model<Equipment>,
+    @InjectModel(Race.name) private raceModel: Model<Race>,
   ) {
     this.tools = createAgentTools();
     this.loadApiKeys();
@@ -204,6 +207,13 @@ export class AgentService {
       } catch (err) {
         this.logger.warn(`Failed to load weekly plan: ${err}`);
       }
+    }
+
+    try {
+      const raceContext = await buildRaceContext(this.raceModel, userId);
+      if (raceContext) extraBlocks.push(raceContext);
+    } catch (err) {
+      this.logger.warn(`Failed to load race context: ${err}`);
     }
 
     if (intent === 'month') {

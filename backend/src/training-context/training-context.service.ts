@@ -196,6 +196,37 @@ export class TrainingContextService {
     return plan.save();
   }
 
+  async markWorkoutCompletedByDate(userId: string, activityDate: Date): Promise<{ matched: boolean; workoutType?: string }> {
+    const trainingStart = await this.getTrainingStart(userId);
+    const relativeWeek = this.computeRelativeWeek(activityDate, trainingStart);
+    const plan = await this.weeklyPlanModel.findOne({ user: userId as any, relativeWeek }).exec();
+    if (!plan) return { matched: false };
+
+    const dayOfWeek = (activityDate.getDay() + 6) % 7;
+    const dayWorkouts = plan.workouts.filter((w) => w.dayOfWeek === dayOfWeek && w.type !== 'rest');
+    if (dayWorkouts.length === 0) return { matched: false };
+
+    for (const w of dayWorkouts) {
+      w.completed = true;
+      w.completedAt = activityDate as any;
+    }
+    plan.updatedAt = new Date();
+    await plan.save();
+    return { matched: true, workoutType: dayWorkouts[0].type };
+  }
+
+  async getPlannedWorkoutForDate(userId: string, date: Date): Promise<{ type?: string; distance?: number; notes?: string } | null> {
+    const trainingStart = await this.getTrainingStart(userId);
+    const relativeWeek = this.computeRelativeWeek(date, trainingStart);
+    const plan = await this.weeklyPlanModel.findOne({ user: userId as any, relativeWeek }).lean().exec();
+    if (!plan) return null;
+
+    const dayOfWeek = (date.getDay() + 6) % 7;
+    const workout = plan.workouts.find((w: any) => w.dayOfWeek === dayOfWeek);
+    if (!workout) return null;
+    return { type: workout.type, distance: workout.distance, notes: workout.notes };
+  }
+
   async deleteWeeklyPlan(userId: string, relativeWeek: number): Promise<boolean> {
     const result = await this.weeklyPlanModel.findOneAndDelete({
       user: userId as any,
