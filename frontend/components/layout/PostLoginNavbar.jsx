@@ -133,18 +133,21 @@ const PostLoginNavbar = () => {
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-40 flex h-20 items-center justify-between border-b border-[#FF5500]/20 bg-[#0A0A0A] px-8 shadow-[0_0_20px_rgba(255,85,0,0.08)] md:px-16">
+    <nav className="fixed top-0 left-0 right-0 z-40 flex h-[63px] items-center justify-between border-b border-[#FF5500]/20 bg-[#0A0A0A] px-4 shadow-[0_0_20px_rgba(255,85,0,0.08)] md:px-8">
       {/* Logo */}
       <Link href="/dashboard">
         <motion.div
-          className="flex items-center cursor-pointer"
+          className="flex items-center cursor-pointer gap-2.5"
           whileHover={{ scale: 1.05 }}
         >
           <img
-            src="/images/cyclogen_logo.png"
+            src="/images/C_icon.png"
             alt="Cyclogen"
-            className="h-15 w-40"
+            className="h-8 w-auto"
           />
+          <span className="font-barlowCondensed text-xl font-bold uppercase tracking-wide text-white">
+            Cyclogen<span className="text-[#FF5500]">AI</span>
+          </span>
         </motion.div>
       </Link>
 
@@ -154,7 +157,7 @@ const PostLoginNavbar = () => {
           <div key={link.name} className="relative">
             <Link
               href={link.href}
-              className={`rounded-lg px-4 py-2 font-dmSans text-sm font-medium tracking-wide transition-all duration-200 ${
+              className={`rounded-lg px-3 py-1.5 font-dmSans text-base font-medium tracking-wide transition-all duration-200 ${
                 pathname === link.href
                   ? 'bg-[#FF5500]/10 text-[#FF5500]'
                   : 'text-white/60 hover:bg-white/5 hover:text-white'
@@ -165,7 +168,7 @@ const PostLoginNavbar = () => {
             {pathname === link.href && (
               <motion.div
                 layoutId="navbar-underline"
-                className="absolute -bottom-[9px] left-2 right-2 h-[2px] bg-[#FF5500] rounded-full shadow-[0_0_6px_rgba(255,85,0,0.6)]"
+                className="absolute -bottom-[6px] left-2 right-2 h-[2px] bg-[#FF5500] rounded-full shadow-[0_0_6px_rgba(255,85,0,0.6)]"
               />
             )}
           </div>

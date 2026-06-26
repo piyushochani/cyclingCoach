@@ -16,7 +16,7 @@ import { JwtStrategy } from './jwt.strategy';
     MongooseModule.forFeature([{ name: Otp.name, schema: OtpSchema }]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'fallback_secret',
+      secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '7d' },
     }),
     EmailModule,

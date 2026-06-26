@@ -6,6 +6,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area, LineChart, Line,
 } from 'recharts';
+import Loader from '../../../components/ui/Loader';
 import { api } from '../../../lib/api';
 import AnalysisModal from '../../../components/ui/AnalysisModal';
 
@@ -58,7 +59,7 @@ function CountUp({ value, suffix = '', decimals = 0 }) {
     }, duration / (end / step || 1));
     return () => clearInterval(timer);
   }, [value]);
-  return <span>{display.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}{suffix}</span>;
+  return <span>{display.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: false })}{suffix}</span>;
 }
 
 function StatCard({ icon, label, value, suffix, delay, sub }) {
@@ -105,8 +106,8 @@ const CustomTooltip = ({ active, payload, label, formatter }) => {
     <div className="rounded-xl border border-[#FF5500]/30 bg-surface-cards px-4 py-3 shadow-2xl backdrop-blur-xl">
       <p className="font-dmSans text-xs text-white/50">{label}</p>
       {payload.map((p, i) => (
-        <p key={i} className="font-jetbrainsMono text-sm font-bold text-white">
-          {formatter ? formatter(p) : `${p.value.toLocaleString()} ${p.name === 'distance' ? 'km' : p.name === 'elevation' || p.name === 'elevationGain' ? 'm' : p.name === 'count' || p.name === 'activities' ? 'activities' : p.name === 'hours' || p.name === 'duration' ? 'hrs' : ''}`}
+          <p key={i} className="font-jetbrainsMono text-sm font-bold text-white">
+            {formatter ? formatter(p) : `${p.value.toLocaleString('en-US', { useGrouping: false })} ${p.name === 'distance' ? 'km' : p.name === 'elevation' || p.name === 'elevationGain' ? 'm' : p.name === 'count' || p.name === 'activities' ? 'activities' : p.name === 'hours' || p.name === 'duration' ? 'hrs' : ''}`}
         </p>
       ))}
     </div>
@@ -226,13 +227,17 @@ export default function StatisticsPage() {
   }, [filteredActivities]);
 
   const bestEffortsPanel = useMemo(() => {
-    if (!bestEfforts?.fastest) return [];
-    const labels = ['5 km', '10 km', '20 km', '50 km', '100 km'];
-    return labels.map((label) => {
-      const efforts = bestEfforts.fastest[label];
-      if (!efforts?.length) return { label, best: null };
-      return { label, best: efforts[0] };
-    }).filter((e) => e.best);
+    if (!bestEfforts?.bestEfforts) return [];
+    const labelOrder = ['1,000m', '5,000m', '10,000m', '20,000m', '30,000m', '40,000m', '50,000m'];
+    const bestByLabel = {};
+    for (const e of bestEfforts.bestEfforts) {
+      if (!bestByLabel[e.label] || e.rank < bestByLabel[e.label].rank) {
+        bestByLabel[e.label] = e;
+      }
+    }
+    return labelOrder
+      .map((label) => ({ label, best: bestByLabel[label] || null }))
+      .filter((e) => e.best);
   }, [bestEfforts]);
 
   const longestRides = useMemo(() => {
@@ -324,7 +329,7 @@ export default function StatisticsPage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FF5500] border-t-transparent" />
+          <Loader size={32} />
           <p className="font-dmSans text-sm text-white/30">Loading statistics...</p>
         </div>
       </div>
@@ -338,26 +343,24 @@ export default function StatisticsPage() {
         <div className="absolute bottom-[-10%] left-[-5%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.04)_0%,transparent_72%)]" />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="relative z-[1] mx-auto max-w-[1200px] px-4 pb-16 pt-6 md:px-8"
+      <motion.main
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
       >
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-6"
-        >
+        <div className="mb-8 border-b border-white/10 pb-6">
           <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Performance Analytics
           </p>
-          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
+          <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
             Your <span className="text-[#FF5500]">Numbers</span>
           </h1>
-          <div className="mt-3 h-[2px] w-10 rounded-full bg-[#FF5500]" />
-        </motion.div>
+          <p className="mt-3 font-dmSans text-sm text-white/50">
+            Track your season, review training consistency, and monitor your performance.
+          </p>
+        </div>
 
         {/* Weekly Goal Banner */}
         <motion.div
@@ -507,10 +510,10 @@ export default function StatisticsPage() {
         <div className="mb-8 grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           <StatCard icon="🚴" label="Total Distance" value={totalDistance.toFixed(2)} suffix=" km" delay={0.1} sub={activityCount > 0 ? `Avg ${avgDistance.toFixed(2)} km` : undefined} />
           <StatCard icon="⏱️" label="Moving Time" value={formatDuration(totalDuration)} suffix="" delay={0.13} sub={activityCount > 0 ? `Avg ${formatDurationShort(avgDuration)}` : undefined} />
-          <StatCard icon="🗻" label="Elevation" value={totalElevation.toFixed(2)} suffix=" m" delay={0.16} />
+          <StatCard icon="🗻" label="Elevation" value={totalElevation.toFixed(1)} suffix=" m" delay={0.16} />
           <StatCard icon="📊" label="Activities" value={activityCount} suffix="" delay={0.19} />
           <StatCard icon="📈" label="Longest Ride" value={longestRideVal.toFixed(2)} suffix=" km" delay={0.22} />
-          <StatCard icon="🏔️" label="Biggest Climb" value={biggestElevDay.toFixed(2)} suffix=" m" delay={0.25} />
+          <StatCard icon="🏔️" label="Biggest Climb" value={biggestElevDay.toFixed(1)} suffix=" m" delay={0.25} />
         </div>
 
         {/* AI Review Buttons */}
@@ -678,7 +681,7 @@ export default function StatisticsPage() {
                         {formatDurationShort(e.best.time)}
                       </div>
                       <div className="font-dmSans text-[10px] text-white/30">
-                        {(e.best.avgSpeed * 3.6).toFixed(2)} km/h
+                        {(e.best.avgSpeed * 3.6).toFixed(1)} km/h
                       </div>
                     </div>
                   </div>
@@ -827,7 +830,7 @@ export default function StatisticsPage() {
                       <td className="font-dmSans py-2.5 pr-3 text-xs text-white/70">{a.name}</td>
                        <td className="font-jetbrainsMono py-2.5 text-right text-xs text-white">{(a.distance || 0).toFixed(2)} km</td>
                        <td className="font-jetbrainsMono hidden py-2.5 text-right text-xs text-white/60 md:table-cell">{formatDurationShort(a.durationSeconds || 0)}</td>
-                       <td className="font-jetbrainsMono hidden py-2.5 text-right text-xs text-white/60 lg:table-cell">{(a.elevationGain || 0).toFixed(2)} m</td>
+                       <td className="font-jetbrainsMono hidden py-2.5 text-right text-xs text-white/60 lg:table-cell">{(a.elevationGain || 0).toFixed(1)} m</td>
                     </tr>
                   ))}
                 </tbody>
@@ -835,7 +838,7 @@ export default function StatisticsPage() {
             </div>
           </motion.div>
         </div>
-      </motion.div>
+      </motion.main>
 
       <AnalysisModal
         isOpen={analysisModal.open}

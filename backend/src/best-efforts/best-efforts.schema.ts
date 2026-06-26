@@ -123,3 +123,23 @@ export class SegmentEffort extends Document {
 }
 
 export const SegmentEffortSchema = SchemaFactory.createForClass(SegmentEffort);
+
+@Schema({ collection: 'best_efforts_sync_status', timestamps: true })
+export class BestEffortsSyncStatus extends Document {
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, unique: true })
+  user: MongooseSchema.Types.ObjectId;
+
+  @Prop({ default: 'idle' })
+  status: string;
+
+  @Prop()
+  lastSyncAt: Date;
+
+  @Prop()
+  error: string;
+
+  @Prop({ default: false })
+  hasNewData: boolean;
+}
+
+export const BestEffortsSyncStatusSchema = SchemaFactory.createForClass(BestEffortsSyncStatus);

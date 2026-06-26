@@ -9,7 +9,7 @@ class ApiError extends Error {
 }
 
 const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 10000;
+const CACHE_TTL = 300000;
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -54,7 +54,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   const headers = { ...getAuthHeaders(), ...options?.headers };
   const res = await fetch(`${API_BASE}${path}`, {
-    cache: 'no-store',
     ...options,
     headers,
   });

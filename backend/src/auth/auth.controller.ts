@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { SyncService } from '../sync/sync.service';
@@ -9,6 +9,8 @@ const SYNC_MONTHS = parseInt(process.env.STRAVA_SYNC_MONTHS || '6', 10);
 @Public()
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly syncService: SyncService,
@@ -82,26 +84,14 @@ export class AuthController {
       const cutoff = new Date(Date.now() - SYNC_MONTHS * 30 * 24 * 3600 * 1000);
       const lastActivity = await this.syncService.getLatestActivityDate(user._id as any);
       const isUpToDate = user.isStravaUpToDate && lastActivity && lastActivity >= cutoff;
-      console.log(`\n  ╔══════════════════════════════════════════╗`);
-      console.log(`  ║         Strava Sync Status               ║`);
-      console.log(`  ╠══════════════════════════════════════════╣`);
-      console.log(`  ║  Last synced : ${(user.stravaUpdatedAt?.toISOString().slice(0, 19) || 'never').padEnd(25)}║`);
-      console.log(`  ║  Up to date  : ${String(isUpToDate).padEnd(25)}║`);
-      console.log(`  ║  Window      : ${`${SYNC_MONTHS} months`.padEnd(25)}║`);
-      console.log(`  ╚══════════════════════════════════════════╝\n`);
 
       if (!isUpToDate) {
-        console.log('  → Auto-triggering incremental sync...');
         this.syncService.incrementalSync(user._id as any).then((r) => {
-          console.log(`  → Sync complete: ${r.newActivities} new activities`);
-        }).catch(() => {});
+          this.logger.log(`Sync complete: ${r.newActivities} new activities`);
+        }).catch((err) => {
+          this.logger.warn(`Sync failed: ${err.message}`);
+        });
       }
-    } else {
-      console.log(`\n  ╔══════════════════════════════════════════╗`);
-      console.log(`  ║         Strava Sync Status               ║`);
-      console.log(`  ╠══════════════════════════════════════════╣`);
-      console.log(`  ║  Never synced                            ║`);
-      console.log(`  ╚══════════════════════════════════════════╝\n`);
     }
 
     return {

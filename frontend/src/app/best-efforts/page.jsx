@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
+import Loader from "../../../components/ui/Loader";
 
 const SEGMENT_FILTERS = ["KOMs", "Top 10", "All"];
 
@@ -10,14 +11,13 @@ function formatTime(secs) {
   if (!secs) return "—";
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
-  const s = secs % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-  return `${m}:${String(s).padStart(2, "0")}`;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}`;
+  return `${m}:${String(Math.floor(secs % 60)).padStart(2, "0")}`;
 }
 
 function formatSpeed(ms) {
   if (!ms) return "—";
-  return `${(ms * 3.6).toFixed(2)} km/h`;
+  return `${(ms * 3.6).toFixed(1)} km/h`;
 }
 
 function formatDistance(meters) {
@@ -184,35 +184,49 @@ export default function BestEffortsPage() {
   const [segmentFilter, setSegmentFilter] = useState("KOMs");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [expandedFastest, setExpandedFastest] = useState(false);
   const [expandedLongest, setExpandedLongest] = useState(false);
   const [expandedSegments, setExpandedSegments] = useState(false);
 
-  useEffect(() => {
-    setLoading(true);
-    api.post("/sync/refresh", {}).catch(() => {});
-    api.get("/best-efforts")
-      .then((d) => {
-        if (d) {
-          setData(d);
-          const keys = Object.keys(d.fastest || {}).sort((a, b) => {
-            const numA = parseFloat(a);
-            const numB = parseFloat(b);
-            return numA - numB;
-          });
-          setDistanceTabs(keys);
-          if (keys.length > 0 && !activeTab) setActiveTab(keys[0]);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+  const loadData = useCallback(async () => {
+    const d = await api.get("/best-efforts").catch(() => null);
+    if (d) {
+      setData(d);
+      const labels = [...new Set((d.bestEfforts || []).map((e) => e.label))].sort((a, b) => {
+        const numA = parseFloat(a.replace(/,/g, ''));
+        const numB = parseFloat(b.replace(/,/g, ''));
+        return numA - numB;
+      });
+      setDistanceTabs(labels);
+      if (labels.length > 0 && !activeTab) setActiveTab(labels[0]);
+    }
   }, []);
 
-  const currentEfforts = data?.fastest?.[activeTab] || [];
+  useEffect(() => {
+    setLoading(true);
+    loadData().finally(() => setLoading(false));
+
+    api.post("/best-efforts/refresh", {}).then((res) => {
+      if (res?.status === 'syncing') {
+        setSyncing(true);
+        const poll = setInterval(async () => {
+          const status = await api.get("/best-efforts/status").catch(() => null);
+          if (!status || status.status !== 'syncing') {
+            clearInterval(poll);
+            setSyncing(false);
+            loadData();
+          }
+        }, 2000);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const currentEfforts = (data?.bestEfforts || []).filter((e) => activeTab ? e.label === activeTab : true).sort((a, b) => a.rank - b.rank);
   const longestRides = data?.longestRides || [];
   const segments = data?.segments || { koms: [], top10: [], all: [] };
 
-  const hasData = data && (Object.values(data?.fastest || {}).flat().length > 0 ||
+  const hasData = data && ((data?.bestEfforts || []).length > 0 ||
     (data?.longestRides || []).length > 0 ||
     (data?.segments?.all || []).length > 0);
 
@@ -223,40 +237,39 @@ export default function BestEffortsPage() {
   }, [segmentFilter, segments]);
 
   const summaryStats = useMemo(() => {
-    const fastest = Object.values(data?.fastest || {}).flat();
+    const bes = data?.bestEfforts || [];
     return {
-      totalEfforts: fastest.length + longestRides.length,
-      prs: Object.values(data?.fastest || {}).map((e) => e[0]).filter(Boolean).length,
+      totalEfforts: bes.length + longestRides.length,
+      prs: bes.filter((e) => e.rank === 1).length,
       komCount: (segments.koms || []).length,
       longest: longestRides.length,
     };
   }, [data, longestRides, segments]);
 
   return (
-    <div className="min-h-screen bg-[#080808]">
+    <div className="min-h-screen bg-black">
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="absolute left-[55%] top-[-10%] h-[500px] w-[500px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.05)_0%,transparent_70%)]" />
-        <div className="absolute bottom-[-8%] right-[-5%] h-[400px] w-[400px] rounded-full bg-[radial-gradient(circle,rgba(255,85,0,0.03)_0%,transparent_70%)]" />
+        <div className="absolute left-[62%] top-[-8%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.06)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-10%] left-[-5%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.04)_0%,transparent_72%)]" />
       </div>
 
-      <div className="relative z-[1] mx-auto max-w-[1200px] px-4 pb-16 pt-10 md:px-8">
-        <motion.div
-          initial={{ opacity: 0, y: -14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mb-8"
-        >
+      <motion.main
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
+      >
+        <div className="mb-8 border-b border-white/10 pb-6">
           <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Strava · Cycling
           </p>
-          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
+          <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
             Best <span className="text-[#FF5500]">Efforts</span>
           </h1>
-          <div className="mt-3 h-[2px] w-9 rounded-full bg-[#FF5500]" />
-          <p className="font-dmSans mt-3 text-sm text-white/30">
+          <p className="mt-3 font-dmSans text-sm text-white/50">
             Your fastest rides, longest distances, and segment rankings.
           </p>
-        </motion.div>
+        </div>
 
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -282,9 +295,16 @@ export default function BestEffortsPage() {
           </div>
         </motion.div>
 
+        {syncing && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-[#FF5500]/20 bg-[#FF5500]/5 px-4 py-2">
+            <Loader size={14} />
+            <span className="font-dmSans text-[11px] text-[#FF5500]/70">Syncing latest data from Strava...</span>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FF5500] border-t-transparent" />
+            <Loader size={32} />
           </div>
         ) : !hasData ? (
           <motion.div
@@ -458,9 +478,9 @@ export default function BestEffortsPage() {
                 </div>
               </motion.div>
             )}
-          </>
-        )}
-      </div>
+            </>
+          )}
+        </motion.main>
     </div>
   );
 }

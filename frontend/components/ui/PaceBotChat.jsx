@@ -4,6 +4,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { api } from '../../lib/api';
 
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
 const COACH_STORAGE_KEY = "cyclogenai_selected_coach";
 const TRAINING_START_KEY = "cyclogenai_training_start";
 
@@ -16,6 +19,29 @@ function loadCoach() {
     }
     return JSON.parse(localStorage.getItem(COACH_STORAGE_KEY));
   } catch { return null; }
+}
+
+function getMonday(d) {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  return date;
+}
+
+function getCurrentRelativeWeek() {
+  try {
+    const stored = localStorage.getItem("cyclogenai_user");
+    if (stored) {
+      const u = JSON.parse(stored);
+      if (u.trainingStart) {
+        const startMonday = getMonday(new Date(u.trainingStart));
+        const todayMonday = getMonday(new Date());
+        const diffMs = todayMonday.getTime() - startMonday.getTime();
+        return Math.round(diffMs / (7 * 86400000));
+      }
+    }
+  } catch {}
+  return 0;
 }
 
 function getTrainingWeek() {
@@ -65,6 +91,54 @@ function clearSavedSession() {
   localStorage.removeItem(SAVED_SESSION_KEY);
 }
 
+const FLOW = { IDLE: 0, OPT_WEEK: 1, OPT_CHANGES: 2, OPT_CONFIRM: 3 };
+
+const RIGIDITY_RULES = [
+  { keyword: 'injury', note: 'Taking rest or reducing intensity due to injury is the right call — recovery comes first.' },
+  { keyword: 'sick', note: 'Rest is essential when you\'re under the weather. Pushing through will only set you back.' },
+  { keyword: 'race', note: 'Adjusting around a race makes sense — we should keep you fresh for race day.' },
+  { keyword: 'event', note: 'Life events take priority. We\'ll adjust the plan to fit your schedule.' },
+  { keyword: 'work', note: 'Work schedule changes are a valid reason to shift workouts around.' },
+  { keyword: 'weather', note: 'Weather can make training unsafe or impractical. Smart to adjust.' },
+  { keyword: 'time', note: 'If you\'re short on time, we can swap or shorten sessions.' },
+  { keyword: 'tired', note: 'Fatigue is a signal, not a weakness. Recovery is training too.' },
+  { keyword: 'fatigue', note: 'Accumulated fatigue deserves respect. Let\'s adjust the load.' },
+  { keyword: 'pain', note: 'Pain is a warning sign. Reducing intensity or taking rest is wise.' },
+  { keyword: 'bike', note: 'Bike issues or maintenance are a valid reason to adjust.' },
+  { keyword: 'travel', note: 'Travel plans can interrupt training. We can reschedule around it.' },
+];
+
+function fmtDist(km) {
+  if (km == null || isNaN(km)) return '';
+  return ` ${Number(km).toFixed(2)}km`;
+}
+
+function formatPlanForChat(plan, weekLabel) {
+  if (!plan || !plan.workouts) return `No plan found for ${weekLabel}.`;
+  const days = plan.workouts
+    .sort((a, b) => a.dayOfWeek - b.dayOfWeek)
+    .map((w) => {
+      const dist = fmtDist(w.distance);
+      const zone = w.zoneBreakdown ? ` (${w.zoneBreakdown})` : '';
+      const terrain = w.terrain ? ` · ${w.terrain}` : '';
+      const importance = w.importance === 'high' ? ' 🔴' : w.importance === 'low' ? ' 🟢' : ' 🟡';
+      return `${DAY_NAMES_FULL[w.dayOfWeek]}: ${w.type}${dist}${zone}${terrain}${importance}`;
+    }).join('\n');
+  const notes = plan.coachNotes ? `\n\nCoach Notes: ${plan.coachNotes}` : '';
+  const aim = plan.skeleton?.aim ? `\n\n🎯 Weekly Focus: ${plan.skeleton.aim}` : '';
+  return `${weekLabel}:\n${days}${aim}${notes}`;
+}
+
+function validateOptimizeReason(reason) {
+  const lower = reason.toLowerCase();
+  for (const rule of RIGIDITY_RULES) {
+    if (lower.includes(rule.keyword)) {
+      return { valid: true, note: rule.note };
+    }
+  }
+  return { valid: false, note: '' };
+}
+
 const PaceBotChat = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -74,6 +148,8 @@ const PaceBotChat = () => {
   const [coach, setCoach] = useState(null);
   const [userProfileImage, setUserProfileImage] = useState(null);
   const [showingContinuePrompt, setShowingContinuePrompt] = useState(false);
+  const [flowState, setFlowState] = useState(FLOW.IDLE);
+  const [flowData, setFlowData] = useState({});
   const messagesEndRef = useRef(null);
   const pendingCommandRef = useRef(null);
   const sessionIdRef = useRef(null);
@@ -169,7 +245,11 @@ const PaceBotChat = () => {
     if (isOpen && pendingCommandRef.current) {
       const cmd = pendingCommandRef.current;
       pendingCommandRef.current = null;
-      sendToAgent(cmd);
+      if (cmd.toLowerCase().startsWith('/optimize')) {
+        processMessage(cmd);
+      } else {
+        sendToAgent(cmd);
+      }
     }
   }, [isOpen]);
 
@@ -186,6 +266,7 @@ const PaceBotChat = () => {
     '/new': 'Start a fresh conversation',
     '/clear': 'Clear the current chat',
     '/continue': 'Resume your previous expired session',
+    '/optimize': 'Optimize your weekly training plan',
     '/analyse': 'Analyze your most recent activity and compare with the planned workout',
     '/plan': 'View or generate your weekly training plan',
     '/review': 'Get an AI review of your last ride',
@@ -203,13 +284,104 @@ const PaceBotChat = () => {
     setMessages((prev) => [...prev, { id: Date.now(), sender: 'bot', text }]);
   }, []);
 
+  const fetchPlan = async (relativeWeek) => {
+    try {
+      const res = await api.get(`/training-context/weekly-plan?relativeWeek=${relativeWeek}`);
+      return res;
+    } catch { return null; }
+  };
+
+  const savePlan = async (relativeWeek, plan) => {
+    try {
+      await api.post('/training-context/weekly-plan', { relativeWeek, ...plan });
+      return true;
+    } catch { return false; }
+  };
+
+  const handleOptimizeMessage = (msg) => {
+    const lower = msg.toLowerCase().trim();
+    const userMsg = { id: Date.now(), sender: 'user', text: msg };
+    setMessages((prev) => [...prev, userMsg]);
+
+    if (flowState === FLOW.OPT_WEEK) {
+      const baseRw = getCurrentRelativeWeek();
+      let rw;
+      if (lower.includes('this') || lower.includes('current')) {
+        rw = baseRw;
+      } else if (lower.includes('next')) {
+        rw = baseRw + 1;
+      } else {
+        addBotMessage('Please reply with "this week" or "next week".');
+        return;
+      }
+
+      setFlowData((prev) => ({ ...prev, selectedWeek: rw }));
+      setFlowState(FLOW.OPT_CHANGES);
+
+      fetchPlan(rw).then((plan) => {
+        const weekLabel = rw === baseRw ? 'This Week (Current)' : 'Next Week';
+        const formatted = formatPlanForChat(plan, weekLabel);
+        addBotMessage(`Great choice! Here's the plan for **${weekLabel}**:\n\n${formatted}\n\nWhat would you like to change in this plan and why? (e.g., "Swap Thursday's endurance ride for intervals because I have a race on Sunday")`);
+        setFlowData((prev) => ({ ...prev, plan, weekLabel }));
+      }).catch(() => {
+        addBotMessage(`Could not load the plan for ${rw === baseRw ? 'this' : 'next'} week. Please make sure a plan exists first.`);
+        setFlowState(FLOW.IDLE);
+      });
+      return;
+    }
+
+    if (flowState === FLOW.OPT_CHANGES) {
+      const validation = validateOptimizeReason(msg);
+      const pd = flowData;
+
+      setFlowState(FLOW.OPT_CONFIRM);
+      setFlowData((prev) => ({ ...prev, changeRequest: msg, validation }));
+
+      if (validation.valid) {
+        addBotMessage(`${validation.note}\n\nBased on your request, I can adjust the plan. However, changing the plan may affect the weekly focus${pd.plan?.skeleton?.aim ? ` (${pd.plan.skeleton.aim})` : ''}.\n\nDo you want me to apply these changes? (Reply **Yes** or **No**)`);
+      } else {
+        addBotMessage(`I understand you want to make changes, but I need a bit more context on why. Could you share your reason? (e.g., injury, fatigue, race, work schedule, weather, etc.)`);
+        setFlowState(FLOW.OPT_CHANGES);
+      }
+      return;
+    }
+
+    if (flowState === FLOW.OPT_CONFIRM) {
+      const confirmed = lower === 'yes' || lower === 'y';
+      if (confirmed) {
+        const pd = flowData;
+        const currentWorkouts = pd.plan?.workouts || [];
+        const updatedPlan = {
+          workouts: currentWorkouts,
+          coachNotes: `Optimized based on: ${pd.changeRequest}. ${pd.validation?.note || ''}`,
+          skeleton: pd.plan?.skeleton || null,
+        };
+        savePlan(pd.selectedWeek, updatedPlan).then((ok) => {
+          if (ok) {
+            addBotMessage(`✅ Done! The plan for ${pd.weekLabel} has been updated. You can view the changes in the calendar.\n\nThis plan aims to strike a balance between building your aerobic base and improving your anaerobic capacity. Remember to listen to your body and adjust the intensity and volume based on how you feel. Stay hydrated, fuel properly, and get enough rest. Let me know if you have any questions or need further adjustments.`);
+          } else {
+            addBotMessage('❌ Failed to save the updated plan. Please try again.');
+          }
+        });
+      } else {
+        addBotMessage('No changes made. Your plan remains as is. Let me know if you need anything else!');
+      }
+      setFlowState(FLOW.IDLE);
+      setFlowData({});
+      return;
+    }
+
+    // Fallback — shouldn't happen
+    addBotMessage('Something went wrong with the optimization flow. Let me know if you want to start over with /optimize.');
+    setFlowState(FLOW.IDLE);
+    setFlowData({});
+  };
+
   const sendToAgent = async (msg) => {
     const trimmed = msg.trim();
     if (!trimmed) return;
-
     setMessages((prev) => [...prev, { id: Date.now(), sender: 'user', text: trimmed }]);
     setLoading(true);
-
     try {
       const res = await api.post('/agent/chat', { message: trimmed, chatId: sessionIdRef.current });
       setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: res?.text || 'No response.' }]);
@@ -224,6 +396,11 @@ const PaceBotChat = () => {
     if (!inputMessage.trim() || loading) return;
     const msg = inputMessage.trim();
     setInputMessage('');
+    processMessage(msg);
+  };
+
+  const processMessage = (msg) => {
+    if (!msg.trim()) return;
 
     if (showingContinuePrompt) {
       if (msg.toLowerCase() === '/continue') {
@@ -240,8 +417,15 @@ const PaceBotChat = () => {
       savedSessionRef.current = null;
     }
 
-    // Handle local commands
     const lower = msg.toLowerCase();
+
+    // If in optimize flow, route to flow handler
+    if (flowState !== FLOW.IDLE) {
+      handleOptimizeMessage(msg);
+      return;
+    }
+
+    // Handle local commands
     if (lower === '/help') {
       addBotMessage(`Available commands:\n${COMMAND_LIST}\n\nOr just ask me anything in natural language!`);
       return;
@@ -257,6 +441,16 @@ const PaceBotChat = () => {
       savedSessionRef.current = null;
       sessionIdRef.current = generateSessionId();
       setMessages([]);
+      return;
+    }
+
+    // Start optimize flow for /optimize or /optimize_<num>
+    if (lower.startsWith('/optimize')) {
+      setFlowState(FLOW.OPT_WEEK);
+      setFlowData({});
+      const userMsg = { id: Date.now(), sender: 'user', text: msg };
+      setMessages((prev) => [...prev, userMsg]);
+      addBotMessage('Which week would you like to optimize — **this week** or **next week**?');
       return;
     }
 
@@ -284,11 +478,11 @@ const PaceBotChat = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 300 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 300 }}
-            transition={{ type: 'spring', stiffness: 100, damping: 20 }}
-            className={`fixed bottom-28 right-8 z-50 bg-black rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ${
+            initial={{ opacity: 0, y: 16, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.97 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className={`fixed bottom-28 right-8 z-50 bg-black rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden ${
               isFullscreen ? 'w-[90vw] h-[85vh]' : 'w-[420px] h-[560px]'
             }`}
           >

@@ -138,7 +138,7 @@ function ActivityRow({ activity, index }) {
         </span>
 
         <span className="font-jetbrainsMono text-[13px] text-white/35">
-          {((activity.elevation ?? activity.elevationGain) || 0).toFixed(2)} m
+          {((activity.elevation ?? activity.elevationGain) || 0).toFixed(1)} m
         </span>
 
         <span className="flex items-center gap-1.5 text-xs text-white/20">

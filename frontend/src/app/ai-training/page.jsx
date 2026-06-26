@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../../../lib/api';
 import ScheduleRaceModal from '../../../components/layout/ScheduleRaceModal';
+import Loader from '../../../components/ui/Loader';
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -20,6 +21,33 @@ const WORKOUT_COLORS = {
   vo2max: '#A78BFA', race: '#FF5500', long: '#3B82F6',
   gym: '#EC4899', mobility: '#14B8A6', stretching: '#8B5CF6',
 };
+
+function getMonday(d) {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  return date;
+}
+
+function getCurrentRelativeWeek() {
+  try {
+    const stored = localStorage.getItem("cyclogenai_user");
+    if (stored) {
+      const u = JSON.parse(stored);
+      if (u.trainingStart) {
+        const startMonday = getMonday(new Date(u.trainingStart));
+        const todayMonday = getMonday(new Date());
+        const diffMs = todayMonday.getTime() - startMonday.getTime();
+        return Math.round(diffMs / (7 * 86400000));
+      }
+    }
+  } catch {}
+  const now = new Date();
+  const thisMonday = getMonday(now);
+  const trainingStart = thisMonday;
+  const diffMs = thisMonday.getTime() - trainingStart.getTime();
+  return Math.round(diffMs / (7 * 86400000));
+}
 
 function daysLeft(dateStr) {
   const diff = new Date(dateStr).getTime() - Date.now();
@@ -82,7 +110,7 @@ const AITrainingPage = () => {
     try {
       const [raceData, planData] = await Promise.all([
         api.get('/races').catch(() => []),
-        api.get('/training-context/weekly-plan?relativeWeek=0').catch(() => null),
+        api.get('/training-context/weekly-plan').catch(() => null),
       ]);
       setRaces(Array.isArray(raceData) ? raceData : []);
       setWeeklyPlan(planData);
@@ -97,7 +125,8 @@ const AITrainingPage = () => {
     const key = `${dayOfWeek}-${workoutIndex}`;
     setCompleting(prev => ({ ...prev, [key]: true }));
     try {
-      const updated = await api.post('/training-context/weekly-plan/complete', { relativeWeek: 0, dayOfWeek, completed, workoutIndex });
+      const rw = getCurrentRelativeWeek();
+      const updated = await api.post('/training-context/weekly-plan/complete', { relativeWeek: rw, dayOfWeek, completed, workoutIndex });
       setWeeklyPlan(updated);
     } finally {
       setCompleting(prev => ({ ...prev, [key]: false }));
@@ -160,7 +189,7 @@ const AITrainingPage = () => {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: "easeOut" }}
-        className="relative z-[1] mx-auto max-w-[1200px] px-4 pb-16 pt-[44px] md:px-8 md:pt-[52px]"
+        className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
       >
         {/* Header */}
         <div className="mb-8 flex flex-col gap-3 border-b border-white/10 pb-6 md:flex-row md:items-end md:justify-between">
@@ -181,7 +210,7 @@ const AITrainingPage = () => {
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FF5500] border-t-transparent" />
+            <Loader size={32} />
           </div>
         ) : (
           <div className="space-y-8">

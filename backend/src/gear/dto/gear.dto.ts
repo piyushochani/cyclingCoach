@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsBoolean, IsDateString } from 'class-validator';
 
 export class CreateBikeDto {
   @IsOptional()
@@ -42,7 +42,5 @@ export class CreateEquipmentDto {
   @IsDateString()
   purchaseDate?: string;
 }
-
-import { IsDateString } from 'class-validator';
 
 export class UpdateEquipmentDto extends CreateEquipmentDto {}

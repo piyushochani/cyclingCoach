@@ -24,7 +24,7 @@ const ClientLayoutWrapper = ({ children }) => {
         <div className="min-h-screen bg-bg-dark text-text-primary">
           {!isPublic && <PostLoginNavbar />}
           {!isPublic && <ModelChangeBanner />}
-          <main className={!isPublic ? 'pt-20' : ''}>
+          <main className={!isPublic ? 'pt-[59px]' : ''}>
             <PageTransitionWrapper>
               {children}
             </PageTransitionWrapper>

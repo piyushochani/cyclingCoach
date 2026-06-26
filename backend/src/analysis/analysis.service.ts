@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { InjectQueue } from '@nestjs/bullmq';
 import { Model } from 'mongoose';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -8,6 +9,9 @@ import { parse as parseYaml } from 'yaml';
 import { ContextBuilderService } from './context-builder.service';
 import { DataProcessorService, computeHRZoneBoundaries } from './data-processor.service';
 import { User } from '../user/user.schema';
+import { Race } from '../race/race.schema';
+import { Activity } from '../activity/activity.schema';
+import { TrainingContextService } from '../training-context/training-context.service';
 import { logKeyHealth } from '../common/gemini-key-validator';
 import { callGroqSimple } from '../common/groq-client';
 import { isGeminiQuotaError } from '../common/llm-config';
@@ -180,6 +184,10 @@ export class AnalysisService {
     private readonly contextBuilder: ContextBuilderService,
     private readonly dataProcessor: DataProcessorService,
     @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(Activity.name) private activityModel: Model<Activity>,
+    @InjectModel(Race.name) private raceModel: Model<Race>,
+    @InjectQueue('analysis') private readonly analysisQueue: any,
+    private readonly trainingContext: TrainingContextService,
   ) {
     logKeyHealth(this.logger, 'sync').catch(() => {});
   }
@@ -279,6 +287,35 @@ ${userMessage}`;
     return { analysis: result };
   }
 
+  private async fetchUpcomingRaces(userId: string): Promise<string> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const races = await this.raceModel
+      .find({ user: userId as any, date: { $gte: today } })
+      .sort({ date: 1 })
+      .limit(10)
+      .lean()
+      .exec();
+
+    if (!races.length) return '';
+
+    const now = new Date();
+    const lines = races.map((r: any) => {
+      const date = r.date ? new Date(r.date).toISOString().split('T')[0] : '?';
+      const daysUntil = Math.round((new Date(r.date).getTime() - now.getTime()) / 86400000);
+      const when = daysUntil <= 0 ? 'today/tomorrow' : `in ${daysUntil} days`;
+
+      const parts = [`- ${r.name} (${when})`, `  Date: ${date} | Type: ${r.type || '?'} | Terrain: ${r.terrain || '?'}`];
+      parts.push(`  Location: ${r.location || '?'} | Distance: ${r.distance ? `${r.distance} km` : '?'} | Elevation: ${r.elevationGain ? `${r.elevationGain} m` : '?'} | Priority: ${r.priority || '?'}`);
+      if (r.story) parts.push(`  Rider's goal/expectations: ${r.story}`);
+      if (r.description) parts.push(`  Course description: ${r.description}`);
+      return parts.join('\n');
+    });
+
+    return `\n## Upcoming Races\n\nThe athlete has the following races coming up. Plan training volume and intensity around these events:\n\n${lines.join('\n\n')}\n`;
+  }
+
   async generateNextWeekPlan(activities: any[], userId?: string): Promise<{ workouts: any[]; coachNotes: string }> {
     if (!activities || activities.length === 0) {
       return { workouts: [], coachNotes: 'No recent activities to base the plan on.' };
@@ -306,6 +343,8 @@ ${userMessage}`;
       })
       .join('\n\n');
 
+    const racesFormatted = userId ? await this.fetchUpcomingRaces(userId) : '';
+
     const prompt = `You are a cycling coach generating a next-week training plan as JSON.
 
 ## Athlete Context
@@ -320,7 +359,7 @@ ${context.summary}
 
 ## Recent Activities
 ${activitiesFormatted}
-
+${racesFormatted}
 ## Instructions
 Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON matching this schema:
 {
@@ -365,6 +404,150 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
         coachNotes: 'Could not generate a plan. Please try again.',
       };
     }
+  }
+
+  async queueWeeklyReview(userId: string): Promise<{ analysis: string }> {
+    return this.analyze({ type: 'weekly', activities: [], message: 'Weekly review' }, userId);
+  }
+
+  async queueMonthlyReview(userId: string): Promise<{ analysis: string }> {
+    return this.analyze({ type: 'monthly', activities: [], message: 'Monthly review' }, userId);
+  }
+
+  async queueActivityAnalysis(activityId: string, userId: string): Promise<void> {
+    await this.analysisQueue.add('activity', { activityId, userId });
+  }
+
+  async generateActivityAnalysis(activityId: string, userId: string): Promise<string> {
+    const activity = await this.activityModel.findById(activityId).lean().exec() as any;
+    if (!activity) return '';
+
+    const sameDay = new Date(activity.date);
+    sameDay.setHours(0, 0, 0, 0);
+    const nextDay = new Date(sameDay);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const [nearbyRace] = await this.raceModel.find({
+      user: userId as any,
+      date: { $gte: sameDay, $lt: nextDay },
+    }).lean().exec() as any[];
+
+    const p = activity.processed || {};
+
+    const plannedWorkout = await this.trainingContext.getPlannedWorkoutForDate(userId, activity.date);
+    const planNote = plannedWorkout
+      ? ` The plan called for a ${plannedWorkout.type || 'workout'}${plannedWorkout.distance ? ` of ${plannedWorkout.distance} km` : ''}.${plannedWorkout.notes ? ` Notes: ${plannedWorkout.notes}` : ''}`
+      : '';
+
+    const parts: string[] = [
+      `This was a ${p.sessionType || 'training'} ride covering ${(activity.distance / 1000).toFixed(1)} km with ${activity.elevationGain?.toFixed(0) || 0} m of climbing over ${Math.round((activity.durationSeconds || 0) / 60)} minutes.${planNote}`,
+      activity.averageWatts ? `Average power was ${Math.round(activity.averageWatts)} W.` : '',
+      activity.averageHeartrate ? `Average heart rate was ${Math.round(activity.averageHeartrate)} bpm.` : '',
+      p.terrainClass ? `Terrain was ${p.terrainClass}.` : '',
+    ].filter(Boolean);
+
+    if (nearbyRace) {
+      const rc = nearbyRace as any;
+      parts.push(`\n\nThis ride coincides with your scheduled "${rc.name}" (${rc.type || 'race'}) on ${new Date(rc.date).toLocaleDateString()}.`);
+      if (rc.distance) parts.push(`The race is ${rc.distance} km with ${rc.elevationGain || 0} m of climbing.`);
+      if (rc.story) parts.push(`Your goal: ${rc.story}`);
+      if (rc.description) parts.push(`Course: ${rc.description}`);
+    }
+
+    const result = parts.join(' ');
+
+    await this.activityModel.updateOne(
+      { _id: activity._id },
+      { $set: { llmAnalysis: result } },
+    ).exec();
+
+    return result;
+  }
+
+  async deepReviewActivity(activityId: string, userId: string): Promise<{ review: string }> {
+    const activity = await this.activityModel.findById(activityId).lean().exec() as any;
+    if (!activity) return { review: 'Activity not found.' };
+
+    const sameDay = new Date(activity.date);
+    sameDay.setHours(0, 0, 0, 0);
+    const nextDay = new Date(sameDay);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    const [nearbyRace] = await this.raceModel.find({
+      user: userId as any,
+      date: { $gte: sameDay, $lt: nextDay },
+    }).lean().exec() as any[];
+
+    const recentActivities = await this.activityModel.find({
+      user: userId as any,
+      _id: { $ne: activity._id },
+      sport: { $regex: /ride|cycling|bike/i },
+    }).sort({ date: -1 }).limit(10).lean().exec() as any[];
+
+    const p = activity.processed || {};
+
+    const plannedWorkout = await this.trainingContext.getPlannedWorkoutForDate(userId, activity.date);
+    const planSection = plannedWorkout
+      ? `\n## Planned Workout\n- Type: ${plannedWorkout.type || '?'}\n- Target Distance: ${plannedWorkout.distance ? plannedWorkout.distance + ' km' : 'Not specified'}\n- Notes: ${plannedWorkout.notes || 'None'}`
+      : '';
+
+    const raceSection = nearbyRace ? `\n## Scheduled Race\n- Name: ${(nearbyRace as any).name}\n- Type: ${(nearbyRace as any).type || '?'}\n- Distance: ${(nearbyRace as any).distance} km\n- Elevation: ${(nearbyRace as any).elevationGain || 0} m\n- Terrain: ${(nearbyRace as any).terrain || '?'}\n- Goal: ${(nearbyRace as any).story || 'Not specified'}\n- Course: ${(nearbyRace as any).description || 'Not specified'}` : '';
+
+    const recentSection = recentActivities.length > 0
+      ? `\n## Recent Rides (for comparison)\n${recentActivities.map((a: any) => {
+          const ap = a.processed || {};
+          return `- ${a.name || 'Ride'} on ${new Date(a.date).toLocaleDateString()}: ${(a.distance / 1000).toFixed(1)} km, ${a.elevationGain || 0}m elev, ${a.averageWatts ? Math.round(a.averageWatts) + 'W avg' : 'no power'}, ${ap.sessionType || 'training'}`;
+        }).join('\n')}`
+      : '';
+
+    const prompt = `You are an expert cycling coach reviewing a specific ride. Provide a thorough, insightful analysis with these sections:
+
+## Ride Summary
+Brief overview of the ride — distance, duration, elevation, average power/HR.
+
+## Performance Assessment
+How did the athlete execute this ride? Was the effort consistent? Any standout segments?
+
+## Plan Adherence
+Compare what was actually done to what was planned. Did the athlete hit the target workout type, distance, and intensity? If the ride deviated from the plan, note whether the deviation was justified (e.g., weather, fatigue).
+
+${planSection}
+
+## Comparison with Recent Training
+Compare this ride to the last ${recentActivities.length} rides. Is the athlete progressing, maintaining, or fatigued? Comment on volume, intensity, and consistency trends.
+
+## Race Context${nearbyRace ? '\nThis ride falls on a race day. Compare the ride metrics to the race requirements and evaluate readiness.' : '\nNo race is associated with this date.'}
+
+${raceSection}
+
+## Coaching Recommendation
+One or two specific, actionable recommendations based on this ride and the athlete's recent training.
+
+## Activity Data
+- Name: ${activity.name || 'Ride'}
+- Date: ${new Date(activity.date).toLocaleDateString()}
+- Distance: ${(activity.distance / 1000).toFixed(1)} km
+- Duration: ${Math.round((activity.durationSeconds || 0) / 60)} min
+- Elevation: ${activity.elevationGain || 0} m
+- Avg Power: ${activity.averageWatts ? Math.round(activity.averageWatts) + ' W' : 'N/A'}
+- Max Power: ${activity.maxWatts ? Math.round(activity.maxWatts) + ' W' : 'N/A'}
+- Avg HR: ${activity.averageHeartrate ? Math.round(activity.averageHeartrate) + ' bpm' : 'N/A'}
+- Max HR: ${activity.maxHeartrate ? Math.round(activity.maxHeartrate) + ' bpm' : 'N/A'}
+- Session Type: ${p.sessionType || 'training'}
+- Terrain: ${p.terrainClass || 'mixed'}
+- Intensity Factor: ${p.intensityFactor || 'N/A'}
+- TSS: ${p.tss || 'N/A'}
+- Norm. Power: ${p.normalizedPower ? Math.round(p.normalizedPower) + ' W' : 'N/A'}${recentSection}
+`;
+
+    const analysis = await this.callLLM(prompt, { temperature: 0.3, keyType: 'sync' });
+
+    await this.activityModel.updateOne(
+      { _id: activity._id },
+      { $set: { llmAnalysis: analysis } },
+    ).exec();
+
+    return { review: analysis };
   }
 
   private async callLLM(prompt: string, opts?: { temperature?: number; maxTokens?: number; keyType?: string }): Promise<string> {

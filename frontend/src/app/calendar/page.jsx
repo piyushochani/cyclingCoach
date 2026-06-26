@@ -48,6 +48,75 @@ function mapActivity(a) {
   };
 }
 
+function getMonday(d) {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  return date;
+}
+
+function classifyDays(activities, weeklyPlan, races) {
+  const map = {};
+  const planMondays = [];
+  if (weeklyPlan?.startDate) {
+    planMondays.push(getMonday(new Date(weeklyPlan.startDate)));
+  }
+
+  const activityDates = {};
+  for (const a of activities) {
+    if (a.date) activityDates[a.date] = a;
+  }
+
+  const raceDates = {};
+  for (const r of races || []) {
+    if (r.date) {
+      const rd = new Date(r.date).toISOString().slice(0, 10);
+      raceDates[rd] = r;
+    }
+  }
+
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  for (const monday of planMondays) {
+    for (const w of weeklyPlan?.workouts || []) {
+      const date = new Date(monday);
+      date.setDate(date.getDate() + w.dayOfWeek);
+      const dateStr = date.toISOString().slice(0, 10);
+      const activity = activityDates[dateStr];
+      const race = raceDates[dateStr];
+      const isFuture = dateStr > todayStr;
+      const isPast = dateStr < todayStr;
+
+      if (race) {
+        map[dateStr] = { type: 'race', data: race };
+      } else if (activity && w.completed) {
+        map[dateStr] = { type: 'completed', data: activity, workout: w };
+      } else if (activity && !w.completed && !isFuture) {
+        map[dateStr] = { type: 'completed', data: activity, workout: w };
+      } else if (activity && !w.completed) {
+        map[dateStr] = { type: 'completed', data: activity, workout: w };
+      } else if (!activity && !w.completed && isPast) {
+        map[dateStr] = { type: 'missed', data: w };
+      } else if (!activity && !isPast) {
+        map[dateStr] = { type: 'future_scheduled', data: w };
+      }
+    }
+  }
+
+  for (const dateStr of Object.keys(activityDates)) {
+    if (!map[dateStr]) {
+      map[dateStr] = { type: 'bonus', data: activityDates[dateStr] };
+    }
+  }
+
+  for (const [dateStr, race] of Object.entries(raceDates)) {
+    map[dateStr] = { type: 'race', data: race };
+  }
+
+  return map;
+}
+
 const WORKOUT_EMOJI = { Ride: '🚴', Run: '🏃', Walk: '🚶', Swim: '🏊', Workout: '🏋️', VirtualRide: '🚴' };
 
 function defaultDayDetail() {
@@ -102,6 +171,7 @@ const TrainingCalendarPage = () => {
   const [isBreakupOpen, setIsBreakupOpen] = useState(false);
   const [activities, setActivities] = useState([]);
   const [weeklyPlan, setWeeklyPlan] = useState(null);
+  const [races, setRaces] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -111,10 +181,12 @@ const TrainingCalendarPage = () => {
   useEffect(() => {
     Promise.all([
       api.get('/activities').catch(() => []),
-      api.get('/training-context/weekly-plan?relativeWeek=0').catch(() => null),
-    ]).then(([acts, plan]) => {
+      api.get('/training-context/weekly-plan').catch(() => null),
+      api.get('/races').catch(() => []),
+    ]).then(([acts, plan, r]) => {
       setActivities(Array.isArray(acts) ? acts.map(mapActivity) : []);
       setWeeklyPlan(plan);
+      setRaces(Array.isArray(r) ? r : []);
       setLoading(false);
     });
   }, []);
@@ -130,6 +202,17 @@ const TrainingCalendarPage = () => {
       a.date && isSameMonth(new Date(a.date), currentMonth)
     );
   }, [activities, currentMonth]);
+
+  const dayMeta = useMemo(() => {
+    return classifyDays(activities, weeklyPlan, races);
+  }, [activities, weeklyPlan, races]);
+
+  const selectedDayMeta = useMemo(() => {
+    const dateStr = selectedDay.toISOString().slice(0, 10);
+    const meta = dayMeta[dateStr];
+    const dayActs = activities.filter((a) => a.date && isSameDay(new Date(a.date), selectedDay));
+    return { meta, activities: dayActs, dateStr };
+  }, [selectedDay, dayMeta, activities]);
 
   const selectedDayActivities = useMemo(() => {
     return activities.filter((a) =>
@@ -163,19 +246,33 @@ const TrainingCalendarPage = () => {
       const importanceMap = { low: 2, medium: 3, high: 5 };
       const imp = importanceMap[planWorkout.importance] || 3;
       const impLabel = { low: 'Low Importance', medium: 'Medium Importance', high: 'High Importance' };
+      const description = planWorkout.notes || `${label} session`;
+      const distStr = planWorkout.distance ? `${planWorkout.distance.toFixed(2)} km` : '—';
+      const zoneStr = planWorkout.zoneBreakdown || '—';
+      const terrainStr = planWorkout.terrain || '—';
+
+      const breakup = planWorkout.zoneBreakdown
+        ? planWorkout.zoneBreakdown.split(',').map((z) => {
+            const parts = z.trim().split(/\s+/);
+            const zone = parts[0] || 'Z1';
+            const time = parseInt(parts[1], 10) || 45;
+            return { zone, time };
+          })
+        : [{ zone: label, time: 60 }];
+
       return {
-        title: label,
-        focus: planWorkout.notes || 'General preparation',
-        target: planWorkout.type === 'rest' ? 'Full rest & recovery' : `${label} session`,
+        title: description,
+        focus: description,
+        target: planWorkout.type === 'rest' ? 'Full rest & recovery' : description,
         duration: '—',
-        distance: planWorkout.distance ? `${planWorkout.distance.toFixed(0)} km` : '—',
+        distance: distStr,
         elevation: '—',
-        notes: planWorkout.notes || 'Follow the planned workout.',
-        route: planWorkout.terrain || '—',
-        approxDistance: planWorkout.distance ? `${planWorkout.distance.toFixed(0)} km` : '—',
+        notes: description,
+        route: terrainStr,
+        approxDistance: distStr,
         rideType: label,
-        zones: '—',
-        breakup: [{ zone: label, time: 60 }],
+        zones: zoneStr,
+        breakup,
         importance: imp,
         importanceLabel: impLabel[planWorkout.importance] || 'Medium Importance',
       };
@@ -203,21 +300,25 @@ const TrainingCalendarPage = () => {
   }, [weeklyPlan, activities, focusedDay]);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: "easeOut" }}
-      className="min-h-screen bg-[#080808] px-4 py-8 text-white md:px-8"
-    >
-      <div className="mx-auto max-w-[1120px]">
-        <div className="mb-8">
+    <div className="min-h-screen bg-black text-white">
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute left-[62%] top-[-8%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.06)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-10%] left-[-5%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.04)_0%,transparent_72%)]" />
+      </div>
+
+      <motion.main
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
+      >
+        <div className="mb-8 border-b border-white/10 pb-6">
           <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Training Intelligence
           </p>
-          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
-            TRAINING <span style={{ color: "#FF5500" }}>CALENDAR</span>
+          <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
+            TRAINING <span className="text-[#FF5500]">CALENDAR</span>
           </h1>
-          <div style={{ width: 36, height: 2, background: "#FF5500", marginBottom: 14, borderRadius: 2 }} />
         </div>
 
         <section className="mb-6 overflow-hidden rounded-[28px] border border-white/10 bg-[#050505]">
@@ -227,7 +328,7 @@ const TrainingCalendarPage = () => {
                 Analysis Layer
               </p>
               <h2 className="mt-1 font-bebasNeue text-[2rem] tracking-[0.04em] text-white">
-                MONTHLY <span className="text-[#FF5500]">ANALYSIS</span>
+                MONTHLY <span className="text-[#FF5500]">STATS</span>
               </h2>
             </div>
 
@@ -286,7 +387,7 @@ const TrainingCalendarPage = () => {
                         key={day.toISOString()}
                         onClick={() => setSelectedDay(day)}
                         className={[
-                          "group flex aspect-square min-h-[84px] flex-col items-center rounded-[16px] border p-3 transition-all duration-150 md:min-h-[92px]",
+                          "group flex aspect-square min-h-[84px] flex-col items-center rounded-[16px] border p-2 transition-all duration-150 md:min-h-[92px] relative",
                           isSelected
                             ? "border-[#FF5500]/45 bg-[#FF5500]/[0.10]"
                             : today
@@ -296,25 +397,55 @@ const TrainingCalendarPage = () => {
                             : "border-white/8 bg-white/[0.02] text-white/25",
                         ].join(" ")}
                       >
-                        <span className={`font-dmSans text-sm md:text-base ${
+                        <span className={`font-dmSans text-xs md:text-sm leading-tight ${
                           today ? "text-[#FF5500]" :
                           inCurrentMonth ? "text-white/88" : "text-white/30"
                         }`}>
                           {format(day, "d")}
                         </span>
 
-                        <div className="flex flex-1 items-center justify-center">
-                          {count > 0 ? (
-                            <div className="flex flex-wrap justify-center gap-0.5">
-                              {activities
-                                .filter((a) => a.date && isSameDay(new Date(a.date), day))
-                                .map((a) => (
-                                  <span key={a.id} className="text-[20px] leading-none" title={a.type}>
-                                    {WORKOUT_EMOJI[a.type] || '🚴'}
-                                  </span>
-                                ))}
-                            </div>
-                          ) : null}
+                        <div className="flex flex-1 items-center justify-center mt-0.5">
+                          {(() => {
+                            const dateStr = day.toISOString().slice(0, 10);
+                            const meta = dayMeta[dateStr];
+                            if (!meta) return null;
+
+                            if (meta.type === 'race') {
+                              return (
+                                <span className="inline-flex items-center rounded-[4px] bg-red-500/90 px-1.5 py-0.5 font-dmSans text-[8px] font-bold uppercase tracking-[0.1em] text-white leading-tight md:text-[9px]">
+                                  RACE
+                                </span>
+                              );
+                            }
+
+                            if (meta.type === 'completed') {
+                              return (
+                                <span className="text-emerald-400 text-sm md:text-base leading-none">✓</span>
+                              );
+                            }
+
+                            if (meta.type === 'bonus') {
+                              return (
+                                <span className="text-sky-400 text-sm md:text-base leading-none">★</span>
+                              );
+                            }
+
+                            if (meta.type === 'missed') {
+                              return (
+                                <span className="text-red-400/70 text-sm md:text-base leading-none">✕</span>
+                              );
+                            }
+
+                            if (meta.type === 'future_scheduled') {
+                              return (
+                                <span className="inline-flex items-center rounded-full bg-yellow-400/20 px-1.5 py-0.5 font-dmSans text-[9px] font-bold uppercase tracking-[0.08em] text-yellow-300 leading-tight md:text-[10px]">
+                                  ●
+                                </span>
+                              );
+                            }
+
+                            return null;
+                          })()}
                         </div>
                       </button>
                     );
@@ -341,7 +472,7 @@ const TrainingCalendarPage = () => {
 
                   <div className="grid grid-cols-2 gap-3">
   {[
-    { label: "Distance", value: `${monthlyStats.totalDistance.toFixed(2)} km` },
+                  { label: "Distance", value: `${monthlyStats.totalDistance.toFixed(1)} km` },
     { label: "Time", value: formatMinutesAsDuration(monthlyStats.totalMinutes) },
   ].map((item) => (
     <div
@@ -360,7 +491,7 @@ const TrainingCalendarPage = () => {
 
 <div className="mt-3 grid grid-cols-2 gap-3">
   {[
-    { label: "Elevation", value: `${monthlyStats.totalElevation.toLocaleString()} m` },
+    { label: "Elevation", value: `${monthlyStats.totalElevation.toFixed(1)} m` },
     { label: "Activities", value: monthlyStats.totalActivities },
   ].map((item) => (
     <div
@@ -415,7 +546,68 @@ const TrainingCalendarPage = () => {
                 </div>
 
                 <div className="space-y-3">
-                  {selectedDayActivities.length > 0 ? (
+                  {selectedDayMeta.meta?.type === 'race' ? (
+                    <div className="space-y-3">
+                      <div className="rounded-[16px] border border-red-500/20 bg-[#070707] p-4">
+                        <p className="font-dmSans text-[10px] font-bold uppercase tracking-[0.12em] text-red-400">Race Day</p>
+                        <h4 className="mt-1 font-dmSans text-[17px] font-semibold text-white">
+                          {selectedDayMeta.meta.data.name || 'Race'}
+                        </h4>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="rounded-[16px] border border-white/10 bg-[#070707] p-4">
+                          <p className="font-dmSans text-[10px] uppercase tracking-[0.08em] text-white/25">Distance</p>
+                          <p className="mt-1 font-dmSans text-sm font-semibold text-white">
+                            {(selectedDayMeta.meta.data.distance / 1000).toFixed(1)} km
+                          </p>
+                        </div>
+                        <div className="rounded-[16px] border border-white/10 bg-[#070707] p-4">
+                          <p className="font-dmSans text-[10px] uppercase tracking-[0.08em] text-white/25">Elevation</p>
+                          <p className="mt-1 font-dmSans text-sm font-semibold text-white">
+                            {selectedDayMeta.meta.data.elevationGain || 0} m
+                          </p>
+                        </div>
+                      </div>
+                      <div className="rounded-[16px] border border-white/10 bg-[#070707] p-4">
+                        <p className="font-dmSans text-[10px] uppercase tracking-[0.08em] text-white/25">Description</p>
+                        <p className="mt-2 font-dmSans text-sm leading-relaxed text-white/72">
+                          {selectedDayMeta.meta.data.description || selectedDayMeta.meta.data.story || 'No description available.'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : selectedDayMeta.meta?.type === 'future_scheduled' || selectedDayMeta.meta?.type === 'missed' ? (
+                    <div className="rounded-[16px] border border-white/10 bg-[#070707] p-4">
+                      <p className="font-dmSans text-[10px] font-bold uppercase tracking-[0.12em] text-yellow-400">
+                        {selectedDayMeta.meta.type === 'missed' ? 'Missed Workout' : 'Planned Workout'}
+                      </p>
+                      <h4 className="mt-1 font-dmSans text-[15px] font-semibold text-white">
+                        {selectedDayMeta.meta.data.notes || selectedDayMeta.meta.data.type || 'Workout'}
+                      </h4>
+                      <div className="mt-4 grid grid-cols-3 gap-3">
+                        <div>
+                          <p className="font-dmSans text-[10px] uppercase tracking-[0.08em] text-white/25">Type</p>
+                          <p className="mt-1 font-dmSans text-sm text-white/80 capitalize">
+                            {selectedDayMeta.meta.data.type || '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-dmSans text-[10px] uppercase tracking-[0.08em] text-white/25">Zone</p>
+                          <p className="mt-1 font-dmSans text-sm text-white/80">
+                            {selectedDayMeta.meta.data.zoneBreakdown || '—'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-dmSans text-[10px] uppercase tracking-[0.08em] text-white/25">Distance</p>
+                          <p className="mt-1 font-dmSans text-sm text-white/80">
+                            {selectedDayMeta.meta.data.distance ? `${selectedDayMeta.meta.data.distance.toFixed(2)} km` : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <button className="mt-4 w-full rounded-xl border border-[#FF5500]/20 bg-[#FF5500]/10 px-4 py-2.5 font-dmSans text-xs font-bold uppercase tracking-[0.08em] text-[#FF5500] transition hover:bg-[#FF5500]/20">
+                        View More
+                      </button>
+                    </div>
+                  ) : selectedDayActivities.length > 0 ? (
                     selectedDayActivities.map((activity) => (
                       <div
                         key={activity.id}
@@ -573,12 +765,12 @@ const TrainingCalendarPage = () => {
 
               <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                 {[
-                  { label: "Ride", value: todayDetail.rideType },
-                  { label: "Approx Distance", value: todayDetail.approxDistance },
+                  { label: "Type", value: todayDetail.rideType },
+                  { label: "Distance", value: todayDetail.approxDistance },
                   { label: "Target", value: todayDetail.target },
-                  { label: "duration", value: todayDetail.duration },
+                  { label: "Zones", value: todayDetail.zones },
                   { label: "Focus", value: todayDetail.focus },
-                  { label: "Route", value: todayDetail.route },
+                  { label: "Terrain", value: todayDetail.route },
                 ].map((item) => (
                   <div
                     key={item.label}
@@ -602,7 +794,7 @@ const TrainingCalendarPage = () => {
                         Ride Breakup
                       </p>
                       <p className="mt-2 font-dmSans text-sm leading-6 text-white/72">
-                        {todayDetail.breakup.map((b) => `${b.time} mins ${b.zone}`).join(" + ")}
+                        {todayDetail.breakup.map((b) => `${b.time}min ${b.zone}`).join(" + ")}
                       </p>
                     </div>
 
@@ -627,10 +819,10 @@ const TrainingCalendarPage = () => {
 
               <div className="mt-4 rounded-[16px] border border-white/10 bg-[#080808] p-4">
                 <p className="font-dmSans text-[10px] uppercase tracking-[0.08em] text-white/25">
-                  Remember
+                  Coach Notes
                 </p>
-                <p className="mt-2 font-dmSans text-sm text-white">
-                  {todayDetail.duration}
+                <p className="mt-2 font-dmSans text-sm text-white/80 leading-relaxed">
+                  {weeklyPlan?.coachNotes || todayDetail.notes || 'Follow your planned workout for today.'}
                 </p>
               </div>
             </div>
@@ -979,8 +1171,8 @@ const TrainingCalendarPage = () => {
     </div>
   </div>
 )}
-      </div>
-    </motion.div>
+      </motion.main>
+    </div>
   );
 };
 

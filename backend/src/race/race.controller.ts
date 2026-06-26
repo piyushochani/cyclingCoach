@@ -22,13 +22,13 @@ export class RaceController {
   @Post()
   create(@Body() raceData: CreateRaceDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.raceService.create({ ...raceData, user: userId as any });
+    return this.raceService.create({ ...raceData, date: new Date(raceData.date), user: userId as any });
   }
 
   @Put(':id')
   update(@Param('id') id: string, @Body() raceData: UpdateRaceDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.raceService.update(id, raceData, userId);
+    return this.raceService.update(id, { ...raceData, date: new Date(raceData.date) }, userId);
   }
 
   @Delete(':id')

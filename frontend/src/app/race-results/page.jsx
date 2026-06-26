@@ -258,34 +258,29 @@ export default function RacesPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#080808",
-        padding: "2.5rem 1.5rem 5rem",
-        fontFamily: "'DM Sans', sans-serif",
-        color: "#fff",
-      }}
-    >
-      <div style={{ maxWidth: 1120, margin: "0 auto" }}>
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          style={{ marginBottom: "2.5rem" }}
-        >
+    <div className="min-h-screen bg-black">
+      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="absolute left-[62%] top-[-8%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.06)_0%,transparent_70%)]" />
+        <div className="absolute bottom-[-10%] left-[-5%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(255,76,0,0.04)_0%,transparent_72%)]" />
+      </div>
+
+      <motion.main
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: "easeOut" }}
+        className="relative z-[1] mx-auto max-w-[1320px] px-4 pb-10 pt-[44px] md:px-6 md:pt-[52px] xl:px-8"
+      >
+        <div className="mb-8 border-b border-white/10 pb-6">
           <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-[#FF5500]/80">
             Competition
           </p>
-          <h1 className="font-barlowCondensed text-5xl md:text-6xl">
-            YOUR <span style={{ color: "#FF5500" }}>RACES</span>
+          <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
+            YOUR <span className="text-[#FF5500]">RACES</span>
           </h1>
-          <div style={{ width: 36, height: 2, background: "#FF5500", marginBottom: 14, borderRadius: 2 }} />
-          <p style={{ margin: 0, fontSize: 14, color: "rgba(255,255,255,0.3)" }}>
+          <p className="mt-3 font-dmSans text-sm text-white/50">
             Every finish line you&apos;ve crossed.
           </p>
-        </motion.div>
+        </div>
 
         {/* Upcoming Race */}
         {upcoming && (
@@ -371,7 +366,7 @@ export default function RacesPage() {
             { label: "Total Races", value: stats.total },
             { label: "Best Finish", value: stats.best ? `${stats.best}${stats.best === 1 ? "st" : stats.best === 2 ? "nd" : stats.best === 3 ? "rd" : "th"}` : "\u2014" },
             { label: "Total km", value: `${stats.totalDist.toFixed(2)} km` },
-            { label: "Total Elev", value: `${stats.totalElev.toFixed(2)} m` },
+            { label: "Total Elev", value: `${stats.totalElev.toFixed(1)} m` },
             { label: "Podiums", value: stats.podiums },
           ].map((s) => (
             <div key={s.label} style={{ textAlign: "center" }}>
@@ -739,7 +734,7 @@ export default function RacesPage() {
                     {race.position ? `${race.position}${race.position === 1 ? "st" : race.position === 2 ? "nd" : race.position === 3 ? "rd" : "th"}` : "\u2014"}
                   </span>
                   <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", textAlign: "right", fontFamily: "'JetBrains Mono', monospace" }}>
-                    {race.elevationGain > 0 ? `${parseFloat(race.elevationGain).toFixed(2)}m` : "\u2014"}
+                    {race.elevationGain > 0 ? `${parseFloat(race.elevationGain).toFixed(1)}m` : "\u2014"}
                   </span>
                   <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
                     <button
@@ -801,7 +796,7 @@ export default function RacesPage() {
             Load More
           </motion.button>
         )}
-      </div>
+      </motion.main>
 
       {chatRaceId && (
         <RaceChatModal

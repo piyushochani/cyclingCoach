@@ -37,6 +37,9 @@ const bebasNeue = Bebas_Neue({
 export const metadata: Metadata = {
   title: "CyclogenAI - Your Ultimate Cycling Training Partner",
   description: "Advanced AI-powered cycling coaching for personalized training plans, race intelligence, and performance analytics.",
+  icons: {
+    icon: '/icon.png',
+  },
 };
 
 export default function RootLayout({

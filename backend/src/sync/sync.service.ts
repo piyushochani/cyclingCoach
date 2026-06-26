@@ -5,12 +5,38 @@ import { readFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
+import polyline from '@mapbox/polyline';
 import { Activity } from '../activity/activity.schema';
 import { User } from '../user/user.schema';
 import { ActivitySyncPipelineService } from '../analysis/activity-sync-pipeline.service';
 import { AnalysisService } from '../analysis/analysis.service';
 import { NotificationService } from '../notification/notification.service';
 import { GearService } from '../gear/gear.service';
+import { TrainingContextService } from '../training-context/training-context.service';
+
+function haversineMeters(a: [number, number], b: [number, number]): number {
+  const [lat1, lon1] = a;
+  const [lat2, lon2] = b;
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+  const aVal = sinDLat * sinDLat + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * sinDLon * sinDLon;
+  return R * 2 * Math.atan2(Math.sqrt(aVal), Math.sqrt(1 - aVal));
+}
+
+function simplifiedLatLng(latlng: [number, number][], minMeters = 30): [number, number][] {
+  if (!latlng || latlng.length < 2) return latlng || [];
+  const result: [number, number][] = [latlng[0]];
+  for (let i = 1; i < latlng.length - 1; i++) {
+    if (haversineMeters(result[result.length - 1], latlng[i]) >= minMeters) {
+      result.push(latlng[i]);
+    }
+  }
+  result.push(latlng[latlng.length - 1]);
+  return result;
+}
 
 const STRAVA_API = 'https://www.strava.com/api/v3';
 const CYCLING_SPORTS = ['ride', 'virtualride', 'ebikeride', 'velomobile', 'handcycle', 'cycling', 'bike', 'bicycle'];
@@ -44,6 +70,7 @@ export class SyncService {
     private readonly analysisService: AnalysisService,
     private readonly notificationService: NotificationService,
     private readonly gearService: GearService,
+    private readonly trainingContext: TrainingContextService,
   ) {
     this.loadConfig();
   }
@@ -220,8 +247,28 @@ export class SyncService {
       this.logger.warn(`Failed to fetch streams for activity ${stravaId}, continuing without streams`);
     }
 
+    const simplified = rawStreams?.latlng ? simplifiedLatLng(rawStreams.latlng as [number, number][]) : null;
+    const encodedPolyline = simplified ? polyline.encode(simplified) : null;
+
+    if (rawStreams) {
+      const compact: Record<string, any> = { sampleRate: 1 };
+      if (rawStreams.watts) compact.power = rawStreams.watts;
+      if (rawStreams.heartrate) compact.heartRate = rawStreams.heartrate;
+      if (rawStreams.altitude) compact.elevation = rawStreams.altitude;
+      if (rawStreams.distance && rawStreams.time) {
+        const speed: number[] = [];
+        for (let i = 0; i < rawStreams.distance.length; i++) {
+          if (i === 0) { speed.push(0); continue; }
+          const dt = (rawStreams.time[i] - rawStreams.time[i - 1]) / 3600;
+          const dd = (rawStreams.distance[i] - rawStreams.distance[i - 1]) / 1000;
+          speed.push(dt > 0 ? parseFloat((dd / dt).toFixed(1)) : 0);
+        }
+        compact.speed = speed;
+      }
+      rawStreams = compact;
+    }
+
     const activityPayload: any = {
-      stravaId,
       name: (rawActivity?.name || a.name || 'Unknown'),
       sport: (rawActivity?.sport_type || rawActivity?.type || a.type || 'Ride'),
       distance: rawActivity?.distance ?? distance,
@@ -251,6 +298,7 @@ export class SyncService {
             ...activityPayload,
             rawActivity: rawActivity ?? null,
             rawStreams: rawStreams ?? null,
+            polyline: encodedPolyline,
             embeddingStatus: 'pending',
             updatedAt: new Date(),
           },
@@ -262,6 +310,7 @@ export class SyncService {
         ...activityPayload,
         rawActivity: rawActivity ?? null,
         rawStreams: rawStreams ?? null,
+        polyline: encodedPolyline,
         embeddingStatus: 'pending',
         syncedAt: new Date(),
         updatedAt: new Date(),
@@ -290,6 +339,21 @@ export class SyncService {
       rawActivity,
       rawStreams,
     );
+
+    try {
+      const savedActivity = await this.activityModel.findOne({ stravaId, user: userId as any }).sort({ _id: -1 }).exec();
+      if (savedActivity) {
+        await this.analysisService.queueActivityAnalysis(String(savedActivity._id), userId);
+
+        const activityDate = savedActivity.date || new Date(rawActivity?.start_date_local || Date.now());
+        const result = await this.trainingContext.markWorkoutCompletedByDate(userId, activityDate);
+        if (result.matched) {
+          this.logger.debug(`Auto-marked ${result.workoutType} workout as completed for ${stravaId}`);
+        }
+      }
+    } catch (e) {
+      this.logger.warn(`Failed to queue activity analysis for ${stravaId}: ${(e as Error).message}`);
+    }
   }
 
   async incrementalSync(userId: any): Promise<{ newActivities: number }> {
