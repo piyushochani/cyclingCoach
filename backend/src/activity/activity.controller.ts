@@ -33,13 +33,20 @@ export class ActivityController {
   @Post()
   create(@Body() activityData: CreateActivityDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.activityService.create({ ...activityData, user: userId as any });
+    return this.activityService.create({
+      ...activityData,
+      date: new Date(activityData.date),
+      user: userId as any,
+    });
   }
 
   @Put(':id')
   update(@Param('id') id: string, @Body() data: UpdateActivityDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.activityService.update(id, data, userId);
+    return this.activityService.update(id, {
+      ...data,
+      date: data.date ? new Date(data.date) : undefined,
+    }, userId);
   }
 
   @Delete(':id')

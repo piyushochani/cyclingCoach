@@ -16,13 +16,20 @@ export class ExpenseController {
   @Post()
   create(@Body() expenseData: CreateExpenseDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.expenseService.create({ ...expenseData, user: userId as any });
+    return this.expenseService.create({
+      ...expenseData,
+      date: new Date(expenseData.date),
+      user: userId as any,
+    });
   }
 
   @Put(':id')
   update(@Param('id') id: string, @Body() expenseData: UpdateExpenseDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.expenseService.update(id, expenseData, userId);
+    return this.expenseService.update(id, {
+      ...expenseData,
+      date: new Date(expenseData.date),
+    }, userId);
   }
 
   @Delete(':id')
