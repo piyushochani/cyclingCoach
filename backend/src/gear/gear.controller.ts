@@ -40,13 +40,19 @@ export class GearController {
   @Post('equipment')
   createEquipment(@Body() data: CreateEquipmentDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.gearService.createEquipment(data, userId);
+    return this.gearService.createEquipment({
+      ...data,
+      purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : undefined,
+    }, userId);
   }
 
   @Put('equipment/:id')
   updateEquipment(@Param('id') id: string, @Body() data: UpdateEquipmentDto, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.gearService.updateEquipment(id, data, userId);
+    return this.gearService.updateEquipment(id, {
+      ...data,
+      purchaseDate: data.purchaseDate ? new Date(data.purchaseDate) : undefined,
+    }, userId);
   }
 
   @Delete('equipment/:id')

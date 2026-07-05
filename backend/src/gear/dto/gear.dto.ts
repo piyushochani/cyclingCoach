@@ -32,7 +32,7 @@ export class CreateEquipmentDto {
 
   @IsOptional()
   @IsString()
-  model?: string;
+  equipmentModel?: string;
 
   @IsOptional()
   @IsNumber()

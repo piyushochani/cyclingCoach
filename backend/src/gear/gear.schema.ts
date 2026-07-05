@@ -38,6 +38,18 @@ export class Equipment extends Document {
   @Prop({ default: '' })
   notes: string;
 
+  @Prop({ default: '' })
+  brand: string;
+
+  @Prop({ default: '' })
+  equipmentModel: string;
+
+  @Prop({ default: null })
+  weightG: number | null;
+
+  @Prop({ default: null })
+  purchaseDate: Date | null;
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   user: MongooseSchema.Types.ObjectId;
 }
