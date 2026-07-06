@@ -21,6 +21,7 @@ import { SubscriptionModule } from './subscription/subscription.module';
 import { NotificationModule } from './notification/notification.module';
 import { AgentModule } from './agent/agent.module';
 import { GeminiStatusModule } from './gemini-status/gemini-status.module';
+import { HealthModule } from './health/health.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
@@ -48,7 +49,8 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
     ChatQueryModule,
     NotificationModule,
     AgentModule,
-    GeminiStatusModule
+    GeminiStatusModule,
+    HealthModule,
   ],
   controllers: [],
   providers: [
