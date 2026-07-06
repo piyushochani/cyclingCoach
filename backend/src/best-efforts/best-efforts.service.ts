@@ -215,7 +215,7 @@ export class BestEffortsService {
     for (let i = 0; i < sorted.length; i++) {
       const a = sorted[i];
       const old = oldMap.get(i + 1);
-      const isNew = old ? (a.distance || 0) > old.distance : false;
+      const isFresh = old ? (a.distance || 0) > old.distance : false;
       await this.bestEffortModel.create({
         label: `${((a.distance || 0) / 1000).toFixed(1)} km`,
         time: a.moving_time || a.elapsed_time || 0,
@@ -230,10 +230,10 @@ export class BestEffortsService {
         category: 'longest',
         user: userId,
         previousBest: old ? old.distance : undefined,
-        isNew,
+        isFresh,
       });
 
-      if (isNew) {
+      if (isFresh) {
         this.notificationService.createBestEffortNotification(
           String(userId._id || userId),
           'Longest Ride',
@@ -329,7 +329,7 @@ export class BestEffortsService {
               category: 'strava_best',
               user: userId,
               previousBest: existing?.time || null,
-              isNew: existing ? candidateTime < existing.time : true,
+              isFresh: existing ? candidateTime < existing.time : true,
             });
           }
         }
@@ -340,7 +340,7 @@ export class BestEffortsService {
         const sorted = [...existingMap.values()].sort((a, b) => (b.distance || 0) - (a.distance || 0));
         for (const entry of sorted) {
           await this.bestEffortModel.create({ ...entry, rank: rank++ });
-          if (entry.isNew) {
+          if (entry.isFresh) {
             this.notificationService.createBestEffortNotification(
               String(userId._id || userId),
               `Best Effort: ${entry.label}`,
@@ -370,7 +370,7 @@ export class BestEffortsService {
       distance: r.distance,
       avgSpeed: r.avgSpeed,
       rank: r.rank,
-      isNew: r.isNew || false,
+      isFresh: r.isFresh || false,
       previousBest: r.previousBest || null,
     }));
 
@@ -384,7 +384,7 @@ export class BestEffortsService {
       avgSpeed: r.avgSpeed,
       rank: r.rank,
       label: r.label,
-      isNew: r.isNew || false,
+      isFresh: r.isFresh || false,
       previousBest: r.previousBest || null,
     }));
 

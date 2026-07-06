@@ -62,7 +62,7 @@ function EffortRow({ effort, i, efforts }) {
       <div className="min-w-0">
         <p className={`truncate text-sm font-semibold leading-tight ${isPR ? "text-white" : "text-white/75"}`}>
           {effort.name ?? `Ride · ${formatDate(effort.date)}`}
-          {effort.isNew && (
+          {effort.isFresh && (
             <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 font-dmSans text-[9px] font-bold uppercase tracking-[0.08em] text-emerald-400">
               NEW
             </span>
@@ -106,7 +106,7 @@ function LongestRideRow({ effort, isFirst }) {
       <div className="min-w-0">
         <p className={`truncate text-sm font-semibold leading-tight ${isFirst ? "text-white" : "text-white/75"}`}>
           {effort.name}
-          {effort.isNew && (
+          {effort.isFresh && (
             <span className="ml-2 inline-flex items-center rounded-full bg-emerald-500/15 px-2 py-0.5 font-dmSans text-[9px] font-bold uppercase tracking-[0.08em] text-emerald-400">
               NEW
             </span>

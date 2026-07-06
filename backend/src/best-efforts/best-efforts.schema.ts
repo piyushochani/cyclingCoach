@@ -34,7 +34,7 @@ export class BestEffortRecord extends Document {
   previousBest: number;
 
   @Prop({ default: false })
-  isNew: boolean;
+  isFresh: boolean;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   user: MongooseSchema.Types.ObjectId;
