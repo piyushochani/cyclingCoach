@@ -44,10 +44,10 @@ export class Equipment extends Document {
   @Prop({ default: '' })
   equipmentModel: string;
 
-  @Prop({ default: null })
+  @Prop({ type: Number, default: null })
   weightG: number | null;
 
-  @Prop({ default: null })
+  @Prop({ type: Date, default: null })
   purchaseDate: Date | null;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
