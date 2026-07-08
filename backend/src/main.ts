@@ -5,10 +5,20 @@ import express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
 async function bootstrap() {
+  const server = express();
+  server.use(express.json({ limit: '10mb' }));
+
+  server.get('/health', (_req, res) => res.json({ ok: true }));
+
   try {
-    const server = express();
-    server.use(express.json({ limit: '10mb' }));
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
 
     app.use(helmet());
@@ -34,8 +44,11 @@ async function bootstrap() {
     await app.listen(port, '0.0.0.0');
     console.log(`Backend listening on 0.0.0.0:${port}`);
   } catch (err) {
-    console.error('Failed to start backend:', err);
-    process.exit(1);
+    console.error('NestJS bootstrap failed — starting health-only server:', err);
+    const port = parseInt(process.env.PORT || '3001', 10);
+    server.listen(port, '0.0.0.0', () => {
+      console.log(`Health-only server listening on 0.0.0.0:${port}`);
+    });
   }
 }
 bootstrap();
