@@ -1,50 +1,50 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Job, Queue } from 'bullmq';
-import { SyncQueueService } from './sync-queue.service';
+import { Job } from 'bullmq';
+import { BestEffortsService } from './best-efforts.service';
 import { JobStatusService } from '../common/queue/job-status.service';
 import { MockQueue } from '../common/queue/mock-queue';
 import { QUEUES } from '../common/queue/queue.constants';
 
 @Injectable()
-export class SyncJobHandler {
-  private readonly logger = new Logger(SyncJobHandler.name);
+export class BestEffortsJobHandler {
+  private readonly logger = new Logger(BestEffortsJobHandler.name);
 
   constructor(
-    private readonly syncQueueService: SyncQueueService,
+    private readonly bestEffortsService: BestEffortsService,
     private readonly jobStatusService: JobStatusService,
   ) {}
 
-  async process(job: Job<{ userId: string; type: string }>): Promise<{ newActivities: number }> {
+  async process(job: Job<{ userId: string }>): Promise<{ status: string }> {
     const bullJobId = String(job.id);
+    const { userId } = job.data;
     await this.jobStatusService.updateStatus(bullJobId, 'active').catch(() => {});
 
     try {
-      const result = await this.syncQueueService.handleSyncJob(job.name, job.data);
+      const result = await this.bestEffortsService.executeSync(userId);
       await this.jobStatusService.updateStatus(bullJobId, 'completed', { result });
       return result;
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Sync job ${bullJobId} failed: ${message}`);
+      this.logger.error(`Best-efforts job ${bullJobId} failed: ${message}`);
       await this.jobStatusService.updateStatus(bullJobId, 'failed', { error: message });
       throw error;
     }
   }
 }
 
-/** Runs sync jobs inline when Redis is disabled (local dev). */
 @Injectable()
-export class SyncMockProcessor implements OnApplicationBootstrap {
+export class BestEffortsMockProcessor implements OnApplicationBootstrap {
   constructor(
-    private readonly syncJobHandler: SyncJobHandler,
-    @InjectQueue(QUEUES.SYNC) private readonly queue: MockQueue,
+    private readonly bestEffortsJobHandler: BestEffortsJobHandler,
+    @InjectQueue(QUEUES.BEST_EFFORTS) private readonly queue: MockQueue,
   ) {}
 
   onApplicationBootstrap() {
     if (!(this.queue instanceof MockQueue)) return;
-    this.queue.registerDirectHandler(async (jobName: string, data: { userId: string; type: string }) => {
-      const mockJob = { data, name: jobName, id: `mock_${Date.now()}` } as Job;
-      return this.syncJobHandler.process(mockJob);
+    this.queue.registerDirectHandler(async (_jobName: string, data: { userId: string }) => {
+      const mockJob = { data, name: 'refresh', id: `mock_${Date.now()}` } as Job;
+      return this.bestEffortsJobHandler.process(mockJob);
     });
   }
 }

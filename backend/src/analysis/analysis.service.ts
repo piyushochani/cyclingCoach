@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { buildJobId, DEFAULT_JOB_OPTIONS, QUEUES } from '../common/queue/queue.constants';
+import { MockQueue } from '../common/queue/mock-queue';
 import { Model } from 'mongoose';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -186,7 +189,7 @@ export class AnalysisService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Activity.name) private activityModel: Model<Activity>,
     @InjectModel(Race.name) private raceModel: Model<Race>,
-    @InjectQueue('analysis') private readonly analysisQueue: any,
+    @InjectQueue(QUEUES.ANALYSIS) private readonly analysisQueue: Queue | MockQueue,
     private readonly trainingContext: TrainingContextService,
   ) {
     logKeyHealth(this.logger, 'sync').catch(() => {});
@@ -406,16 +409,80 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
     }
   }
 
-  async queueWeeklyReview(userId: string): Promise<{ analysis: string }> {
+  async ensurePlans(userId: string): Promise<{ generated: number; message: string }> {
+    if (!userId) return { generated: 0, message: 'User ID required' };
+
+    const generated: number[] = [];
+
+    const recentActivities = await this.activityModel
+      .find({
+        user: userId as any,
+        sport: { $regex: /ride|cycling|bike|bicycle|velomobile|handcycle/i },
+      })
+      .sort({ date: -1 })
+      .limit(20)
+      .lean()
+      .exec();
+
+    for (const relativeWeek of [0, 1]) {
+      const existing = await this.trainingContext.getWeeklyPlan(userId, relativeWeek);
+      if (existing && existing.workouts && existing.workouts.length > 0) continue;
+
+      try {
+        const result = await this.generateNextWeekPlan(recentActivities, userId);
+        if (result.workouts?.length > 0) {
+          await this.trainingContext.upsertWeeklyPlan(userId, relativeWeek, {
+            workouts: result.workouts,
+            coachNotes: result.coachNotes,
+            status: 'generated',
+          });
+          generated.push(relativeWeek);
+        }
+      } catch (err) {
+        this.logger.error(`Failed to generate plan for week ${relativeWeek}: ${err}`);
+      }
+    }
+
+    return {
+      generated: generated.length,
+      message: generated.length > 0 ? `${generated.length} plan(s) generated` : 'All plans already exist',
+    };
+  }
+
+  async runWeeklyReview(userId: string): Promise<{ analysis: string }> {
     return this.analyze({ type: 'weekly', activities: [], message: 'Weekly review' }, userId);
   }
 
-  async queueMonthlyReview(userId: string): Promise<{ analysis: string }> {
+  async runMonthlyReview(userId: string): Promise<{ analysis: string }> {
     return this.analyze({ type: 'monthly', activities: [], message: 'Monthly review' }, userId);
   }
 
+  async queueWeeklyReview(userId: string): Promise<void> {
+    await this.analysisQueue.add(
+      'weekly',
+      { userId, type: 'weekly' },
+      { ...DEFAULT_JOB_OPTIONS, jobId: buildJobId(QUEUES.ANALYSIS, userId, 'weekly'), attempts: 2 },
+    );
+  }
+
+  async queueMonthlyReview(userId: string): Promise<void> {
+    await this.analysisQueue.add(
+      'monthly',
+      { userId, type: 'monthly' },
+      { ...DEFAULT_JOB_OPTIONS, jobId: buildJobId(QUEUES.ANALYSIS, userId, 'monthly'), attempts: 2 },
+    );
+  }
+
   async queueActivityAnalysis(activityId: string, userId: string): Promise<void> {
-    await this.analysisQueue.add('activity', { activityId, userId });
+    await this.analysisQueue.add(
+      'activity',
+      { activityId, userId, type: 'activity' },
+      {
+        ...DEFAULT_JOB_OPTIONS,
+        jobId: buildJobId(QUEUES.ANALYSIS, userId, `activity:${activityId}`),
+        attempts: 2,
+      },
+    );
   }
 
   async generateActivityAnalysis(activityId: string, userId: string): Promise<string> {

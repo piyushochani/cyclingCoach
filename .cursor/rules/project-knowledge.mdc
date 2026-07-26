@@ -1,0 +1,15 @@
+---
+description: Project knowledge index — deployment, architecture, async tasks
+alwaysApply: true
+---
+
+# Cycling Coach project knowledge
+
+Read `.cursor/knowledge/` before deployment or background-task work:
+
+- `README.md` — branch map and production audit
+- `deployment.md` — Vercel/Railway URLs and env vars
+- `architecture.md` — auth, API proxy, module layout
+- `async-tasks.md` — BullMQ queue design on `feat/asynchronous-tasks`
+
+Monorepo git root: `cycling-coach/` (not parent folder).

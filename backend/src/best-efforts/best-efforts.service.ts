@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Model } from 'mongoose';
 import { readFileSync, existsSync } from 'fs';
 import { homedir } from 'os';
@@ -7,6 +9,9 @@ import { join } from 'path';
 import { parse as parseYaml } from 'yaml';
 import { BestEffortRecord, Segment, SegmentEffort, BestEffortsSyncStatus } from './best-efforts.schema';
 import { NotificationService } from '../notification/notification.service';
+import { QueueEnqueueService } from '../common/queue/queue-enqueue.service';
+import { MockQueue } from '../common/queue/mock-queue';
+import { QUEUES } from '../common/queue/queue.constants';
 
 const STRAVA_BEST_EFFORT_NAMES = [
   '1,000m', '5,000m', '10,000m', '20,000m', '30,000m', '40,000m', '50,000m',
@@ -38,6 +43,8 @@ export class BestEffortsService {
     private readonly notificationService: NotificationService,
     @InjectModel(SegmentEffort.name) private segmentEffortModel: Model<SegmentEffort>,
     @InjectModel(BestEffortsSyncStatus.name) private syncStatusModel: Model<BestEffortsSyncStatus>,
+    private readonly queueEnqueue: QueueEnqueueService,
+    @InjectQueue(QUEUES.BEST_EFFORTS) private readonly bestEffortsQueue: Queue | MockQueue,
   ) {
     this.loadConfig();
   }
@@ -58,7 +65,7 @@ export class BestEffortsService {
     };
   }
 
-  async triggerBackgroundSync(userId: any): Promise<{ status: string }> {
+  async triggerBackgroundSync(userId: any): Promise<{ status: string; jobId?: string }> {
     if (!userId) return { status: 'error' };
 
     const existing = await this.syncStatusModel.findOne({ user: userId as any }).exec();
@@ -72,12 +79,23 @@ export class BestEffortsService {
       { upsert: true },
     ).exec();
 
-    this.runBackgroundSync(userId).catch(() => {});
+    const enqueued = await this.queueEnqueue.enqueue(
+      this.bestEffortsQueue,
+      QUEUES.BEST_EFFORTS,
+      'refresh',
+      { userId: String(userId) },
+      String(userId),
+    );
 
-    return { status: 'syncing' };
+    if (enqueued.async) {
+      return { status: 'syncing', jobId: enqueued.jobId };
+    }
+
+    return { status: 'idle' };
   }
 
-  private async runBackgroundSync(userId: any) {
+  /** Durable sync handler used by BullMQ workers and MockQueue. */
+  async executeSync(userId: any): Promise<{ status: string }> {
     try {
       const before = await this.getStoredResults(userId);
       await this.compute(userId);
@@ -89,12 +107,16 @@ export class BestEffortsService {
         { user: userId as any },
         { $set: { status: 'idle', lastSyncAt: new Date(), hasNewData } },
       ).exec();
-    } catch (err: any) {
-      this.logger.error(`Background sync failed: ${err.message}`);
+
+      return { status: 'idle' };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Background sync failed: ${message}`);
       await this.syncStatusModel.updateOne(
         { user: userId as any },
-        { $set: { status: 'idle', error: err.message, lastSyncAt: new Date() } },
+        { $set: { status: 'idle', error: message, lastSyncAt: new Date() } },
       ).exec();
+      throw err;
     }
   }
 

@@ -1,11 +1,9 @@
 import { Controller, Post, Body, Logger } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
 import { UserId } from '../common/user-id.decorator';
 import { AnalysisService } from './analysis.service';
 import { NotificationService } from '../notification/notification.service';
 import { TrainingContextService } from '../training-context/training-context.service';
-import { Activity } from '../activity/activity.schema';
+import { PlanQueueService } from '../plan/plan-queue.service';
 
 @Controller('analysis')
 export class AnalysisController {
@@ -15,7 +13,7 @@ export class AnalysisController {
     private readonly analysisService: AnalysisService,
     private readonly notificationService: NotificationService,
     private readonly trainingContext: TrainingContextService,
-    @InjectModel(Activity.name) private activityModel: Model<Activity>,
+    private readonly planQueueService: PlanQueueService,
   ) {}
 
   @Post()
@@ -74,46 +72,19 @@ export class AnalysisController {
   async ensurePlans(@UserId() userId: string) {
     if (!userId) return { generated: 0, message: 'User ID required' };
 
-    const generated: number[] = [];
-
-    const recentActivities = await this.activityModel
-      .find({
-        user: userId as any,
-        sport: { $regex: /ride|cycling|bike|bicycle|velomobile|handcycle/i },
-      })
-      .sort({ date: -1 })
-      .limit(20)
-      .lean()
-      .exec();
-
-    for (const relativeWeek of [0, 1]) {
-      const existing = await this.trainingContext.getWeeklyPlan(userId, relativeWeek);
-      if (existing && existing.workouts && existing.workouts.length > 0) continue;
-
-      try {
-        const result = await this.analysisService.generateNextWeekPlan(recentActivities, userId);
-        if (result.workouts?.length > 0) {
-          await this.trainingContext.upsertWeeklyPlan(userId, relativeWeek, {
-            workouts: result.workouts,
-            coachNotes: result.coachNotes,
-            status: 'generated',
-          });
-          generated.push(relativeWeek);
-        }
-      } catch (err) {
-        this.logger.error(`Failed to generate plan for week ${relativeWeek}: ${err}`);
-      }
+    const enqueued = await this.planQueueService.enqueueEnsurePlans(userId);
+    if (enqueued.async) {
+      return { jobId: enqueued.jobId, status: enqueued.status };
     }
 
-    if (generated.length > 0) {
-      const weekLabel = generated.map((w) => w === 0 ? 'current' : 'next').join(' and ');
+    const result = await this.analysisService.ensurePlans(userId);
+    if (result.generated > 0) {
       await this.notificationService.create(userId, 'system', 'Training Plan Ready',
-        `Your ${weekLabel} week training plan${generated.length > 1 ? 's have' : ' has'} been generated.`,
-        { generated: generated.map((w) => `week-${w}`), link: '/ai-training' },
+        `${result.generated} training plan(s) generated.`,
+        { link: '/ai-training' },
       ).catch(() => {});
     }
-
-    return { generated: generated.length, message: generated.length > 0 ? `${generated.length} plan(s) generated` : 'All plans already exist' };
+    return result;
   }
 }
 
