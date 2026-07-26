@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UsePipes, ValidationPipe } from '@nestjs/common';
+﻿import { Controller, Get, Post, Body, UsePipes, ValidationPipe } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 import { UserId } from '../common/user-id.decorator';
 
@@ -9,6 +9,11 @@ export class SubscriptionController {
   @Get()
   async getStatus(@UserId() userId: string) {
     return this.subscriptionService.getStatus(userId);
+  }
+
+  @Get('renewal-status')
+  async renewalStatus(@UserId() userId: string) {
+    return this.subscriptionService.getRenewalStatus(userId);
   }
 
   @Post('cancel')

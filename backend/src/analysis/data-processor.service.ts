@@ -16,7 +16,6 @@ export interface HRZoneSeconds {
   z3: number;
   z4: number;
   z5: number;
-  z6: number;
 }
 
 export interface HRZoneBoundary {
@@ -30,12 +29,11 @@ export interface HRZoneBoundary {
 
 export function computeHRZoneBoundaries(maxHr: number): HRZoneBoundary[] {
   return [
-    { zone: 'Z1', label: 'Active Recovery', minPercent: 0, maxPercent: 54, minBpm: 0, maxBpm: Math.round(maxHr * 0.54) },
-    { zone: 'Z2', label: 'Endurance', minPercent: 55, maxPercent: 69, minBpm: Math.round(maxHr * 0.55), maxBpm: Math.round(maxHr * 0.69) },
-    { zone: 'Z3', label: 'Tempo', minPercent: 70, maxPercent: 79, minBpm: Math.round(maxHr * 0.70), maxBpm: Math.round(maxHr * 0.79) },
-    { zone: 'Z4', label: 'Threshold', minPercent: 80, maxPercent: 87, minBpm: Math.round(maxHr * 0.80), maxBpm: Math.round(maxHr * 0.87) },
-    { zone: 'Z5', label: 'VO2 Max', minPercent: 88, maxPercent: 94, minBpm: Math.round(maxHr * 0.88), maxBpm: Math.round(maxHr * 0.94) },
-    { zone: 'Z6', label: 'Anaerobic', minPercent: 95, maxPercent: 100, minBpm: Math.round(maxHr * 0.95), maxBpm: maxHr },
+    { zone: 'Z1', label: 'Recovery', minPercent: 50, maxPercent: 60, minBpm: Math.round(maxHr * 0.50), maxBpm: Math.round(maxHr * 0.60) },
+    { zone: 'Z2', label: 'Endurance', minPercent: 60, maxPercent: 70, minBpm: Math.round(maxHr * 0.60), maxBpm: Math.round(maxHr * 0.70) },
+    { zone: 'Z3', label: 'Tempo', minPercent: 70, maxPercent: 80, minBpm: Math.round(maxHr * 0.70), maxBpm: Math.round(maxHr * 0.80) },
+    { zone: 'Z4', label: 'Threshold', minPercent: 80, maxPercent: 90, minBpm: Math.round(maxHr * 0.80), maxBpm: Math.round(maxHr * 0.90) },
+    { zone: 'Z5', label: 'VO2 Max', minPercent: 90, maxPercent: 100, minBpm: Math.round(maxHr * 0.90), maxBpm: maxHr },
   ];
 }
 
@@ -234,16 +232,15 @@ export class DataProcessorService {
   }
 
   private computeHRZones(hrStream: number[], maxHr: number): HRZoneSeconds {
-    const zones: HRZoneSeconds = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0, z6: 0 };
+    const zones: HRZoneSeconds = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
     for (const h of hrStream) {
       if (h <= 0) continue;
       const pct = h / maxHr;
-      if (pct < 0.55) zones.z1++;
-      else if (pct <= 0.69) zones.z2++;
-      else if (pct <= 0.79) zones.z3++;
-      else if (pct <= 0.87) zones.z4++;
-      else if (pct <= 0.94) zones.z5++;
-      else zones.z6++;
+      if (pct < 0.60) zones.z1++;
+      else if (pct < 0.70) zones.z2++;
+      else if (pct < 0.80) zones.z3++;
+      else if (pct < 0.90) zones.z4++;
+      else zones.z5++;
     }
     return zones;
   }

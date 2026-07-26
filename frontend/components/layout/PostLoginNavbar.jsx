@@ -4,7 +4,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api } from '../../lib/api';
+import { api, dispatchDataRefetch } from '../../lib/api';
+import { clearAuthSession } from '../../lib/auth';
 import { getSyncStatus, triggerGlobalSync } from '../../lib/useAutoSync';
 
 const navLinks = [
@@ -77,9 +78,11 @@ const PostLoginNavbar = () => {
   useEffect(() => {
     const handler = () => loadFromStorage();
     window.addEventListener("storage", handler);
+    window.addEventListener("auth-session-changed", handler);
     window.addEventListener("notifications-updated", loadNotifCount);
     return () => {
       window.removeEventListener("storage", handler);
+      window.removeEventListener("auth-session-changed", handler);
       window.removeEventListener("notifications-updated", loadNotifCount);
     };
   }, [loadFromStorage, loadNotifCount]);
@@ -109,7 +112,7 @@ const PostLoginNavbar = () => {
     setIsDropdownOpen(false);
     const ok = await triggerGlobalSync();
     if (ok) {
-      setTimeout(() => window.location.reload(), 2000);
+      dispatchDataRefetch();
     } else {
       alert('Sync failed. Check your browser console (F12) for details, or try logging out and back in.');
     }
@@ -126,9 +129,7 @@ const PostLoginNavbar = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('cyclogenai_signed_in');
-    localStorage.removeItem('cyclogenai_user');
-    localStorage.removeItem('cyclogenai_onboarding_done');
+    clearAuthSession();
     router.push('/');
   };
 

@@ -12,14 +12,22 @@ export default function PlanAutoGenerator() {
 
   useEffect(() => {
     if (publicPaths.includes(pathname)) return;
-    if (checkedRef.current) return;
-    checkedRef.current = true;
 
-    const id = setTimeout(() => {
+    const runEnsurePlans = () => {
       api.post('/analysis/ensure-plans', {}).catch(() => {});
-    }, 2000);
+    };
 
-    return () => clearTimeout(id);
+    if (!checkedRef.current) {
+      checkedRef.current = true;
+      const id = setTimeout(runEnsurePlans, 2000);
+      return () => clearTimeout(id);
+    }
+
+    const onAuth = () => {
+      setTimeout(runEnsurePlans, 1500);
+    };
+    window.addEventListener('auth-session-changed', onAuth);
+    return () => window.removeEventListener('auth-session-changed', onAuth);
   }, [pathname]);
 
   return null;

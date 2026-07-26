@@ -11,8 +11,30 @@ import StravaConnectOverlay from './StravaConnectOverlay';
 import ModelChangeBanner from './ModelChangeBanner';
 import OnboardingChat from './OnboardingChat';
 import PlanAutoGenerator from './PlanAutoGenerator';
+import { useAutoSync } from '../../lib/useAutoSync';
 
 const publicPaths = ['/', '/login', '/signup', '/forgot-password'];
+
+function AuthenticatedShell({ children, isPublic, pathname }) {
+  useAutoSync();
+  return (
+    <StravaConnectOverlay>
+      <div className="min-h-screen bg-bg-dark text-text-primary">
+        {!isPublic && <PostLoginNavbar />}
+        {!isPublic && <ModelChangeBanner />}
+        <main className={!isPublic ? 'pt-[59px]' : ''}>
+          <PageTransitionWrapper>
+            {children}
+          </PageTransitionWrapper>
+        </main>
+        {!isPublic && <GeneralFooter />}
+        {!isPublic && <PaceBotChat />}
+        {!isPublic && pathname !== '/auth/strava/callback' && <OnboardingChat />}
+        {!isPublic && <PlanAutoGenerator />}
+      </div>
+    </StravaConnectOverlay>
+  );
+}
 
 const ClientLayoutWrapper = ({ children }) => {
   const pathname = usePathname();
@@ -20,21 +42,13 @@ const ClientLayoutWrapper = ({ children }) => {
 
   return (
     <AuthGuard>
-      <StravaConnectOverlay>
+      {isPublic ? (
         <div className="min-h-screen bg-bg-dark text-text-primary">
-          {!isPublic && <PostLoginNavbar />}
-          {!isPublic && <ModelChangeBanner />}
-          <main className={!isPublic ? 'pt-[59px]' : ''}>
-            <PageTransitionWrapper>
-              {children}
-            </PageTransitionWrapper>
-          </main>
-          {!isPublic && <GeneralFooter />}
-          {!isPublic && <PaceBotChat />}
-          {!isPublic && pathname !== '/auth/strava/callback' && <OnboardingChat />}
-          {!isPublic && <PlanAutoGenerator />}
+          <PageTransitionWrapper>{children}</PageTransitionWrapper>
         </div>
-      </StravaConnectOverlay>
+      ) : (
+        <AuthenticatedShell isPublic={isPublic} pathname={pathname}>{children}</AuthenticatedShell>
+      )}
     </AuthGuard>
   );
 };

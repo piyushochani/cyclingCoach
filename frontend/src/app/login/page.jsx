@@ -4,7 +4,9 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { api, setToken } from "../../../lib/api";
+import { api } from "../../../lib/api";
+import { completeAuthSession, isAuthenticated } from "../../../lib/auth";
+import { triggerBackgroundSyncAfterAuth } from "../../../lib/useAutoSync";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,7 +16,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (localStorage.getItem("cyclogenai_signed_in") === "true") {
+    if (isAuthenticated()) {
       router.replace("/dashboard");
     }
   }, [router]);
@@ -30,9 +32,8 @@ export default function LoginPage() {
     try {
       const res = await api.post("/auth/login", { email, password });
       const { token, ...user } = res;
-      setToken(token);
-      localStorage.setItem("cyclogenai_user", JSON.stringify(user));
-      localStorage.removeItem("cyclogenai_onboarding_done");
+      completeAuthSession(token, user);
+      triggerBackgroundSyncAfterAuth(false);
       router.replace("/dashboard");
     } catch (err) {
       setError(err.message || "Invalid email or password");

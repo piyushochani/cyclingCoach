@@ -21,8 +21,7 @@ export class SummaryBuilderService {
         const z3 = Math.round((processed.hrZoneSeconds.z3 / total) * 100);
         const z4 = Math.round((processed.hrZoneSeconds.z4 / total) * 100);
         const z5 = Math.round((processed.hrZoneSeconds.z5 / total) * 100);
-        const z6 = Math.round((processed.hrZoneSeconds.z6 / total) * 100);
-        lines.push(`Heart rate: avg ${processed.avgHeartrate} bpm, max ${processed.maxHeartrate} bpm. Time in zones: Z1 ${z1}%, Z2 ${z2}%, Z3 ${z3}%, Z4 ${z4}%, Z5 ${z5}%, Z6 ${z6}%.`);
+        lines.push(`Heart rate: avg ${processed.avgHeartrate} bpm, max ${processed.maxHeartrate} bpm. Time in zones: Z1 ${z1}%, Z2 ${z2}%, Z3 ${z3}%, Z4 ${z4}%, Z5 ${z5}%.`);
       }
     } else {
       lines.push(`Heart rate: avg ${processed.avgHeartrate ?? 'N/A'} bpm, max ${processed.maxHeartrate ?? 'N/A'} bpm.`);

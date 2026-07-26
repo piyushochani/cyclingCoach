@@ -8,6 +8,7 @@ import {
 } from 'recharts';
 import Loader from '../../../components/ui/Loader';
 import { api } from '../../../lib/api';
+import { useDataRefetch } from '../../../lib/useDataRefetch';
 import AnalysisModal from '../../../components/ui/AnalysisModal';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -122,8 +123,10 @@ export default function StatisticsPage() {
   const [period, setPeriod] = useState('all');
   const [sportFilter, setSportFilter] = useState('all');
   const [analysisModal, setAnalysisModal] = useState({ open: false, type: 'monthly', activities: [], previousActivities: [], activityName: '' });
+  const refetchKey = useDataRefetch();
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
       api.get('/stats').catch(() => null),
       api.get('/activities').catch(() => []),
@@ -134,7 +137,7 @@ export default function StatisticsPage() {
       setBestEfforts(be);
       setLoading(false);
     });
-  }, []);
+  }, [refetchKey]);
 
   const filteredActivities = useMemo(() => {
     let filtered = [...activities];

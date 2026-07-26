@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api } from "../../../../../lib/api";
+import { api, clearApiCache, dispatchDataRefetch } from "../../../../../lib/api";
 import FirstSyncTutorial from "../../../../../components/layout/FirstSyncTutorial";
 import OnboardingChat from "../../../../../components/layout/OnboardingChat";
 
@@ -58,6 +58,9 @@ function StravaCallbackInner() {
       })
       .then(async (syncResult) => {
         if (cancelled) return;
+        clearApiCache();
+        dispatchDataRefetch();
+        window.dispatchEvent(new CustomEvent("sync-completed", { detail: Date.now() }));
         api.post("/best-efforts/refresh", {}).catch(() => {});
         try {
           const stored = localStorage.getItem("cyclogenai_user");
@@ -115,10 +118,12 @@ function StravaCallbackInner() {
       }
     } catch {}
     setSavingProfile(false);
+    dispatchDataRefetch();
     router.push("/dashboard");
   };
 
   const skip = () => {
+    dispatchDataRefetch();
     router.push("/dashboard");
   };
 

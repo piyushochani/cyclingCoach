@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "../../lib/api";
+import { useDataRefetch } from "../../lib/useDataRefetch";
 
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -187,12 +188,13 @@ export default function WeeklyGraph({ activities: apiActivities }) {
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   const svgRef = useRef(null);
+  const refetchKey = useDataRefetch();
 
   useEffect(() => {
     api.get('/training-context/weekly-plans')
       .then((plans) => setWeeklyPlans(plans || []))
       .catch(() => {});
-  }, []);
+  }, [refetchKey]);
 
   const weeklyPlansMap = useMemo(() => {
     const map = {};

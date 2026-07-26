@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
 import { api } from "../../lib/api";
+import { useDataRefetch } from "../../lib/useDataRefetch";
 import Loader from "../ui/Loader";
 
 const dayNames = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
@@ -102,6 +103,7 @@ const WeeklyScheduleCard = ({ plan: initialPlan }) => {
   const [weekOffset, setWeekOffset] = useState(0);
   const [plan, setPlan] = useState(initialPlan);
   const [loading, setLoading] = useState(false);
+  const refetchKey = useDataRefetch();
 
   const isCurrentWeek = weekOffset === 0;
 
@@ -131,13 +133,13 @@ const WeeklyScheduleCard = ({ plan: initialPlan }) => {
       .then((data) => setPlan(data))
       .catch(() => setPlan(null))
       .finally(() => setLoading(false));
-  }, [weekOffset, relativeWeek]);
+  }, [weekOffset, relativeWeek, refetchKey, isCurrentWeek, initialPlan]);
 
   useEffect(() => {
     if (initialPlan && weekOffset === 0) {
       setPlan(initialPlan);
     }
-  }, [initialPlan]);
+  }, [initialPlan, refetchKey]);
 
   const workoutMap = {};
   if (plan?.workouts) {

@@ -56,7 +56,9 @@ async function saveCoach(coach) {
       localStorage.setItem("cyclogenai_user", JSON.stringify(u));
       if (u.email) await api.put('/users/' + encodeURIComponent(u.email), { selectedCoach: coach });
     }
-  } catch {}
+  } catch (err) {
+    console.warn('[Profile] Failed to sync coach selection to server:', err);
+  }
 }
 
 function loadCustomCoaches() {
@@ -80,7 +82,9 @@ async function saveCustomCoaches(list) {
       localStorage.setItem("cyclogenai_user", JSON.stringify(u));
       if (u.email) await api.put('/users/' + encodeURIComponent(u.email), { customCoaches: list });
     }
-  } catch {}
+  } catch (err) {
+    console.warn('[Profile] Failed to sync custom coaches to server:', err);
+  }
 }
 
 const sportOptions = ["cycling", "running", "swimming", "triathlon"];
@@ -180,7 +184,7 @@ const ProfilePage = () => {
         });
       } catch {}
     }
-    api.get("/gear/bikes").then(setApiBikes).catch(() => {});
+    api.get("/gear/bikes").then(setApiBikes).catch(err => console.warn('[Profile] Failed to fetch bikes:', err));
     setGears(loadGears());
     setSelectedCoach(loadCoach());
     const storedCoaches = loadCustomCoaches();
@@ -194,9 +198,11 @@ const ProfilePage = () => {
               setCustomCoaches(data.coaches);
               saveCustomCoaches(data.coaches);
             }
-          }).catch(() => {});
+          }).catch(err => console.warn('[Profile] Failed to fetch user coaches:', err));
         }
-      } catch {}
+      } catch (err) {
+        console.warn('[Profile] Failed to parse stored user:', err);
+      }
     }
   }, []);
 
@@ -229,7 +235,9 @@ const ProfilePage = () => {
         saveCustomCoaches(data.coaches);
       }
       localStorage.setItem("cyclogenai_user", JSON.stringify(data));
-    } catch {}
+    } catch (err) {
+      console.warn('[Profile] Failed to refresh user data:', err);
+    }
   }, []);
 
   const handleSave = async () => {
@@ -644,12 +652,11 @@ const ProfilePage = () => {
             {!editing && (user.maxHeartrate || user.age) && (() => {
               const maxHr = user.maxHeartrate ? Number(user.maxHeartrate) : Math.round(220 - Number(user.age));
               const zones = maxHr >= 120 ? [
-                { label: "Z1 (Active Recovery)", min: 0, max: Math.round(maxHr * 0.55) },
-                { label: "Z2 (Endurance)", min: Math.round(maxHr * 0.55) + 1, max: Math.round(maxHr * 0.69) },
-                { label: "Z3 (Tempo)", min: Math.round(maxHr * 0.70), max: Math.round(maxHr * 0.79) },
-                { label: "Z4 (Threshold)", min: Math.round(maxHr * 0.80), max: Math.round(maxHr * 0.87) },
-                { label: "Z5 (VO2 Max)", min: Math.round(maxHr * 0.88), max: Math.round(maxHr * 0.94) },
-                { label: "Z6 (Anaerobic)", min: Math.round(maxHr * 0.95), max: maxHr },
+                { label: "Z1 (Recovery)", min: 0, max: Math.round(maxHr * 0.60) },
+                { label: "Z2 (Endurance)", min: Math.round(maxHr * 0.60) + 1, max: Math.round(maxHr * 0.70) },
+                { label: "Z3 (Tempo)", min: Math.round(maxHr * 0.70) + 1, max: Math.round(maxHr * 0.80) },
+                { label: "Z4 (Threshold)", min: Math.round(maxHr * 0.80) + 1, max: Math.round(maxHr * 0.90) },
+                { label: "Z5 (VO2 Max)", min: Math.round(maxHr * 0.90) + 1, max: maxHr },
               ] : [];
               return zones.length > 0 ? (
                 <motion.div

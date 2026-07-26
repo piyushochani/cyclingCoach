@@ -30,17 +30,28 @@ async function bootstrap() {
     }));
 
     const allowedOrigins = process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(',')
+      ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
       : ['http://localhost:3000'];
 
     app.enableCors({
-      origin: allowedOrigins,
+      origin: (
+        origin: string | undefined,
+        callback: (err: Error | null, allow?: boolean) => void,
+      ) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        if (/^https:\/\/([a-z0-9-]+\.)*vercel\.app$/.test(origin)) {
+          return callback(null, true);
+        }
+        callback(new Error(`Origin ${origin} not allowed by CORS`), false);
+      },
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id'],
       credentials: true,
     });
 
     const port = parseInt(process.env.PORT || '3001', 10);
+    console.log(`Starting backend on 0.0.0.0:${port} (PORT env=${process.env.PORT ?? 'unset'})`);
     await app.listen(port, '0.0.0.0');
     console.log(`Backend listening on 0.0.0.0:${port}`);
   } catch (err) {

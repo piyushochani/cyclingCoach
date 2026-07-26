@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+﻿import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Subscription } from './subscription.schema';
@@ -24,6 +24,18 @@ export class SubscriptionService {
       endDate: sub.endDate,
       cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
     };
+  }
+
+  async getRenewalStatus(userId: string): Promise<{ daysUntilExpiry: number; tier: string; status: string }> {
+    const sub = await this.findByUserId(userId);
+    if (!sub || !sub.endDate) {
+      return { daysUntilExpiry: -1, tier: 'free', status: 'active' };
+    }
+    const now = new Date();
+    const end = new Date(sub.endDate);
+    const diffTime = end.getTime() - now.getTime();
+    const daysUntilExpiry = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    return { daysUntilExpiry, tier: sub.tier, status: sub.status };
   }
 
   async createOrUpdate(userId: string, data: Partial<Subscription>): Promise<Subscription> {

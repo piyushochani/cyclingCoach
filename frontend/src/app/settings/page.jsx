@@ -80,6 +80,7 @@ export default function SettingsPage() {
   const [user, setUser] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(null);
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -91,6 +92,12 @@ export default function SettingsPage() {
   const [mainSport, setMainSport] = useState("cycling");
   const [experienceLevel, setExperienceLevel] = useState("beginner");
   const [description, setDescription] = useState("");
+
+  useEffect(() => {
+    if (!error) return;
+    const t = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(t);
+  }, [error]);
 
   useEffect(() => {
     try {
@@ -147,7 +154,7 @@ export default function SettingsPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
-      alert("Failed to save settings.");
+      setError(err?.message || "Failed to save settings.");
     } finally {
       setSaving(false);
     }
@@ -285,7 +292,16 @@ export default function SettingsPage() {
 
           <div className="flex items-center justify-between pt-2">
             <div>
-              {saved && (
+              {error && (
+                <motion.span
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="font-dmSans text-sm text-red-400"
+                >
+                  {error}
+                </motion.span>
+              )}
+              {saved && !error && (
                 <motion.span
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}

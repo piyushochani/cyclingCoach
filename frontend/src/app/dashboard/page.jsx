@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { api } from "../../../lib/api";
-import { useAutoSync } from "../../../lib/useAutoSync";
+import { useDataRefetch } from "../../../lib/useDataRefetch";
 import WeeklyGoalCard from "../../../components/layout/WeeklyGoalCard";
 import WeeklyScheduleCard from "../../../components/layout/WeekScheduleCard";
 import StatsYearCard from "../../../components/layout/StatsYearCard";
@@ -20,9 +20,9 @@ const DashboardPage = () => {
   const [races, setRaces] = useState([]);
   const [weeklyPlan, setWeeklyPlan] = useState(null);
   const [syncInfo, setSyncInfo] = useState(null);
-  useAutoSync();
+  const refetchKey = useDataRefetch();
 
-  useEffect(() => {
+  const loadDashboardData = useCallback(() => {
     Promise.all([
       api.get('/stats').catch((e) => { console.warn('Stats API failed:', e); return null; }),
       api.get('/activities').catch((e) => { console.warn('Activities API failed:', e); return []; }),
@@ -38,6 +38,10 @@ const DashboardPage = () => {
         setSyncInfo(syncData);
       });
   }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData, refetchKey]);
 
   const statCards = useMemo(() => stats
     ? [

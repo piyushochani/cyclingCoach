@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { api } from '../../../lib/api';
+import { useDataRefetch } from '../../../lib/useDataRefetch';
 import ScheduleRaceModal from '../../../components/layout/ScheduleRaceModal';
 import Loader from '../../../components/ui/Loader';
 
@@ -104,6 +105,7 @@ const AITrainingPage = () => {
   const [weeklyPlan, setWeeklyPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState({});
+  const refetchKey = useDataRefetch();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -119,7 +121,7 @@ const AITrainingPage = () => {
     }
   }, []);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { fetchData(); }, [fetchData, refetchKey]);
 
   const toggleComplete = async (dayOfWeek, workoutIndex, completed) => {
     const key = `${dayOfWeek}-${workoutIndex}`;

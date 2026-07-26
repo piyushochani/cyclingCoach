@@ -7,19 +7,33 @@ import { api } from "../../../lib/api";
 
 export default function SubscriptionPage() {
   const [user, setUser] = useState<any>(null);
+  const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const stored = localStorage.getItem("cyclogenai_user");
+    let localUser = null;
     if (stored) {
       try {
-        setUser(JSON.parse(stored));
+        localUser = JSON.parse(stored);
+        setUser(localUser);
       } catch {}
     }
-    setLoading(false);
+    api.get("/subscription").then(setSubscription).catch(() => {
+      setSubscription(null);
+    }).finally(() => setLoading(false));
   }, []);
 
-  const isPro = user?.subscriptionTier === "pro";
+  const tier = subscription?.tier || user?.subscriptionTier || "free";
+  const isPro = tier === "pro";
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#FF5500]" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">

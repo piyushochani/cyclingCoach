@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { api } from "../../../lib/api";
+import { useDataRefetch } from "../../../lib/useDataRefetch";
 
 const DATE_RANGE_OPTIONS = ["All Time", "Last 30 Days", "Last 7 Days", "This Year"];
 const SORT_OPTIONS = [
@@ -178,14 +179,16 @@ export default function ActivitiesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [visibleCount, setVisibleCount] = useState(12);
   const [loading, setLoading] = useState(true);
+  const refetchKey = useDataRefetch();
 
   useEffect(() => {
+    setLoading(true);
     api
       .get("/activities")
       .then((data) => setActivities(data || []))
       .catch((err) => console.error("Failed to load activities:", err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refetchKey]);
 
   const sorted = useMemo(() => {
     const now = new Date();

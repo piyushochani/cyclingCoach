@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
+import { useDataRefetch } from "../../../lib/useDataRefetch";
 import RaceChatModal from "../../../components/ui/RaceChatModal";
 
 const TYPE_OPTIONS = ["All", "Road", "Crit", "Time Trial", "Circuit", "Gravel"];
@@ -128,14 +129,16 @@ export default function RacesPage() {
     description: "",
   });
   const [formError, setFormError] = useState("");
+  const refetchKey = useDataRefetch();
 
   useEffect(() => {
+    setLoading(true);
     api
       .get("/races")
       .then((data) => setRaces(data || []))
       .catch((err) => console.error("Failed to load races:", err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [refetchKey]);
 
   const sorted = useMemo(() => {
     const filtered = races.filter((r) => {

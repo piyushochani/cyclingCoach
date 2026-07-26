@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
+import { useDataRefetch } from "../../../lib/useDataRefetch";
 
 const steps = [
   {
@@ -104,6 +105,19 @@ export default function ConnectPage() {
   const [authUrl, setAuthUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(false);
+  const [stravaConnected, setStravaConnected] = useState(null);
+  const [syncStatus, setSyncStatus] = useState(null);
+  const refetchKey = useDataRefetch();
+
+  useEffect(() => {
+    Promise.all([
+      api.get("/strava/status").catch(() => ({ connected: false })),
+      api.get("/sync/status").catch(() => null),
+    ]).then(([strava, sync]) => {
+      setStravaConnected(!!strava?.connected);
+      setSyncStatus(sync);
+    });
+  }, [refetchKey]);
 
   const handleConnect = async () => {
     if (authUrl) {
@@ -172,12 +186,16 @@ export default function ConnectPage() {
 
             <div className="flex-1">
               <h2 className="font-barlowCondensed text-2xl uppercase tracking-wide text-white">
-                {loading ? "Connecting..." : authUrl ? "Ready to Connect" : "Connect Strava"}
+                {loading ? "Connecting..." : stravaConnected ? "Strava Connected" : authUrl ? "Ready to Connect" : "Connect Strava"}
               </h2>
               <p className="font-dmSans mt-2 text-sm leading-relaxed text-white/40">
                 {loading
                   ? "Fetching Strava authorization URL..."
-                  : authUrl
+                  : stravaConnected
+                    ? syncStatus?.isUpToDate
+                      ? "Your Strava account is linked and data is up to date."
+                      : "Your Strava account is linked. Use Refresh in the menu to pull the latest activities."
+                    : authUrl
                     ? "Click below to authorize CyclogenAI to read your Strava activities. The link opens in a new tab."
                     : fetchError
                       ? "Unable to connect to Strava. Please try again later."

@@ -72,7 +72,34 @@ function setLastSyncTime(ts: number) {
   try {
     localStorage.setItem(STORAGE_KEY, String(ts));
     window.dispatchEvent(new CustomEvent("sync-completed", { detail: ts }));
+    window.dispatchEvent(new CustomEvent("data-refetch"));
   } catch {}
+}
+
+/** Kick off background data loading after login or signup (non-blocking). */
+export function triggerBackgroundSyncAfterAuth(isSignup = false): void {
+  if (typeof window === "undefined") return;
+
+  // Preload AI training plans for new accounts.
+  if (isSignup) {
+    api.post("/analysis/ensure-plans", {}).catch(() => {});
+  }
+
+  const user = (() => {
+    try {
+      const raw = localStorage.getItem("cyclogenai_user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  })();
+
+  const hasStrava = user?.stravaUpdatedAt || user?.isStravaUpToDate;
+  if (hasStrava || !isSignup) {
+    triggerGlobalSync().then((ok) => {
+      if (ok) window.dispatchEvent(new CustomEvent("notifications-updated"));
+    });
+  }
 }
 
 export async function triggerGlobalSync(): Promise<boolean> {

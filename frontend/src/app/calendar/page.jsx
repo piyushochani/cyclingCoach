@@ -20,6 +20,7 @@ import {
 import WeeklyScheduleCard from "../../../components/layout/WeekScheduleCard";
 import { getTrainingWeek } from "../../../components/ui/PaceBotChat";
 import { api } from "../../../lib/api";
+import { useDataRefetch } from "../../../lib/useDataRefetch";
 
 const WORKOUT_LABELS = {
   rest: 'Rest', recovery: 'Recovery', endurance: 'Endurance',
@@ -158,12 +159,6 @@ const formatMinutesAsDuration = (mins) => {
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 };
 
-const weatherPreview = {
-  temp: "27°C",
-  condition: "Humid",
-  wind: "14 km/h",
-};
-
 const TrainingCalendarPage = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
@@ -173,12 +168,14 @@ const TrainingCalendarPage = () => {
   const [weeklyPlan, setWeeklyPlan] = useState(null);
   const [races, setRaces] = useState([]);
   const [loading, setLoading] = useState(true);
+  const refetchKey = useDataRefetch();
 
   useEffect(() => {
     document.body.style.overflow = isBreakupOpen ? "hidden" : "";
   }, [isBreakupOpen]);
 
   useEffect(() => {
+    setLoading(true);
     Promise.all([
       api.get('/activities').catch(() => []),
       api.get('/training-context/weekly-plan').catch(() => null),
@@ -189,7 +186,7 @@ const TrainingCalendarPage = () => {
       setRaces(Array.isArray(r) ? r : []);
       setLoading(false);
     });
-  }, []);
+  }, [refetchKey]);
 
   const calendarDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 1 });
@@ -710,18 +707,6 @@ const TrainingCalendarPage = () => {
               </div>
 
               <div className="flex items-start gap-2">
-                <div className="rounded-[14px] border border-white/10 bg-[#080808] px-3 py-2 text-right">
-                  <p className="font-dmSans text-[10px] uppercase tracking-[0.08em] text-white/25">
-                    Weather
-                  </p>
-                  <p className="font-dmSans text-xs text-white">
-                    {weatherPreview.temp} · {weatherPreview.condition}
-                  </p>
-                  <p className="mt-0.5 font-dmSans text-[10px] text-white/35">
-                    Wind {weatherPreview.wind}
-                  </p>
-                </div>
-
                 <button
                   onClick={() => openChat('/day')}
                   className="flex items-center justify-center rounded-[16px] border border-[#FF5500]/20 bg-[#FF5500] px-4 py-2 font-dmSans text-[12px] font-bold uppercase tracking-[0.08em] text-white transition-all duration-150 hover:bg-[#ff6a1a] active:scale-[0.98]">

@@ -1,4 +1,8 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+// Browser requests use the Next.js /api rewrite proxy to avoid CORS issues in production.
+const API_BASE =
+  typeof window !== 'undefined'
+    ? '/api'
+    : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 class ApiError extends Error {
   status: number;
@@ -10,6 +14,10 @@ class ApiError extends Error {
 
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_TTL = 300000;
+
+export function clearApiCache() {
+  cache.clear();
+}
 
 export function getToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -79,10 +87,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   if (isCacheable) {
     cache.set(cacheKey, { data, timestamp: Date.now() });
   } else {
-    cache.clear();
+    clearApiCache();
   }
 
   return data;
+}
+
+export function dispatchDataRefetch() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('data-refetch'));
+  }
 }
 
 export const api = {

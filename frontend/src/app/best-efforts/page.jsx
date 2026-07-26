@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
+import { useDataRefetch } from "../../../lib/useDataRefetch";
 import Loader from "../../../components/ui/Loader";
 
 const SEGMENT_FILTERS = ["KOMs", "Top 10", "All"];
@@ -188,6 +189,7 @@ export default function BestEffortsPage() {
   const [expandedFastest, setExpandedFastest] = useState(false);
   const [expandedLongest, setExpandedLongest] = useState(false);
   const [expandedSegments, setExpandedSegments] = useState(false);
+  const refetchKey = useDataRefetch();
 
   const loadData = useCallback(async () => {
     const d = await api.get("/best-efforts").catch(() => null);
@@ -201,7 +203,7 @@ export default function BestEffortsPage() {
       setDistanceTabs(labels);
       if (labels.length > 0 && !activeTab) setActiveTab(labels[0]);
     }
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
     setLoading(true);
@@ -220,7 +222,7 @@ export default function BestEffortsPage() {
         }, 2000);
       }
     }).catch(() => {});
-  }, []);
+  }, [loadData, refetchKey]);
 
   const currentEfforts = (data?.bestEfforts || []).filter((e) => activeTab ? e.label === activeTab : true).sort((a, b) => a.rank - b.rank);
   const longestRides = data?.longestRides || [];
