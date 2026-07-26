@@ -7,7 +7,8 @@ import { NAV_ITEMS } from "./landing-data";
 import { clearSignupStorage } from "./clearSignupStorage";
 
 function scrollToSection(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const el = document.getElementById(id);
+  el?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 export default function LandingNav() {

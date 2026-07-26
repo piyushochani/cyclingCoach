@@ -13,7 +13,7 @@ import OnboardingChat from './OnboardingChat';
 import PlanAutoGenerator from './PlanAutoGenerator';
 import { useAutoSync } from '../../lib/useAutoSync';
 
-const publicPaths = ['/', '/login', '/signup', '/forgot-password'];
+const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/legal', '/privacy', '/terms', '/cookie-policy'];
 
 function AuthenticatedShell({ children, isPublic, pathname }) {
   useAutoSync();

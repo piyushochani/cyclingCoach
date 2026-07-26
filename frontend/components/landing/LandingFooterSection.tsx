@@ -5,7 +5,7 @@ import { NAV_ITEMS } from "./landing-data";
 
 const FOOTER_COLS = [
   { heading: "Explore", links: NAV_ITEMS.map((n) => ({ label: n.label, href: `#${n.id}` })) },
-  { heading: "Legal", links: [{ label: "Privacy", href: "#" }, { label: "Terms", href: "#" }, { label: "Cookie Policy", href: "#" }] },
+  { heading: "Legal", links: [{ label: "Privacy", href: "/privacy" }, { label: "Terms", href: "/terms" }, { label: "Cookie Policy", href: "/cookie-policy" }] },
   { heading: "Connect", links: [{ label: "Twitter / X", href: "#" }, { label: "Instagram", href: "#" }, { label: "Strava Club", href: "#" }] },
 ] as const;
 
