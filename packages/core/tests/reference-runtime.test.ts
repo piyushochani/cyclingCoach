@@ -130,7 +130,10 @@ describe("bootstrapReference (behavioral)", () => {
     releaseFetch();
     const runtime = await bootstrapPromise;
 
-    expect(events).toEqual(["fetch-start", "fetch-end", "scheduler-start"]);
+    // scheduler.start() is currently disabled in runtime.ts (auto-sync
+    // turned off pending API key re-enablement). Once re-enabled, restore
+    // the 'scheduler-start' event in the expected array below.
+    expect(events).toEqual(["fetch-start", "fetch-end"]);
     expect(runtime.scheduler).toBeInstanceOf(Scheduler);
   });
 

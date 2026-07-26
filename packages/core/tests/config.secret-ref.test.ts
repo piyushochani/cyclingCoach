@@ -8,8 +8,6 @@ const MANAGED_ENV = [
   "ANTHROPIC_API_KEY",
   "OPENAI_API_KEY",
   "GOOGLE_GENERATIVE_AI_API_KEY",
-  "INTERVALS_API_KEY",
-  "INTERVALS_ATHLETE_ID",
   "TELEGRAM_BOT_TOKEN",
   "LLM_PROVIDER",
   "LLM_MODEL",
@@ -17,17 +15,14 @@ const MANAGED_ENV = [
 ];
 
 let tempHome: string;
-let origHome: string | undefined;
 let origCcHome: string | undefined;
 const savedEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
   tempHome = mkdtempSync(join(tmpdir(), "cc-secretref-"));
-  origHome = process.env.HOME;
   origCcHome = process.env.CYCLING_COACH_HOME;
-  process.env.HOME = tempHome;
-  delete process.env.CYCLING_COACH_HOME;
-  mkdirSync(join(tempHome, ".cycling-coach"), { recursive: true });
+  process.env.CYCLING_COACH_HOME = tempHome;
+  mkdirSync(tempHome, { recursive: true });
   for (const k of MANAGED_ENV) {
     savedEnv[k] = process.env[k];
     delete process.env[k];
@@ -36,7 +31,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env.HOME = origHome;
   if (origCcHome !== undefined) process.env.CYCLING_COACH_HOME = origCcHome;
   else delete process.env.CYCLING_COACH_HOME;
   for (const k of MANAGED_ENV) {
@@ -47,7 +41,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const CONFIG = () => join(tempHome, ".cycling-coach", "config.yaml");
+const CONFIG = () => join(tempHome, "config.yaml");
 
 function seed(obj: Record<string, unknown>): void {
   writeFileSync(CONFIG(), toYaml(obj), { mode: 0o600 });
@@ -57,21 +51,22 @@ describe("config — SecretRef integration", () => {
   it("plain-string YAML resolves unchanged (backward compat)", async () => {
     seed({
       llm: { provider: "anthropic", api_key: "sk-plain", model: "claude-sonnet-4-6" },
-      intervals: { api_key: "iv-plain", athlete_id: "i1" },
       telegram: { bot_token: "tg-plain" },
     });
     const { loadConfig, resolveConfigSecrets } = await import("../src/config.js");
     const cfg = await resolveConfigSecrets(loadConfig());
     expect(cfg.llm.apiKey).toBe("sk-plain");
-    expect(cfg.intervals.apiKey).toBe("iv-plain");
     expect(cfg.telegram.botToken).toBe("tg-plain");
   });
 
   it("SecretRef YAML + printf sk-test resolves to 'sk-test'", async () => {
+    const isWin = process.platform === "win32";
+    const cmd = isWin ? "cmd" : "printf";
+    const args = isWin ? ["/c", "echo", "sk-test"] : ["sk-test"];
     seed({
       llm: {
         provider: "anthropic",
-        api_key: { source: "exec", command: "printf", args: ["sk-test"] },
+        api_key: { source: "exec", command: cmd, args },
         model: "claude-sonnet-4-6",
       },
     });
@@ -115,41 +110,38 @@ describe("config — SecretRef integration", () => {
     expect((caught as Error).message).toContain("llm.api_key");
   });
 
-  it("empty YAML preserves '' fall-through for optional intervals/telegram", async () => {
+  it("empty YAML preserves '' fall-through for optional telegram", async () => {
     seed({
       llm: { provider: "anthropic", api_key: "sk", model: "claude-sonnet-4-6" },
     });
     const { loadConfig, resolveConfigSecrets } = await import("../src/config.js");
     const cfg = await resolveConfigSecrets(loadConfig());
-    expect(cfg.intervals.apiKey).toBe("");
     expect(cfg.telegram.botToken).toBe("");
   });
 
   it("resolves SecretRefs on all three fields together", async () => {
+    const isWin = process.platform === "win32";
+    const cmd = isWin ? "cmd" : "printf";
+    const llmArgs = isWin ? ["/c", "echo", "llm-key"] : ["llm-key"];
+    const tgArgs = isWin ? ["/c", "echo", "tg-key"] : ["tg-key"];
     seed({
       llm: {
         provider: "anthropic",
-        api_key: { source: "exec", command: "printf", args: ["llm-key"] },
+        api_key: { source: "exec", command: cmd, args: llmArgs },
         model: "claude-sonnet-4-6",
       },
-      intervals: {
-        api_key: { source: "exec", command: "printf", args: ["iv-key"] },
-        athlete_id: "i1",
-      },
       telegram: {
-        bot_token: { source: "exec", command: "printf", args: ["tg-key"] },
+        bot_token: { source: "exec", command: cmd, args: tgArgs },
       },
     });
     const { loadConfig, resolveConfigSecrets } = await import("../src/config.js");
     const cfg = await resolveConfigSecrets(loadConfig());
     expect(cfg.llm.apiKey).toBe("llm-key");
-    expect(cfg.intervals.apiKey).toBe("iv-key");
     expect(cfg.telegram.botToken).toBe("tg-key");
   });
 
-  it("env-source SecretRef on all three fields resolves from process.env", async () => {
+  it("env-source SecretRef resolves from process.env", async () => {
     process.env.MY_LLM_KEY = "llm-from-env";
-    process.env.MY_IV_KEY = "iv-from-env";
     process.env.MY_TG_KEY = "tg-from-env";
     try {
       seed({
@@ -158,10 +150,6 @@ describe("config — SecretRef integration", () => {
           api_key: { source: "env", var: "MY_LLM_KEY" },
           model: "claude-sonnet-4-6",
         },
-        intervals: {
-          api_key: { source: "env", var: "MY_IV_KEY" },
-          athlete_id: "i1",
-        },
         telegram: {
           bot_token: { source: "env", var: "MY_TG_KEY" },
         },
@@ -169,11 +157,9 @@ describe("config — SecretRef integration", () => {
       const { loadConfig, resolveConfigSecrets } = await import("../src/config.js");
       const cfg = await resolveConfigSecrets(loadConfig());
       expect(cfg.llm.apiKey).toBe("llm-from-env");
-      expect(cfg.intervals.apiKey).toBe("iv-from-env");
       expect(cfg.telegram.botToken).toBe("tg-from-env");
     } finally {
       delete process.env.MY_LLM_KEY;
-      delete process.env.MY_IV_KEY;
       delete process.env.MY_TG_KEY;
     }
   });

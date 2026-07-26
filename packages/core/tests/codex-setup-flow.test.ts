@@ -8,15 +8,14 @@ import { scriptedPrompts } from "./helpers/scripted-prompts.js";
 import { cyclingBinary } from "./helpers/cycling-binary-fixture.js";
 
 let tempHome: string;
-let origHome: string | undefined;
+let origCcHome: string | undefined;
 let origStdinTTY: boolean | undefined;
 let origStdoutTTY: boolean | undefined;
 
 beforeEach(() => {
   tempHome = mkdtempSync(join(tmpdir(), "cc-setup-"));
-  origHome = process.env.HOME;
-  process.env.HOME = tempHome;
-  mkdirSync(join(tempHome, ".cycling-coach"), { recursive: true });
+  origCcHome = process.env.CYCLING_COACH_HOME;
+  process.env.CYCLING_COACH_HOME = tempHome;
   origStdinTTY = process.stdin.isTTY;
   origStdoutTTY = process.stdout.isTTY;
   Object.defineProperty(process.stdin, "isTTY", { value: true, configurable: true });
@@ -31,7 +30,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env.HOME = origHome;
+  if (origCcHome !== undefined) process.env.CYCLING_COACH_HOME = origCcHome;
+  else delete process.env.CYCLING_COACH_HOME;
   Object.defineProperty(process.stdin, "isTTY", { value: origStdinTTY, configurable: true });
   Object.defineProperty(process.stdout, "isTTY", { value: origStdoutTTY, configurable: true });
   rmSync(tempHome, { recursive: true, force: true });
@@ -43,7 +43,8 @@ describe("codex setup flow", () => {
     vi.doMock("@clack/prompts", () =>
       scriptedPrompts({
         selects: ["openai-codex", "gpt-5.4", "plain"], // provider, model, backend
-        passwords: ["", ""],
+        texts: ["strava-client-id-val", "pinecone-index-val"], // Strava Client ID, Pinecone Index Name
+        passwords: ["strava-secret-val", "pinecone-key-val", "tg-token-val"], // Strava Client Secret, Pinecone API Key, Telegram bot token
       }),
     );
 
@@ -60,7 +61,7 @@ describe("codex setup flow", () => {
     const { runSetup } = await import("../src/setup.js");
     await runSetup(cyclingBinary);
 
-    const configPath = join(tempHome, ".cycling-coach", "config.yaml");
+    const configPath = join(tempHome, "config.yaml");
     expect(existsSync(configPath)).toBe(true);
     const yaml = parseYaml(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
     const llm = yaml.llm as Record<string, unknown>;
@@ -69,10 +70,23 @@ describe("codex setup flow", () => {
     expect(llm.api_key).toBeUndefined();
     expect(llm.auth_profile).toBe("openai-codex");
 
-    const profilesPath = join(tempHome, ".cycling-coach", "auth-profiles.json");
+    const strava = yaml.strava as Record<string, unknown>;
+    expect(strava.client_id).toBe("strava-client-id-val");
+    expect(strava.client_secret).toBe("strava-secret-val");
+
+    const pinecone = yaml.pinecone as Record<string, unknown>;
+    expect(pinecone.api_key).toBe("pinecone-key-val");
+    expect(pinecone.index_name).toBe("pinecone-index-val");
+
+    const telegram = yaml.telegram as Record<string, unknown>;
+    expect(telegram.bot_token).toBe("tg-token-val");
+
+    const profilesPath = join(tempHome, "auth-profiles.json");
     expect(existsSync(profilesPath)).toBe(true);
-    const st = statSync(profilesPath);
-    expect(st.mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") {
+      const st = statSync(profilesPath);
+      expect(st.mode & 0o777).toBe(0o600);
+    }
 
     const saved = JSON.parse(readFileSync(profilesPath, "utf-8"));
     expect(saved["openai-codex"].access).toBe("fake-access");
