@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { MONTHLY_FEATURES, YEARLY_FEATURES } from "./landing-data";
-import { clearSignupStorage } from "./clearSignupStorage";
+import { MONTHLY_FEATURES, YEARLY_FEATURES } from "../../../components/landing/landing-data";
+import { clearSignupStorage } from "../../../components/landing/clearSignupStorage";
 
 const plans: {
   id: string;
@@ -33,15 +33,28 @@ const plans: {
   },
 ];
 
-export default function PricingSection() {
+export default function PricingPage() {
   return (
-    <section id="pricing" className="scroll-mt-24 py-20 md:py-28">
-      <div className="mx-auto max-w-7xl px-5 md:px-8 lg:px-10">
+    <div className="min-h-screen bg-[#050506] text-white antialiased">
+      <div className="mx-auto max-w-7xl px-5 py-20 md:px-8 md:py-28 lg:px-10">
+        <Link
+          href="/"
+          className="mb-8 inline-flex items-center gap-1.5 text-sm text-white/40 transition hover:text-white/70"
+        >
+          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to home
+        </Link>
+
         <div className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#FF6B00]/80">Pricing</p>
-          <h2 className="mt-3 font-[family-name:var(--font-barlow-condensed)] text-4xl font-bold uppercase leading-none tracking-tight text-white md:text-5xl">
+          <h1 className="mt-3 font-[family-name:var(--font-barlow-condensed)] text-4xl font-bold uppercase leading-none tracking-tight text-white md:text-5xl">
             Choose your plan
-          </h2>
+          </h1>
+          <p className="mt-3 text-base text-white/50">
+            Pick the plan that fits your training. Upgrade or switch anytime.
+          </p>
         </div>
 
         <div className="mx-auto mt-14 grid gap-8 md:max-w-3xl md:grid-cols-2">
@@ -49,8 +62,7 @@ export default function PricingSection() {
             <motion.div
               key={plan.id}
               initial={{ opacity: 0, y: 32 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: i * 0.1 }}
               className="relative"
             >
@@ -105,6 +117,6 @@ export default function PricingSection() {
           ))}
         </div>
       </div>
-    </section>
+    </div>
   );
 }

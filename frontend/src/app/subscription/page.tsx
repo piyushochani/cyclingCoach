@@ -5,6 +5,49 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { api } from "../../../lib/api";
 
+const PLANS: {
+  id: string;
+  price: string;
+  suffix: string;
+  label: string;
+  badge?: string;
+  features: string[];
+}[] = [
+  {
+    id: "monthly",
+    price: "$12",
+    suffix: "/mo",
+    label: "Billed monthly · Cancel anytime",
+    features: [
+      "AI-powered training plans",
+      "Strava & device sync",
+      "Race-day readiness tools",
+      "Performance analytics dashboard",
+      "AI coach chat",
+      "Priority support",
+    ],
+  },
+  {
+    id: "yearly",
+    price: "$130",
+    suffix: "/yr",
+    label: "Billed annually · Cancel anytime",
+    badge: "Best value",
+    features: [
+      "AI-powered training plans",
+      "Strava & device sync",
+      "Race-day readiness tools",
+      "Performance analytics dashboard",
+      "AI coach chat",
+      "Priority support",
+      "Advanced periodization blocks",
+      "Race-day weather & route analysis",
+      "Recovery & nutrition insights",
+      "Exclusive training community",
+    ],
+  },
+];
+
 export default function SubscriptionPage() {
   const [user, setUser] = useState<any>(null);
   const [subscription, setSubscription] = useState<any>(null);
@@ -63,66 +106,66 @@ export default function SubscriptionPage() {
           </p>
         </div>
 
-        <div className="mx-auto max-w-lg">
-          <div className="relative overflow-hidden rounded-3xl border border-white/[0.07] bg-[#0C0E12] p-10 text-center">
-            <div className="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(circle_at_50%_0%,rgba(255,107,0,0.06),transparent_60%)]" />
-
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-white/30">
-              {isPro ? "Current Plan" : "Pro Monthly"}
-            </p>
-            <p
-              className="mt-4 text-6xl font-black text-white"
-              style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+        <div className="mx-auto grid max-w-3xl gap-6 md:grid-cols-2">
+          {PLANS.map((plan) => (
+            <div
+              key={plan.id}
+              className="relative overflow-hidden rounded-3xl border border-white/[0.07] bg-[#0C0E12] p-8 text-center"
             >
-              $12<span className="text-2xl text-white/30">/mo</span>
-            </p>
-            <p className="mt-2 text-sm text-white/40">
-              {isPro ? "Your subscription is active" : "Billed monthly. Cancel anytime."}
-            </p>
-
-            <ul className="mt-8 space-y-4 text-left">
-              {[
-                "AI-powered training plans",
-                "Strava & Garmin sync",
-                "Race-day readiness tools",
-                "Performance analytics dashboard",
-                "Priority support",
-              ].map((item) => (
-                <li key={item} className="flex items-center gap-3 text-sm text-white/60">
-                  <svg className="h-4 w-4 shrink-0 text-[#FF6B00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
-                  </svg>
-                  {item}
-                </li>
-              ))}
-            </ul>
-
-            {isPro ? (
-              <div className="mt-8 space-y-3">
-                <div className="rounded-full border border-[#FF6B00]/20 bg-[#FF6B00]/5 px-8 py-4 text-sm font-medium text-[#FF6B00]">
-                  ✓ Pro features unlocked
+              {plan.badge && (
+                <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 rounded-full bg-[#FF6B00] px-4 py-1 text-[11px] font-bold uppercase tracking-wider text-white shadow-[0_0_20px_rgba(255,107,0,0.4)]">
+                  {plan.badge}
                 </div>
+              )}
+              <div className="pointer-events-none absolute inset-0 rounded-3xl bg-[radial-gradient(circle_at_50%_0%,rgba(255,107,0,0.06),transparent_60%)]" />
+
+              <p className="text-xs font-bold uppercase tracking-[0.28em] text-white/30">
+                {isPro && plan.id === "monthly" ? "Current Plan" : `Pro ${plan.id === "monthly" ? "Monthly" : "Yearly"}`}
+              </p>
+              <p
+                className="mt-4 text-6xl font-black text-white"
+                style={{ fontFamily: "'Barlow Condensed', sans-serif" }}
+              >
+                {plan.price}<span className="text-2xl text-white/30">{plan.suffix}</span>
+              </p>
+              <p className="mt-2 text-sm text-white/40">{plan.label}</p>
+
+              <ul className="mt-8 space-y-4 text-left">
+                {plan.features.map((item) => (
+                  <li key={item} className="flex items-center gap-3 text-sm text-white/60">
+                    <svg className="h-4 w-4 shrink-0 text-[#FF6B00]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+
+              {isPro ? (
                 <Link href="/dashboard">
-                  <button className="w-full rounded-full border border-white/15 px-8 py-4 text-base font-medium text-white/70 transition hover:border-white/30 hover:text-white">
+                  <button className="mt-8 w-full rounded-full border border-white/15 px-8 py-4 text-base font-medium text-white/70 transition hover:border-white/30 hover:text-white">
                     Go to Dashboard
                   </button>
                 </Link>
-              </div>
-            ) : (
-              <Link href="/signup">
-                <button
-                  className="mt-8 w-full rounded-full px-8 py-4 text-base font-bold text-black transition hover:scale-[1.02] hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] active:scale-[0.98]"
-                  style={{ background: "#FF6B00" }}
-                >
-                  Start Free Trial
-                </button>
-              </Link>
-            )}
-
-            <p className="mt-4 text-xs text-white/25">
-              14-day free trial · No credit card required
-            </p>
-          </div>
+              ) : (
+                <Link href="/signup">
+                  <button
+                    className={`mt-8 w-full rounded-full px-8 py-4 text-base font-bold transition active:scale-[0.98] ${
+                      plan.badge
+                        ? "bg-[#FF6B00] text-black hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] hover:scale-[1.02]"
+                        : "border border-white/20 text-white hover:bg-white/5"
+                    }`}
+                    style={plan.badge ? { background: "#FF6B00" } : {}}
+                  >
+                    Start Free Trial
+                  </button>
+                </Link>
+              )}
+              <p className="mt-4 text-xs text-white/25">
+                14-day free trial · No credit card required
+              </p>
+            </div>
+          ))}
         </div>
       </motion.main>
     </div>

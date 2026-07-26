@@ -70,13 +70,26 @@ export const STEPS = [
   },
 ] as const;
 
-export const PRICING_FEATURES = [
+export const MONTHLY_FEATURES = [
   "AI-powered training plans",
   "Strava & device sync",
   "Race-day readiness tools",
   "Performance analytics dashboard",
   "AI coach chat",
   "Priority support",
+] as const;
+
+export const YEARLY_FEATURES = [
+  "AI-powered training plans",
+  "Strava & device sync",
+  "Race-day readiness tools",
+  "Performance analytics dashboard",
+  "AI coach chat",
+  "Priority support",
+  "Advanced periodization blocks",
+  "Race-day weather & route analysis",
+  "Recovery & nutrition insights",
+  "Exclusive training community",
 ] as const;
 
 export const TESTIMONIALS = [

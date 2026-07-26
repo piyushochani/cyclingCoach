@@ -5,7 +5,7 @@ export default function PrivacyPage() {
     <div className="min-h-screen bg-[#050506] text-white antialiased">
       <div className="mx-auto max-w-3xl px-5 py-20 md:px-8 md:py-28">
         <Link
-          href="/legal"
+          href="/"
           className="mb-8 inline-flex items-center gap-1.5 text-sm text-white/40 transition hover:text-white/70"
         >
           <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -59,7 +59,7 @@ export default function GeneralFooter() {
                 { name: "Terms of Service", href: "/terms" },
                 { name: "Privacy Policy", href: "/privacy" },
                 { name: "Cookie Policy", href: "/cookie-policy" },
-                { name: "Legal", href: "/legal" },
+                { name: "Legal", href: "/privacy" },
               ].map((link) => (
                 <li key={link.name}>
                   <Link
