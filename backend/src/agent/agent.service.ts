@@ -39,6 +39,7 @@ import {
   loadChatApiKeys,
   loadGroqConfig,
 } from '../common/llm-config';
+import { DEFAULT_RAG_MIN_SCORE, formatRagMatchesForAgent } from '../analysis/rag-context.util';
 
 const MAX_STEPS = 10;
 const MAX_HISTORY_MESSAGES = 30;
@@ -232,7 +233,7 @@ export class AgentService {
 
     let retrievedContext = '';
     if (shouldUseRag(intent)) {
-      retrievedContext = await this.retrieveContext(message);
+      retrievedContext = await this.retrieveContext(message, userId);
     }
 
     let faqContext = '';
@@ -370,24 +371,17 @@ export class AgentService {
     return { text: finalText || 'No response generated.' };
   }
 
-  private async retrieveContext(query: string): Promise<string> {
+  private async retrieveContext(query: string, userId: string): Promise<string> {
     if (!this.embedder.isConfigured || !this.pinecone.isConfigured) return '';
 
     try {
       const vector = await this.embedder.embedText(query);
-      const { matches } = await this.pinecone.query(vector, 5);
-
-      if (!matches || matches.length === 0) return '';
-
-      const lines = matches.map((m: any) => {
-        const meta = m.metadata as any;
-        if (meta?.kind === 'profile') {
-          return `[Athlete Profile] ${meta.summary}`;
-        }
-        return `[Activity] ${meta.summary}`;
+      const { matches } = await this.pinecone.query(vector, 5, {
+        filter: { userId: { $eq: userId } },
+        minScore: DEFAULT_RAG_MIN_SCORE,
       });
 
-      return 'Here are some semantically relevant items from the athlete\'s history:\n' + lines.join('\n');
+      return formatRagMatchesForAgent(matches);
     } catch (err) {
       this.logger.warn(`RAG query failed: ${err}`);
       return '';

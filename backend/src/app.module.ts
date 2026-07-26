@@ -23,6 +23,8 @@ import { AgentModule } from './agent/agent.module';
 import { GeminiStatusModule } from './gemini-status/gemini-status.module';
 import { HealthModule } from './health/health.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { QueueModule } from './common/queue/queue.module';
+import { JobsModule } from './common/queue/jobs.module';
 
 @Module({
   imports: [
@@ -30,6 +32,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
       ttl: 60000,
       limit: 100,
     }]),
+    QueueModule.forRoot(),
     DatabaseModule,
     UserModule,
     ActivityModule,
@@ -51,6 +54,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
     AgentModule,
     GeminiStatusModule,
     HealthModule,
+    JobsModule,
   ],
   controllers: [],
   providers: [

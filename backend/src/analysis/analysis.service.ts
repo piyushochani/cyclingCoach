@@ -15,6 +15,9 @@ import { TrainingContextService } from '../training-context/training-context.ser
 import { logKeyHealth } from '../common/gemini-key-validator';
 import { callGroqSimple } from '../common/groq-client';
 import { isGeminiQuotaError } from '../common/llm-config';
+import { PineconeClient } from './pinecone-client';
+import { buildRichSummary } from './rag-context.util';
+import { DEFAULT_QUEUE_JOB_OPTIONS } from '../common/queue/queue.module';
 
 const DAILY_PROMPT = `# Daily Review
 
@@ -188,6 +191,7 @@ export class AnalysisService {
     @InjectModel(Race.name) private raceModel: Model<Race>,
     @InjectQueue('analysis') private readonly analysisQueue: any,
     private readonly trainingContext: TrainingContextService,
+    private readonly pinecone: PineconeClient,
   ) {
     logKeyHealth(this.logger, 'sync').catch(() => {});
   }
@@ -415,7 +419,11 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
   }
 
   async queueActivityAnalysis(activityId: string, userId: string): Promise<void> {
-    await this.analysisQueue.add('activity', { activityId, userId });
+    await this.analysisQueue.add(
+      'activity',
+      { activityId, userId, type: 'activity' },
+      DEFAULT_QUEUE_JOB_OPTIONS,
+    );
   }
 
   async generateActivityAnalysis(activityId: string, userId: string): Promise<string> {
@@ -460,6 +468,15 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
       { _id: activity._id },
       { $set: { llmAnalysis: result } },
     ).exec();
+
+    if (activity.vectorId && this.pinecone.isConfigured) {
+      try {
+        const richSummary = buildRichSummary(activity.summaryText, result);
+        await this.pinecone.updateMetadata(activity.vectorId, { summary: richSummary });
+      } catch (err) {
+        this.logger.warn(`Failed to update Pinecone metadata for ${activity.vectorId}: ${err}`);
+      }
+    }
 
     return result;
   }

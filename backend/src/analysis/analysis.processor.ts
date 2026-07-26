@@ -1,17 +1,21 @@
-import { Injectable, OnApplicationBootstrap, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { AnalysisService } from './analysis.service';
 import { MockQueue } from '../common/queue/mock-queue';
 
+@Processor('analysis')
 @Injectable()
-export class AnalysisProcessor implements OnApplicationBootstrap {
+export class AnalysisProcessor extends WorkerHost implements OnApplicationBootstrap {
   private readonly logger = new Logger(AnalysisProcessor.name);
 
   constructor(
     private readonly analysisService: AnalysisService,
     @InjectQueue('analysis') private readonly queue: any,
-  ) {}
+  ) {
+    super();
+  }
 
   async onApplicationBootstrap() {
     if (this.queue instanceof MockQueue) {
@@ -23,7 +27,8 @@ export class AnalysisProcessor implements OnApplicationBootstrap {
   }
 
   async process(job: Job<any, any, string>): Promise<any> {
-    const { userId, activityId, type } = job.data;
+    const { userId, activityId } = job.data;
+    const type = job.data.type || job.name;
     this.logger.log(`Starting ${type} analysis for user: ${userId}`);
 
     try {

@@ -91,3 +91,6 @@ export class Activity extends Document {
 }
 
 export const ActivitySchema = SchemaFactory.createForClass(Activity);
+
+ActivitySchema.index({ user: 1, date: -1 });
+ActivitySchema.index({ user: 1, stravaId: 1 });
