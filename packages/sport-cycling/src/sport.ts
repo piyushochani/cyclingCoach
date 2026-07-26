@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Tool } from "ai";
 import {
   createMemoryTools,
   createStravaTools,
@@ -109,7 +110,7 @@ export const cyclingSport: Sport = {
       // Vercel AI SDK wraps the Zod schema into a FlexibleSchema that
       // doesn't expose the raw ZodTypeAny; introspection lives on `tool`.
       inputSchema: z.unknown(),
-      tool: t,
+      tool: t as Tool,
     }));
   },
 };
