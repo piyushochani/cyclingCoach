@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, clearApiCache, dispatchDataRefetch } from "../../../../../lib/api";
+import { api, clearApiCache, dispatchDataRefetch, postSyncAndWait } from "../../../../../lib/api";
 import FirstSyncTutorial from "../../../../../components/layout/FirstSyncTutorial";
 import OnboardingChat from "../../../../../components/layout/OnboardingChat";
 
@@ -54,9 +54,9 @@ function StravaCallbackInner() {
         if (cancelled) return;
         setStatus("syncing");
         setMessage("First sync in progress...");
-        return api.post("/sync/refresh", {});
+        return postSyncAndWait("/sync/refresh");
       })
-      .then(async (syncResult) => {
+      .then(async () => {
         if (cancelled) return;
         clearApiCache();
         dispatchDataRefetch();

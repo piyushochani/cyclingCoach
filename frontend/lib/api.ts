@@ -99,6 +99,42 @@ export function dispatchDataRefetch() {
   }
 }
 
+export interface JobStatusResponse {
+  id: string;
+  name: string;
+  status: 'waiting' | 'active' | 'completed' | 'failed' | string;
+  result?: unknown;
+  failedReason?: string | null;
+}
+
+/** Poll GET /jobs/:id until the background job completes or fails. */
+export async function pollJobUntilComplete(
+  jobId: string,
+  options?: { intervalMs?: number; timeoutMs?: number },
+): Promise<JobStatusResponse> {
+  const intervalMs = options?.intervalMs ?? 1500;
+  const timeoutMs = options?.timeoutMs ?? 120000;
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    const job = await request<JobStatusResponse>(`/jobs/${encodeURIComponent(jobId)}`);
+    if (job.status === 'completed') return job;
+    if (job.status === 'failed') {
+      throw new ApiError(job.failedReason || 'Background job failed', 500);
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new ApiError('Background job timed out', 504);
+}
+
+/** POST a sync endpoint that returns 202 { jobId }, then wait for completion. */
+export async function postSyncAndWait(path: string): Promise<JobStatusResponse> {
+  const { jobId } = await request<{ jobId: string }>(path, { method: 'POST', body: JSON.stringify({}) });
+  if (!jobId) throw new ApiError('Sync did not return a jobId', 500);
+  return pollJobUntilComplete(jobId);
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body: unknown) =>

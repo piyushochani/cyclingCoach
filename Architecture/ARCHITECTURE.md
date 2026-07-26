@@ -9,6 +9,8 @@ There are two parallel AI stacks in this repo:
 
 This document focuses on the web backend, with notes where the CLI stack differs.
 
+**Related diagrams:** [Strava Sync Pipeline](./STRAVA-SYNC-PIPELINE.md) · [LLM Agent Architecture](./LLM-AGENT-ARCHITECTURE.md) · [Database ERD](./DATABASE-ERD.md) · [Improvements](./IMPROVEMENTS-BRAINSTORM.md)
+
 ---
 
 ## 1. High-Level System Overview
