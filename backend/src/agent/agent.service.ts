@@ -39,7 +39,7 @@ import {
   loadChatApiKeys,
   loadGroqConfig,
 } from '../common/llm-config';
-import { DEFAULT_RAG_MIN_SCORE, formatRagMatchesForAgent } from '../analysis/rag-context.util';
+import { buildRagQueryFilter, DEFAULT_RAG_MIN_SCORE, formatRagMatchesForAgent } from '../analysis/rag-context.util';
 
 const MAX_STEPS = 10;
 const MAX_HISTORY_MESSAGES = 30;
@@ -377,7 +377,7 @@ export class AgentService {
     try {
       const vector = await this.embedder.embedText(query);
       const { matches } = await this.pinecone.query(vector, 5, {
-        filter: { userId: { $eq: userId } },
+        filter: buildRagQueryFilter(userId, query),
         minScore: DEFAULT_RAG_MIN_SCORE,
       });
 

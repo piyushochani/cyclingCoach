@@ -3,6 +3,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { AnalysisService } from './analysis.service';
+import { EmbeddingRetryService } from './embedding-retry.service';
 import { MockQueue } from '../common/queue/mock-queue';
 
 @Processor('analysis')
@@ -12,6 +13,7 @@ export class AnalysisProcessor extends WorkerHost implements OnApplicationBootst
 
   constructor(
     private readonly analysisService: AnalysisService,
+    private readonly embeddingRetry: EmbeddingRetryService,
     @InjectQueue('analysis') private readonly queue: any,
   ) {
     super();
@@ -29,16 +31,18 @@ export class AnalysisProcessor extends WorkerHost implements OnApplicationBootst
   async process(job: Job<any, any, string>): Promise<any> {
     const { userId, activityId } = job.data;
     const type = job.data.type || job.name;
-    this.logger.log(`Starting ${type} analysis for user: ${userId}`);
+    this.logger.log(`Processing analysis job: ${type}${userId ? ` for user ${userId}` : ''}`);
 
     try {
       if (type === 'activity') {
         this.logger.debug(`Generating activity analysis for ${activityId}`);
         await this.analysisService.generateActivityAnalysis(activityId, userId);
       } else if (type === 'weekly') {
-        return await this.analysisService.queueWeeklyReview(userId);
+        return await this.analysisService.generateWeeklyReview(userId);
       } else if (type === 'monthly') {
-        return await this.analysisService.queueMonthlyReview(userId);
+        return await this.analysisService.generateMonthlyReview(userId);
+      } else if (type === 'embedding-retry') {
+        return await this.embeddingRetry.retryFailedEmbeddings();
       } else if (type === 'plan') {
         this.logger.debug(`Plan generation requested for user: ${userId}`);
       }

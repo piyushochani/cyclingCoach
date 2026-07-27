@@ -410,12 +410,28 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
     }
   }
 
-  async queueWeeklyReview(userId: string): Promise<{ analysis: string }> {
+  async generateWeeklyReview(userId: string): Promise<{ analysis: string }> {
     return this.analyze({ type: 'weekly', activities: [], message: 'Weekly review' }, userId);
   }
 
-  async queueMonthlyReview(userId: string): Promise<{ analysis: string }> {
+  async generateMonthlyReview(userId: string): Promise<{ analysis: string }> {
     return this.analyze({ type: 'monthly', activities: [], message: 'Monthly review' }, userId);
+  }
+
+  async queueWeeklyReview(userId: string): Promise<void> {
+    await this.analysisQueue.add(
+      'weekly',
+      { userId, type: 'weekly' },
+      DEFAULT_QUEUE_JOB_OPTIONS,
+    );
+  }
+
+  async queueMonthlyReview(userId: string): Promise<void> {
+    await this.analysisQueue.add(
+      'monthly',
+      { userId, type: 'monthly' },
+      DEFAULT_QUEUE_JOB_OPTIONS,
+    );
   }
 
   async queueActivityAnalysis(activityId: string, userId: string): Promise<void> {

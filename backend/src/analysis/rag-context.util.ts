@@ -60,3 +60,37 @@ export function formatRagMatchesForReview(matches: PineconeMatch[]): string {
 
   return `## Relevant Historical Activities\n\n${entries.join('\n\n')}`;
 }
+
+function isoDateDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().split('T')[0];
+}
+
+/** Build Pinecone metadata filter from userId + optional query hints. */
+export function buildRagQueryFilter(userId: string, query?: string): Record<string, unknown> {
+  const filter: Record<string, unknown> = { userId: { $eq: userId } };
+  const q = (query || '').toLowerCase();
+
+  if (/\b(last|past)\s+(week|7\s*days?)\b/.test(q)) {
+    filter.date = { $gte: isoDateDaysAgo(7) };
+  } else if (/\b(last|past)\s+(month|30\s*days?)\b/.test(q)) {
+    filter.date = { $gte: isoDateDaysAgo(30) };
+  } else if (/\b(last|past)\s+(3\s*months?|90\s*days?|quarter)\b/.test(q)) {
+    filter.date = { $gte: isoDateDaysAgo(90) };
+  }
+
+  if (/\b(interval|vo2|threshold|tempo|sweet\s*spot)\b/.test(q)) {
+    filter.sessionType = { $in: ['VO2max', 'threshold', 'tempo', 'sweet spot', 'interval'] };
+  } else if (/\b(endurance|long\s*ride|base)\b/.test(q)) {
+    filter.sessionType = { $in: ['endurance', 'recovery'] };
+  } else if (/\b(race|event)\b/.test(q)) {
+    filter.sessionType = { $eq: 'race-like' };
+  }
+
+  if (/\b(indoor|trainer|zwift)\b/.test(q)) {
+    filter.hasPower = { $eq: true };
+  }
+
+  return filter;
+}
