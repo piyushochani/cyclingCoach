@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
 import { useDataRefetch } from "../../../lib/useDataRefetch";
 import RaceChatModal from "../../../components/ui/RaceChatModal";
+import SeasonSummaryStrip from "../../../components/layout/SeasonSummaryStrip";
 
 const TYPE_OPTIONS = ["All", "Road", "Crit", "Time Trial", "Circuit", "Gravel"];
 const TERRAIN_OPTIONS = ["", "Flat", "Rolling", "Hilly", "Mountainous"];
@@ -161,15 +162,6 @@ export default function RacesPage() {
     return races
       .filter((r) => new Date(r.date) > now)
       .sort((a, b) => new Date(a.date) - new Date(b.date))[0] || null;
-  }, [races]);
-
-  const stats = useMemo(() => {
-    const total = races.length;
-    const best = Math.min(...races.map((r) => r.position).filter((p) => p));
-    const totalDist = races.reduce((s, r) => s + (parseFloat(r.distance) || 0), 0);
-    const totalElev = races.reduce((s, r) => s + (parseFloat(r.elevationGain) || 0), 0);
-    const podiums = races.filter((r) => r.position && r.position <= 3).length;
-    return { total, best: isFinite(best) ? best : null, totalDist, totalElev, podiums };
   }, [races]);
 
   const visible = sorted.slice(0, visibleCount);
@@ -349,58 +341,7 @@ export default function RacesPage() {
           </motion.div>
         )}
 
-        {/* Season Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          style={{
-            background: "#0D0D0D",
-            border: "1px solid rgba(255,255,255,0.06)",
-            borderRadius: 12,
-            padding: "1.25rem 1.5rem",
-            marginBottom: "2rem",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
-            gap: 16,
-          }}
-        >
-          {[
-            { label: "Total Races", value: stats.total },
-            { label: "Best Finish", value: stats.best ? `${stats.best}${stats.best === 1 ? "st" : stats.best === 2 ? "nd" : stats.best === 3 ? "rd" : "th"}` : "\u2014" },
-            { label: "Total km", value: `${stats.totalDist.toFixed(2)} km` },
-            { label: "Total Elev", value: `${stats.totalElev.toFixed(1)} m` },
-            { label: "Podiums", value: stats.podiums },
-          ].map((s) => (
-            <div key={s.label} style={{ textAlign: "center" }}>
-              <p
-                style={{
-                  fontFamily: "'Bebas Neue', 'Impact', sans-serif",
-                  fontSize: "1.8rem",
-                  fontWeight: 400,
-                  letterSpacing: "0.04em",
-                  margin: 0,
-                  color: "#fff",
-                  lineHeight: 1.1,
-                }}
-              >
-                {s.value}
-              </p>
-              <p
-                style={{
-                  margin: "2px 0 0",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.3)",
-                }}
-              >
-                {s.label}
-              </p>
-            </div>
-          ))}
-        </motion.div>
+        <SeasonSummaryStrip races={races} />
 
         {/* Filters */}
         <motion.div

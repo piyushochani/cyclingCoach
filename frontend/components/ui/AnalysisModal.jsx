@@ -22,7 +22,15 @@ export default function AnalysisModal({ isOpen, onClose, type, activities, previ
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen && activities?.length > 0 && !chatMode) {
+    if (!isOpen) {
+      setAnalysis(null);
+      setMessages([]);
+      setMessage('');
+      setChatMode(false);
+      setLoading(false);
+      return;
+    }
+    if (activities?.length > 0 && !chatMode) {
       setLoading(true);
       setAnalysis(null);
       api.post('/analysis', {
@@ -42,7 +50,7 @@ export default function AnalysisModal({ isOpen, onClose, type, activities, previ
         })
         .finally(() => setLoading(false));
     }
-  }, [isOpen, type, activities]);
+  }, [isOpen, type, activities, chatMode, activityName]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

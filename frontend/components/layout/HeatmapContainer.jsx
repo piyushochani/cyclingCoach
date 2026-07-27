@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { activityDistanceKm, fmtDist, fmtDuration, getActivityId } from "../../lib/component-data";
 
 const defaultDays = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -68,7 +69,7 @@ const HeatmapContainer = ({ activities, days }) => {
     const dayMap = {};
     for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
       const date = new Date(year, month, dayNum);
-      dayMap[dayNum] = { date, activities: [], totalTime: 0, totalDistance: 0 };
+      dayMap[dayNum] = { date, activities: [], totalTime: 0, totalDistance: 0, totalCalories: 0 };
     }
 
     if (activities) {
@@ -79,7 +80,8 @@ const HeatmapContainer = ({ activities, days }) => {
           if (dayMap[dayNum]) {
             dayMap[dayNum].activities.push(a);
             dayMap[dayNum].totalTime += a.durationSeconds || 0;
-            dayMap[dayNum].totalDistance += a.distance || 0;
+            dayMap[dayNum].totalDistance += activityDistanceKm(a);
+            dayMap[dayNum].totalCalories += a.calories || 0;
           }
         }
       }
@@ -97,19 +99,16 @@ const HeatmapContainer = ({ activities, days }) => {
       const day = dayMap[dayNum];
       const count = day.activities.length;
       const level = count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : 3;
-      const hours = (day.totalTime / 3600).toFixed(1);
-      const dist = (day.totalDistance / 1000).toFixed(2);
-
       cells.push({
         level,
         details: {
           date: day.date,
           dayNumber: dayNum,
           activities: count,
-          activityIds: day.activities.map((a, i) => a._id || a.id || a.stravaId || `act-${i}`),
-          time: `${hours} hrs`,
-          distance: `${dist} km`,
-          calories: `${(day.totalDistance * 28 / 1000).toFixed(2)} kcal`,
+          activityIds: day.activities.map((a, i) => getActivityId(a) || `act-${i}`),
+          time: fmtDuration(day.totalTime),
+          distance: `${fmtDist(day.totalDistance)} km`,
+          calories: day.totalCalories > 0 ? `${Math.round(day.totalCalories)} kcal` : '—',
         },
       });
     }
