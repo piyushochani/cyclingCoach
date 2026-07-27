@@ -12,7 +12,7 @@ function StravaCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<SyncStatus>("exchanging");
-  const [message, setMessage] = useState("Exchanging authorization code for tokens...");
+  const [message, setMessage] = useState("Connecting your Strava account...");
   const [tutorialDone, setTutorialDone] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -38,18 +38,7 @@ function StravaCallbackInner() {
     let cancelled = false;
 
     api
-      .post("/strava/exchange", { code })
-      .then((data: any) => {
-        if (cancelled) return;
-        setStatus("storing");
-        setMessage("Tokens obtained! Storing them...");
-
-        return api.post("/strava/store-tokens", {
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-          expiresAt: data.expiresAt,
-        });
-      })
+      .post("/strava/connect", { code, state: searchParams.get("state") || undefined })
       .then(() => {
         if (cancelled) return;
         setStatus("syncing");
@@ -62,6 +51,15 @@ function StravaCallbackInner() {
         dispatchDataRefetch();
         window.dispatchEvent(new CustomEvent("sync-completed", { detail: Date.now() }));
         api.post("/best-efforts/refresh", {}).catch(() => {});
+        try {
+          const stored = localStorage.getItem("cyclogenai_user");
+          if (stored) {
+            const u = JSON.parse(stored);
+            u.stravaConnected = true;
+            u.stravaUpdatedAt = new Date().toISOString();
+            localStorage.setItem("cyclogenai_user", JSON.stringify(u));
+          }
+        } catch {}
         try {
           const stored = localStorage.getItem("cyclogenai_user");
           if (stored) {

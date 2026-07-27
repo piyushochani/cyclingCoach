@@ -80,7 +80,7 @@ export class AuthController {
     const user = await this.authService.login(body.email, body.password);
     if (!user) throw new UnauthorizedException('Invalid email or password');
 
-    if (user.stravaUpdatedAt) {
+    if ((user as any).stravaAccessToken || user.stravaUpdatedAt) {
       const cutoff = new Date(Date.now() - SYNC_MONTHS * 30 * 24 * 3600 * 1000);
       const lastActivity = await this.syncService.getLatestActivityDate(user._id as any);
       const isUpToDate = user.isStravaUpToDate && lastActivity && lastActivity >= cutoff;
@@ -96,6 +96,7 @@ export class AuthController {
 
     return {
       ...this.userResponse(user),
+      stravaConnected: !!(user as any).stravaAccessToken,
       stravaUpdatedAt: user.stravaUpdatedAt,
       isStravaUpToDate: user.isStravaUpToDate,
       onboardingSummary: (user as any).onboardingSummary || null,

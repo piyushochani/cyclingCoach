@@ -1,30 +1,43 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, UnauthorizedException } from '@nestjs/common';
 import { StravaAuthService } from './strava-auth.service';
-import { Public } from '../common/public.decorator';
+import { UserId } from '../common/user-id.decorator';
 
-@Public()
 @Controller('strava')
 export class StravaAuthController {
   constructor(private readonly stravaAuthService: StravaAuthService) {}
 
   @Get('status')
-  getStatus() {
-    return this.stravaAuthService.getStatus();
+  getStatus(@UserId() userId: string) {
+    if (!userId) throw new UnauthorizedException('User ID required');
+    return this.stravaAuthService.getStatus(userId);
   }
 
   @Get('auth-url')
-  getAuthUrl() {
-    return this.stravaAuthService.getAuthUrl();
+  getAuthUrl(@UserId() userId: string) {
+    if (!userId) throw new UnauthorizedException('User ID required');
+    return this.stravaAuthService.getAuthUrl(userId);
   }
 
-  @Post('exchange')
-  async exchangeCode(@Body() body: { code: string }) {
-    return this.stravaAuthService.exchangeCode(body.code);
+  @Post('connect')
+  async connect(
+    @Body() body: { code: string; state?: string },
+    @UserId() userId: string,
+  ) {
+    if (!userId) throw new UnauthorizedException('User ID required');
+    if (!body.code) throw new UnauthorizedException('Authorization code required');
+
+    const resolvedUserId = this.stravaAuthService.parseState(body.state || null, userId);
+    if (resolvedUserId !== userId) {
+      throw new UnauthorizedException('OAuth state does not match current user');
+    }
+
+    return this.stravaAuthService.exchangeAndStore(userId, body.code);
   }
 
-  @Post('store-tokens')
-  async storeTokens(@Body() body: { accessToken: string; refreshToken: string; expiresAt: number }) {
-    await this.stravaAuthService.storeTokens(body.accessToken, body.refreshToken, body.expiresAt);
+  @Post('disconnect')
+  async disconnect(@UserId() userId: string) {
+    if (!userId) throw new UnauthorizedException('User ID required');
+    await this.stravaAuthService.disconnect(userId);
     return { success: true };
   }
 }

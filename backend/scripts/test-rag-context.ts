@@ -8,6 +8,7 @@ import {
   filterRagMatches,
   formatRagMatchesForAgent,
   formatRagMatchesForReview,
+  buildRagQueryFilter,
 } from '../src/analysis/rag-context.util';
 import { PineconeMatch } from '../src/analysis/pinecone-client';
 
@@ -83,6 +84,17 @@ console.log('\nformatRagMatchesForReview');
 const reviewOutput = formatRagMatchesForReview(sampleMatches);
 assert(reviewOutput.includes('## Relevant Historical Activities'), 'has review header');
 assert(reviewOutput.includes('71% relevance'), 'includes relevance pct');
+
+console.log('\nbuildRagQueryFilter');
+const weekFilter = buildRagQueryFilter('user123', 'rides from last week');
+assert((weekFilter.userId as any).$eq === 'user123', 'always filters by userId');
+assert(!!weekFilter.date, 'last week adds date filter');
+
+const intervalFilter = buildRagQueryFilter('user123', 'my interval sessions');
+assert(!!intervalFilter.sessionType, 'interval query adds sessionType filter');
+
+const plainFilter = buildRagQueryFilter('user123', 'how am I progressing');
+assert(Object.keys(plainFilter).length === 1, 'plain query only has userId filter');
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

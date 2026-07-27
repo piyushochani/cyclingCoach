@@ -15,7 +15,6 @@ import { BestEffortsModule } from './best-efforts/best-efforts.module';
 import { ExpenseModule } from './expense/expense.module';
 import { GearModule } from './gear/gear.module';
 import { AnalysisModule } from './analysis/analysis.module';
-import { ChatQueryModule } from './chat-query/chat-query.module';
 import { TrainingContextModule } from './training-context/training-context.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { NotificationModule } from './notification/notification.module';
@@ -49,7 +48,6 @@ import { JobsModule } from './common/queue/jobs.module';
     AnalysisModule,
     TrainingContextModule,
     SubscriptionModule,
-    ChatQueryModule,
     NotificationModule,
     AgentModule,
     GeminiStatusModule,
