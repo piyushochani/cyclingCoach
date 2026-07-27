@@ -38,7 +38,7 @@ const faqs = [
   },
   {
     q: "What subscription plans are available?",
-    a: "Pro plan at $12/month unlocks AI training plans, race-day tools, advanced analytics, and priority support. Basic tier is free with core features including Strava sync and activity tracking.",
+    a: "Two Pro plans: $12/month (billed monthly) or $130/year (billed annually, best value). Both unlock AI training plans, race-day tools, advanced analytics, and priority support. The yearly plan adds advanced periodization, race-day weather analysis, recovery insights, and community access. Basic tier is free with core features including Strava sync and activity tracking.",
   },
   {
     q: "How is my data kept private?",
