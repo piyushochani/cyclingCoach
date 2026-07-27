@@ -3,14 +3,29 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PaymentCard } from './payment-card.schema';
 
+function toPublicCard(card: PaymentCard) {
+  return {
+    _id: card._id,
+    lastFour: card.lastFour,
+    cardHolderName: card.cardHolderName,
+    expiryMonth: card.expiryMonth,
+    expiryYear: card.expiryYear,
+    brand: card.brand,
+    isDefault: card.isDefault,
+    createdAt: (card as any).createdAt,
+    updatedAt: (card as any).updatedAt,
+  };
+}
+
 @Injectable()
 export class PaymentCardsService {
   constructor(
     @InjectModel(PaymentCard.name) private cardModel: Model<PaymentCard>,
   ) {}
 
-  async findByUser(userId: string): Promise<PaymentCard[]> {
-    return this.cardModel.find({ user: userId as any }).sort({ isDefault: -1, createdAt: -1 }).exec();
+  async findByUser(userId: string) {
+    const cards = await this.cardModel.find({ user: userId as any }).sort({ isDefault: -1, createdAt: -1 }).exec();
+    return cards.map(toPublicCard);
   }
 
   async addCard(userId: string, data: {
@@ -21,7 +36,7 @@ export class PaymentCardsService {
     brand: string;
     stripePaymentMethodId?: string;
     cardFingerprint?: string;
-  }): Promise<PaymentCard> {
+  }): Promise<ReturnType<typeof toPublicCard>> {
     const cardCount = await this.cardModel.countDocuments({ user: userId as any }).exec();
 
     const card = new this.cardModel({
@@ -30,7 +45,7 @@ export class PaymentCardsService {
       isDefault: cardCount === 0,
     });
 
-    return card.save();
+    return toPublicCard(await card.save());
   }
 
   async removeCard(userId: string, cardId: string): Promise<void> {
@@ -49,7 +64,7 @@ export class PaymentCardsService {
     }
   }
 
-  async setDefault(userId: string, cardId: string): Promise<PaymentCard> {
+  async setDefault(userId: string, cardId: string) {
     const card = await this.cardModel.findOne({ _id: cardId, user: userId as any }).exec();
     if (!card) throw new NotFoundException('Card not found');
 
@@ -59,6 +74,6 @@ export class PaymentCardsService {
     ).exec();
 
     card.isDefault = true;
-    return card.save();
+    return toPublicCard(await card.save());
   }
 }

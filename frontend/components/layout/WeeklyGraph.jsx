@@ -16,15 +16,57 @@ function getWeekNumber(d) {
 }
 
 function weekKey(d) {
+  const iso = new Date(d);
+  iso.setHours(0, 0, 0, 0);
+  // ISO week-year is the year of the week's Thursday.
+  iso.setDate(iso.getDate() + 3 - ((iso.getDay() + 6) % 7));
   const wn = getWeekNumber(d);
-  return `${d.getFullYear()}-W${String(wn).padStart(2, "0")}`;
+  return `${iso.getFullYear()}-W${String(wn).padStart(2, "0")}`;
 }
 
 function weekStartDate(key) {
   const parts = key.split("-W");
-  const year = parseInt(parts[0]);
-  const wn = parseInt(parts[1]);
-  return new Date(year, 0, 1 + (wn - 1) * 7);
+  const year = parseInt(parts[0], 10);
+  const wn = parseInt(parts[1], 10);
+  // ISO week 1 always contains Jan 4; its Monday is the anchor for week numbering.
+  const jan4 = new Date(year, 0, 4);
+  jan4.setHours(0, 0, 0, 0);
+  const week1Monday = new Date(jan4);
+  week1Monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  const start = new Date(week1Monday);
+  start.setDate(week1Monday.getDate() + (wn - 1) * 7);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function formatWeekDateRange(startDate) {
+  const end = new Date(startDate);
+  end.setDate(startDate.getDate() + 6);
+  const fmt = (d) =>
+    `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return `${fmt(startDate)} → ${fmt(end)}`;
+}
+
+/** Keep month labels only where they won't overlap on the x-axis. */
+function pickVisibleMonthLabels(monthPts, minGap = 56) {
+  if (monthPts.length === 0) return [];
+  if (monthPts.length === 1) return monthPts;
+
+  const picked = [monthPts[0]];
+  for (let i = 1; i < monthPts.length; i++) {
+    const pt = monthPts[i];
+    if (pt.x - picked[picked.length - 1].x >= minGap) {
+      picked.push(pt);
+    }
+  }
+
+  const last = monthPts[monthPts.length - 1];
+  const lastPicked = picked[picked.length - 1];
+  if (last !== lastPicked && last.x - lastPicked.x >= minGap) {
+    picked.push(last);
+  }
+
+  return picked;
 }
 
 const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -79,7 +121,8 @@ function buildWeeklyData(activities, weeklyPlansMap = {}) {
     const key = weekKey(d);
     if (!weeks[key]) {
       const start = weekStartDate(key);
-      const monthLabel = d.toLocaleString("en", { month: "short" }).toUpperCase();
+      start.setHours(0, 0, 0, 0);
+      const monthLabel = start.toLocaleString("en", { month: "short" }).toUpperCase();
       weeks[key] = {
         week: key,
         km: 0, hrs: 0, elev: 0,
@@ -91,6 +134,7 @@ function buildWeeklyData(activities, weeklyPlansMap = {}) {
             day.setDate(start.getDate() + i);
             return `${String(day.getDate()).padStart(2, "0")}/${String(day.getMonth() + 1).padStart(2, "0")}`;
           }),
+          label: formatWeekDateRange(start),
         },
         startDate: start,
         dayBuckets: {},
@@ -104,7 +148,6 @@ function buildWeeklyData(activities, weeklyPlansMap = {}) {
     weeks[key].dayBuckets[dayName].push(a);
   }
 
-  let prevMonth = null;
   return Object.values(weeks).map((w) => {
     const performed = DAY_NAMES.map((_, i) => buildDayData(w.startDate, i, w.dayBuckets[DAY_NAMES[i]]));
     const plan = weeklyPlansMap[w.week];
@@ -114,9 +157,7 @@ function buildWeeklyData(activities, weeklyPlansMap = {}) {
           return buildDayDataFromPlan(wo, i, w.startDate);
         })
       : performed;
-    const m = w.month === prevMonth ? null : w.month;
-    prevMonth = w.month;
-    return { ...w, planned, performed, month: m, activities: Object.values(w.dayBuckets).flat() };
+    return { ...w, planned, performed, activities: Object.values(w.dayBuckets).flat() };
   }).sort((a, b) => a.week.localeCompare(b.week));
 }
 
@@ -256,7 +297,28 @@ export default function WeeklyGraph({ activities: apiActivities }) {
   const areaPath = linePath && lastPt && firstPt
     ? `${linePath} L${lastPt.x.toFixed(1)},${PAD.t + chartH} L${firstPt.x.toFixed(1)},${PAD.t + chartH} Z`
     : "";
-  const monthPts = pts.filter((p) => p.month);
+  const monthPts = useMemo(() => {
+    const candidates = pts.filter((p, i) => {
+      if (i === 0) return true;
+      const d = new Date(p.startDate);
+      const prevD = new Date(pts[i - 1].startDate);
+      return d.getFullYear() !== prevD.getFullYear() || d.getMonth() !== prevD.getMonth();
+    }).map((p) => {
+      const d = new Date(p.startDate);
+      return {
+        ...p,
+        month: d.toLocaleString("en", { month: "short" }).toUpperCase(),
+        monthKey: `${d.getFullYear()}-${d.getMonth()}`,
+      };
+    });
+
+    // Scale minimum gap with zoom so labels appear only when there's room.
+    const pointSpacing =
+      pts.length > 1 ? chartW / (pts.length - 1) : chartW;
+    const minGap = Math.max(48, Math.min(72, pointSpacing * 0.85));
+
+    return pickVisibleMonthLabels(candidates, minGap);
+  }, [pts, chartW]);
 
   return (
     <div
@@ -426,6 +488,12 @@ export default function WeeklyGraph({ activities: apiActivities }) {
       <div style={{ paddingTop: 12, paddingBottom: 12 }}>
         <div style={{ display: "flex", gap: 40, flexWrap: "wrap", justifyContent: "center" }}>
           {[
+            {
+              label: "Date Range",
+              display: activeWeek?.dateRange?.label || "—",
+              color: "#D1D5DB",
+              size: 20,
+            },
             { label: "Distance", val: activeWeek ? activeWeek.km : 0, unit: "km", decimals: 2, color: "white" },
             {
               label: "Time",
@@ -450,13 +518,14 @@ export default function WeeklyGraph({ activities: apiActivities }) {
               </div>
               <div style={{
                 fontFamily: "'DM Sans', sans-serif",
-                fontSize: 28, fontWeight: 700, color: s.color, lineHeight: 1,
+                fontSize: s.size || 28, fontWeight: 700, color: s.color, lineHeight: 1,
                 display: "flex", alignItems: "baseline", gap: 4,
+                whiteSpace: "nowrap",
               }}>
                 {s.display ? s.display : (
                   <>
                     <span>{(typeof s.val === 'number' ? s.val.toFixed(s.decimals ?? 0) : s.val)}</span>
-                    <span style={{ fontSize: 22 }}> {s.unit}</span>
+                    <span style={{ fontSize: s.size ? s.size - 2 : 22 }}> {s.unit}</span>
                   </>
                 )}
               </div>
@@ -639,12 +708,12 @@ export default function WeeklyGraph({ activities: apiActivities }) {
 
           {monthPts.map((p) => (
             <text
-              key={`ml-${p.month}`}
+              key={`ml-${p.monthKey}-${p.globalIdx}`}
               x={p.x}
               y={H - 6}
               textAnchor="middle"
               fill="#9CA3AF"
-              style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13 }}
+              style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}
             >
               {p.month}
             </text>
@@ -696,7 +765,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                   marginLeft: 10,
                 }}
               >
-                · {activeWeek.dateRange.dates[0]} → {activeWeek.dateRange.dates[6]}
+                · {activeWeek.dateRange.label}
               </span>
             </div>
 

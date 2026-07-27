@@ -32,7 +32,13 @@ const DashboardPage = () => {
     ])
       .then(([statsData, activitiesData, racesData, weeklyPlanData, syncData]) => {
         setStats(statsData);
-        setActivities(activitiesData);
+        const seen = new Set();
+        setActivities((activitiesData || []).filter((a) => {
+          const key = (a.stravaId != null && a.stravaId !== 0) ? a.stravaId : a.name + a.distance;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }));
         setRaces(racesData);
         setWeeklyPlan(weeklyPlanData);
         setSyncInfo(syncData);

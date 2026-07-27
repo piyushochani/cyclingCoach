@@ -39,7 +39,14 @@ function formatDuration(durationSeconds, fallbackDuration) {
 
 export default function RecentActivity({ activities = [] }) {
   const recentActivities = useMemo(() => {
+    const seen = new Set();
     return [...activities]
+      .filter((a) => {
+        const key = (a.stravaId != null && a.stravaId !== 0) ? a.stravaId : a.name + a.distance;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
       .sort((a, b) => new Date(b?.date || 0) - new Date(a?.date || 0))
       .slice(0, 20);
   }, [activities]);
@@ -61,9 +68,6 @@ export default function RecentActivity({ activities = [] }) {
           </h2>
         </div>
 
-        <div className="rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 font-dmSans text-xs tracking-[0.08em] text-white/55">
-          {recentActivities.length} items
-        </div>
       </div>
 
       <div className="overflow-hidden rounded-[20px] border border-white/8 bg-black/20">

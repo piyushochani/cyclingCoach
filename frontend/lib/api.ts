@@ -66,7 +66,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     headers,
   });
 
-  if (res.status === 401) {
+  if (res.status === 401 && !path.startsWith('/auth/')) {
     clearToken();
     if (typeof window !== 'undefined') {
       localStorage.removeItem('cyclogenai_signed_in');

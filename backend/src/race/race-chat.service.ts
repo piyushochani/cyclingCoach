@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { RaceChat } from './race-chat.schema';
@@ -11,13 +11,19 @@ export class RaceChatService {
     @InjectModel(Race.name) private raceModel: Model<Race>,
   ) {}
 
-  async findByRace(raceId: string): Promise<any> {
-    const chat = await this.raceChatModel.findOne({ race: raceId as any }).exec();
-    return chat;
+  async findByRace(raceId: string, userId: string): Promise<any> {
+    return this.raceChatModel.findOne({ race: raceId as any, user: userId as any }).exec();
+  }
+
+  private async assertRaceOwnership(raceId: string, userId: string): Promise<void> {
+    const race = await this.raceModel.findOne({ _id: raceId, user: userId as any }).exec();
+    if (!race) throw new NotFoundException('Race not found');
   }
 
   async findOrCreate(raceId: string, userId: string): Promise<RaceChat> {
-    let chat = await this.raceChatModel.findOne({ race: raceId as any }).exec();
+    await this.assertRaceOwnership(raceId, userId);
+
+    let chat = await this.raceChatModel.findOne({ race: raceId as any, user: userId as any }).exec();
     if (!chat) {
       chat = new this.raceChatModel({
         race: raceId as any,

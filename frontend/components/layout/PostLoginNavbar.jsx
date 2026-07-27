@@ -136,21 +136,18 @@ const PostLoginNavbar = () => {
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 flex h-[63px] items-center justify-between border-b border-[#FF5500]/20 bg-[#0A0A0A] px-4 shadow-[0_0_20px_rgba(255,85,0,0.08)] md:px-8">
       {/* Logo */}
-      <Link href="/dashboard">
-        <motion.div
-          className="flex items-center cursor-pointer gap-2.5"
-          whileHover={{ scale: 1.05 }}
-        >
-          <img
-            src="/images/C_icon.png"
-            alt="Cyclogen"
-            className="h-8 w-auto"
-          />
-          <span className="font-barlowCondensed text-xl font-bold uppercase tracking-wide text-white">
-            Cyclogen<span className="text-[#FF5500]">AI</span>
-          </span>
-        </motion.div>
-      </Link>
+        <Link href="/dashboard">
+          <motion.div
+            className="flex items-center cursor-pointer gap-2.5"
+            whileHover={{ scale: 1.05 }}
+          >
+            <img
+              src="/images/new_cyclogenAI_logo.png"
+              alt="CyclogenAI"
+              className="h-12 w-auto"
+            />
+          </motion.div>
+        </Link>
 
       {/* Desktop Navigation */}
       <div className="hidden md:flex items-center space-x-1">

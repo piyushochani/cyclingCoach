@@ -1,7 +1,8 @@
-import { Controller, Post, Body, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, Headers } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserId } from '../common/user-id.decorator';
+import { Public } from '../common/public.decorator';
 import { AgentService } from './agent.service';
 import { User } from '../user/user.schema';
 
@@ -24,10 +25,17 @@ export class AgentController {
     return this.agentService.chat(userId, body.message, body.chatId);
   }
 
+  @Public()
   @Post('telegram-chat')
   async telegramChat(
     @Body() body: { message: string; telegramChatId: string },
+    @Headers('x-telegram-secret') webhookSecret?: string,
   ) {
+    const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (expectedSecret && webhookSecret !== expectedSecret) {
+      throw new UnauthorizedException('Invalid Telegram webhook secret');
+    }
+
     if (!body.message || !body.message.trim()) {
       return { text: 'Please provide a message.' };
     }
@@ -35,7 +43,7 @@ export class AgentController {
       return { text: 'Telegram chat ID is required.' };
     }
 
-    const user = await this.userModel.findOne({ telegramChatId: String(body.telegramChatId) }).lean().exec();
+    const user = await this.userModel.findOne({ telegramChatId: String(body.telegramChatId) }).select('-passwordHash').lean().exec();
     if (!user) {
       return { text: 'Your Telegram account is not linked. Please link it from the Cycling Coach web dashboard: go to Profile > Link Telegram.' };
     }

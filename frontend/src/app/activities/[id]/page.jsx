@@ -43,6 +43,7 @@ const fmtSpeed = (v) => `${Number(v).toFixed(1)} km/h`;
 const fmtElev = (v) => `${Math.round(v)} m`;
 const fmtHr = (v) => `${Math.round(v)} bpm`;
 const fmtWatts = (v) => `${Math.round(v)} W`;
+const fmtDist = (v) => `${Number(v).toFixed(1)} km`;
 
 function downSample(arr, step = 5) {
   return arr.filter((_, i) => i % step === 0);
@@ -78,6 +79,7 @@ const SingleActivityPage = () => {
   const [streams, setStreams] = useState(null);
   const [loading, setLoading] = useState(true);
   const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState("");
 
   useEffect(() => {
     if (!activityId) return;
@@ -95,36 +97,52 @@ const SingleActivityPage = () => {
 
   const handleDeepReview = async () => {
     setReviewLoading(true);
+    setReviewError("");
     try {
       const result = await api.post(`/activities/${activityId}/review`);
       if (result?.review) {
         setActivity((prev) => ({ ...prev, llmAnalysis: result.review }));
       }
     } catch (err) {
-      console.error('Deep review failed:', err);
+      setReviewError(err?.message || "An error occured while fetching results");
     } finally {
       setReviewLoading(false);
     }
   };
 
+  useEffect(() => {
+    if (activity && !activity.llmAnalysis && !reviewLoading && !reviewError) {
+      handleDeepReview();
+    }
+  }, [activity]);
+
   const raw = streams;
   const sr = raw?.sampleRate || 1;
 
-  const speedData = useMemo(() => {
+  const cumulativeDist = useMemo(() => {
     if (!raw?.speed?.length) return [];
-    return downSample(raw.speed.map((s, i) => ({
-      t: i * sr,
-      speed: s,
-    })));
+    const dist = [0];
+    for (let i = 1; i < raw.speed.length; i++) {
+      dist.push(dist[i - 1] + (raw.speed[i] * (sr / 3600)));
+    }
+    return dist;
   }, [raw, sr]);
 
-  const elevationData = useMemo(() => {
-    if (!raw?.elevation?.length) return [];
+  const speedDistData = useMemo(() => {
+    if (!raw?.speed?.length || !cumulativeDist.length) return [];
+    return downSample(raw.speed.map((s, i) => ({
+      dist: cumulativeDist[i],
+      speed: s,
+    })));
+  }, [raw, cumulativeDist]);
+
+  const elevationDistData = useMemo(() => {
+    if (!raw?.elevation?.length || !cumulativeDist.length) return [];
     return downSample(raw.elevation.map((e, i) => ({
-      t: i * sr,
+      dist: cumulativeDist[i],
       elevation: e,
     })));
-  }, [raw, sr]);
+  }, [raw, cumulativeDist]);
 
   const hrData = useMemo(() => {
     if (!raw?.heartRate?.length) return [];
@@ -132,14 +150,6 @@ const SingleActivityPage = () => {
       t: i * sr,
       actual: bpm,
       required: null,
-    })));
-  }, [raw, sr]);
-
-  const powerTimeData = useMemo(() => {
-    if (!raw?.power?.length) return [];
-    return downSample(raw.power.map((w, i) => ({
-      t: i * sr,
-      power: w,
     })));
   }, [raw, sr]);
 
@@ -233,29 +243,12 @@ const SingleActivityPage = () => {
                   <h2 className="font-barlowCondensed text-2xl uppercase tracking-tight text-white">AI Coach Insights</h2>
                   <p className="font-dmSans text-[10px] uppercase tracking-widest text-[#FF5500]/60">Automated Performance Review</p>
                 </div>
-                <button
-                  onClick={handleDeepReview}
-                  disabled={reviewLoading}
-                  className="flex items-center gap-2 rounded-xl border border-[#FF5500]/30 bg-[#FF5500]/10 px-4 py-2 font-dmSans text-xs font-medium text-[#FF5500] transition-all duration-200 hover:bg-[#FF5500]/20 disabled:opacity-50"
-                >
-                  {reviewLoading ? (
-                    <span className="flex items-center gap-2">
-                      <Loader size={14} />
-                      Analyzing...
-                    </span>
-                  ) : (
-                    <>
-                      <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                      </svg>
-                      AI Review
-                    </>
-                  )}
-                </button>
               </div>
 
               <div className="space-y-4 font-dmSans text-base leading-relaxed text-white/80">
-                {reviewLoading ? (
+                {reviewError ? (
+                  <p className="text-red-400">{reviewError}</p>
+                ) : reviewLoading ? (
                   <div className="flex items-center gap-3 py-4">
                     <Loader size={20} />
                     <p className="text-sm text-white/40">Generating deep insights...</p>
@@ -285,28 +278,28 @@ const SingleActivityPage = () => {
               </div>
             </div>
 
-            {speedData.length > 0 && (
-              <GraphCard title="Speed Over Time">
+            {speedDistData.length > 0 && (
+              <GraphCard title="Speed">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={speedData}>
+                  <LineChart data={speedDistData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis dataKey="t" stroke="rgba(255,255,255,0.3)" fontSize={10} tickFormatter={formatTimeShort} domain={['auto', 'auto']} />
+                    <XAxis dataKey="dist" stroke="rgba(255,255,255,0.3)" fontSize={10} tickFormatter={fmtDist} domain={['auto', 'auto']} />
                     <YAxis stroke="#4ADE80" fontSize={10} tickFormatter={fmtSpeed} />
-                    <Tooltip content={<CustomTooltip formatter={(p) => `${Number(p.value).toFixed(1)} km/h`} />} labelFormatter={(v) => formatTimeShort(v)} />
+                    <Tooltip content={<CustomTooltip formatter={(p) => `${Number(p.value).toFixed(1)} km/h`} />} labelFormatter={(v) => `${Number(v).toFixed(1)} km`} />
                     <Line type="monotone" dataKey="speed" stroke="#4ADE80" strokeWidth={2} dot={false} name="Speed" />
                   </LineChart>
                 </ResponsiveContainer>
               </GraphCard>
             )}
 
-            {elevationData.length > 0 && (
-              <GraphCard title="Elevation Profile">
+            {elevationDistData.length > 0 && (
+              <GraphCard title="Elevation">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={elevationData}>
+                  <LineChart data={elevationDistData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis dataKey="t" stroke="rgba(255,255,255,0.3)" fontSize={10} tickFormatter={formatTimeShort} domain={['auto', 'auto']} />
+                    <XAxis dataKey="dist" stroke="rgba(255,255,255,0.3)" fontSize={10} tickFormatter={fmtDist} domain={['auto', 'auto']} />
                     <YAxis stroke="#F59E0B" fontSize={10} tickFormatter={fmtElev} />
-                    <Tooltip content={<CustomTooltip formatter={(p) => `${Math.round(p.value)} m`} />} labelFormatter={(v) => formatTimeShort(v)} />
+                    <Tooltip content={<CustomTooltip formatter={(p) => `${Math.round(p.value)} m`} />} labelFormatter={(v) => `${Number(v).toFixed(1)} km`} />
                     <Line type="monotone" dataKey="elevation" stroke="#F59E0B" strokeWidth={2} dot={false} name="Elevation" />
                   </LineChart>
                 </ResponsiveContainer>
@@ -325,20 +318,6 @@ const SingleActivityPage = () => {
                     {hrData.some(d => d.required != null) && (
                       <Line type="monotone" dataKey="required" stroke="#EF4444" strokeWidth={2} strokeDasharray="6 3" dot={false} name="Required HR" opacity={0.6} />
                     )}
-                  </LineChart>
-                </ResponsiveContainer>
-              </GraphCard>
-            )}
-
-            {powerTimeData.length > 0 && (
-              <GraphCard title="Power Over Time">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={powerTimeData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                    <XAxis dataKey="t" stroke="rgba(255,255,255,0.3)" fontSize={10} tickFormatter={formatTimeShort} domain={['auto', 'auto']} />
-                    <YAxis stroke="#FF5500" fontSize={10} tickFormatter={fmtWatts} />
-                    <Tooltip content={<CustomTooltip formatter={(p) => `${Math.round(p.value)} W`} />} labelFormatter={(v) => formatTimeShort(v)} />
-                    <Line type="monotone" dataKey="power" stroke="#FF5500" strokeWidth={2} dot={false} name="Power" />
                   </LineChart>
                 </ResponsiveContainer>
               </GraphCard>

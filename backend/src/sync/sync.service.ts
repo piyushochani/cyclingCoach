@@ -290,33 +290,27 @@ export class SyncService {
     activityPayload.userFtp = userFtp;
     activityPayload.userMaxHr = rawActivity?.max_heartrate || a.max_heartrate || null;
 
-    if (existing) {
-      await this.activityModel.updateOne(
-        { _id: existing._id },
-        {
-          $set: {
-            ...activityPayload,
-            rawActivity: rawActivity ?? null,
-            rawStreams: rawStreams ?? null,
-            polyline: encodedPolyline,
-            embeddingStatus: 'pending',
-            updatedAt: new Date(),
-          },
+    const upsertResult = await this.activityModel.findOneAndUpdate(
+      { stravaId, user: userId as any },
+      {
+        $set: {
+          ...activityPayload,
+          rawActivity: rawActivity ?? null,
+          rawStreams: rawStreams ?? null,
+          polyline: encodedPolyline,
+          embeddingStatus: 'pending',
+          updatedAt: new Date(),
         },
-      ).exec();
-      this.logger.debug(`Updated existing activity ${stravaId} with raw data`);
-    } else {
-      await this.activityModel.create({
-        ...activityPayload,
-        rawActivity: rawActivity ?? null,
-        rawStreams: rawStreams ?? null,
-        polyline: encodedPolyline,
-        embeddingStatus: 'pending',
-        syncedAt: new Date(),
-        updatedAt: new Date(),
-      });
+        $setOnInsert: { syncedAt: new Date() },
+      },
+      { upsert: true, returnDocument: 'after' },
+    ).exec();
+
+    if (upsertResult.syncedAt?.getTime() === upsertResult.updatedAt?.getTime()) {
       this.logger.debug(`Created new activity ${stravaId} with raw data`);
       this.notificationService.createActivitySynced(userId, activityPayload.name || 'Ride', String(stravaId)).catch(() => {});
+    } else {
+      this.logger.debug(`Updated existing activity ${stravaId} with raw data`);
     }
 
     const gearId = rawActivity?.gear?.id || rawActivity?.gear_id || null;

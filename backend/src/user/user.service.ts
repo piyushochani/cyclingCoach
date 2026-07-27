@@ -15,7 +15,7 @@ export class UserService {
   }
 
   findOne(email: string): Promise<User | null> {
-    return this.userModel.findOne({ email }).exec();
+    return this.userModel.findOne({ email }).select('-passwordHash').exec();
   }
 
   async create(user: Partial<User>): Promise<User> {
@@ -23,7 +23,10 @@ export class UserService {
       user.passwordHash = await bcrypt.hash(user.passwordHash, 12);
     }
     const newUser = new this.userModel(user);
-    return newUser.save();
+    const saved = await newUser.save();
+    const obj = saved.toObject();
+    delete (obj as any).passwordHash;
+    return obj as User;
   }
 
   async update(email: string, data: Partial<User>): Promise<User | null> {
@@ -33,6 +36,6 @@ export class UserService {
     for (const key of allowed) {
       if (d[key] !== undefined) update[key] = d[key];
     }
-    return this.userModel.findOneAndUpdate({ email }, update, { returnDocument: 'after' }).exec();
+    return this.userModel.findOneAndUpdate({ email }, update, { returnDocument: 'after' }).select('-passwordHash').exec();
   }
 }

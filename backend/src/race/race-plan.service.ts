@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { RacePlan } from './race-plan.schema';
@@ -11,11 +11,14 @@ export class RacePlanService {
     @InjectModel(Race.name) private raceModel: Model<Race>,
   ) {}
 
-  async findByRace(raceId: string): Promise<any> {
-    return this.racePlanModel.findOne({ race: raceId as any }).lean().exec();
+  async findByRace(raceId: string, userId: string): Promise<any> {
+    return this.racePlanModel.findOne({ race: raceId as any, user: userId as any }).lean().exec();
   }
 
   async create(raceId: string, userId: string, days: any[]): Promise<RacePlan> {
+    const race = await this.raceModel.findOne({ _id: raceId, user: userId as any }).exec();
+    if (!race) throw new NotFoundException('Race not found');
+
     const plan = new this.racePlanModel({
       race: raceId as any,
       user: userId as any,

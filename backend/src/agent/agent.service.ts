@@ -42,6 +42,7 @@ import {
 
 const MAX_STEPS = 10;
 const MAX_HISTORY_MESSAGES = 30;
+const MIN_RAG_SCORE = 0.7;
 
 interface GeminiMessage {
   role: 'user' | 'model' | 'function';
@@ -379,7 +380,10 @@ export class AgentService {
 
       if (!matches || matches.length === 0) return '';
 
-      const lines = matches.map((m: any) => {
+      const relevant = matches.filter((m: any) => (m.score ?? 0) >= MIN_RAG_SCORE);
+      if (relevant.length === 0) return '';
+
+      const lines = relevant.map((m: any) => {
         const meta = m.metadata as any;
         if (meta?.kind === 'profile') {
           return `[Athlete Profile] ${meta.summary}`;

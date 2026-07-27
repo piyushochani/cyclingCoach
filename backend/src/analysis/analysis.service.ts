@@ -419,7 +419,7 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
   }
 
   async generateActivityAnalysis(activityId: string, userId: string): Promise<string> {
-    const activity = await this.activityModel.findById(activityId).lean().exec() as any;
+    const activity = await this.activityModel.findOne({ _id: activityId, user: userId as any }).lean().exec() as any;
     if (!activity) return '';
 
     const sameDay = new Date(activity.date);
@@ -465,7 +465,7 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
   }
 
   async deepReviewActivity(activityId: string, userId: string): Promise<{ review: string }> {
-    const activity = await this.activityModel.findById(activityId).lean().exec() as any;
+    const activity = await this.activityModel.findOne({ _id: activityId, user: userId as any }).lean().exec() as any;
     if (!activity) return { review: 'Activity not found.' };
 
     const sameDay = new Date(activity.date);
