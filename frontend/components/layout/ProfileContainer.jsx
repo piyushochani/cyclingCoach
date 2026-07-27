@@ -2,13 +2,19 @@
 
 import React from "react";
 import { motion } from "framer-motion";
+import {
+  getUserDisplayName,
+  getUserInitials,
+  formatExperienceLevel,
+  formatSportLabel,
+} from "../../lib/component-data";
 
 const ProfileContainer = ({ user }) => {
-  const name = user?.firstName || "Athlete";
+  const name = getUserDisplayName(user);
   const email = user?.email || "";
-  const initials = name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "AT";
-  const sport = user?.mainSport || "cycling";
-  const level = user?.experienceLevel || "beginner";
+  const initials = getUserInitials(user);
+  const sport = formatSportLabel(user?.mainSport);
+  const level = formatExperienceLevel(user?.experienceLevel);
 
   return (
     <motion.div
@@ -32,11 +38,9 @@ const ProfileContainer = ({ user }) => {
           </div>
         </div>
 
-        <h2 className="font-dmSans text-2xl font-semibold text-white">
-          {name}
-        </h2>
+        <h2 className="font-dmSans text-2xl font-semibold text-white">{name}</h2>
         <p className="mt-1 font-dmSans text-sm text-white/50">
-          {sport === "cycling" ? "Cyclist" : sport} · {level.charAt(0).toUpperCase() + level.slice(1)}
+          {sport} · {level}
         </p>
 
         {email && (

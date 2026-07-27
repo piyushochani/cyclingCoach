@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { api } from "../../lib/api";
+import { api, dispatchDataRefetch } from "../../lib/api";
 
 const TERRAIN_OPTIONS = ["", "Flat", "Rolling", "Hilly", "Mountainous"];
 
@@ -68,6 +68,19 @@ const ScheduleRaceModal = ({ isOpen, onClose }) => {
         completed: false,
       });
 
+      dispatchDataRefetch();
+      setForm({
+        name: "",
+        date: new Date().toISOString().split("T")[0],
+        city: "",
+        distance: "",
+        elevationGain: "",
+        priority: "B",
+        terrain: "",
+        type: "",
+        expectations: "",
+        description: "",
+      });
       onClose();
     } catch (err) {
       setError(err.message || "Failed to schedule race");

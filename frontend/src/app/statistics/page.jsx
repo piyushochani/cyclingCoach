@@ -10,6 +10,9 @@ import Loader from '../../../components/ui/Loader';
 import { api } from '../../../lib/api';
 import { useDataRefetch } from '../../../lib/useDataRefetch';
 import AnalysisModal from '../../../components/ui/AnalysisModal';
+import TrainingChart from '../../../components/layout/week_month_statisticspage';
+import PRProgressionChart from '../../../components/layout/PRProgressionChart';
+import { mapActivitiesToChartEntries } from '../../../lib/component-data';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -592,6 +595,12 @@ export default function StatisticsPage() {
             </button>
           </div>
         </motion.div>
+
+        {/* Strava-style training chart + PR progression */}
+        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <TrainingChart entries={mapActivitiesToChartEntries(activities)} />
+          <PRProgressionChart bestEfforts={bestEfforts} />
+        </div>
 
         {/* Trend Charts Row */}
         <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
