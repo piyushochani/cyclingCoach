@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AnalysisController } from './analysis.controller';
 import { AnalysisService } from './analysis.service';
-import { AnalysisProcessor } from './analysis.processor';
+import { AnalysisJobHandler, AnalysisMockProcessor } from './analysis.processor';
+import { AnalysisWorker } from './analysis.worker';
 import { ContextBuilderService } from './context-builder.service';
 import { DataProcessorService } from './data-processor.service';
 import { SummaryBuilderService } from './summary-builder.service';
@@ -16,6 +17,7 @@ import { NotificationModule } from '../notification/notification.module';
 import { PlanModule } from '../plan/plan.module';
 import { TrainingContextModule } from '../training-context/training-context.module';
 import { createQueueModule } from '../common/queue/conditional-queue';
+import { isRedisEnabled, QUEUES } from '../common/queue/queue.constants';
 
 @Module({
   imports: [
@@ -24,15 +26,16 @@ import { createQueueModule } from '../common/queue/conditional-queue';
       { name: User.name, schema: UserSchema },
       { name: Race.name, schema: RaceSchema },
     ]),
-    createQueueModule('analysis'),
+    createQueueModule(QUEUES.ANALYSIS),
     NotificationModule,
-    PlanModule,
+    forwardRef(() => PlanModule),
     TrainingContextModule,
   ],
   controllers: [AnalysisController],
   providers: [
     AnalysisService,
-    AnalysisProcessor,
+    AnalysisJobHandler,
+    ...(isRedisEnabled() ? [AnalysisWorker] : [AnalysisMockProcessor]),
     ContextBuilderService,
     DataProcessorService,
     SummaryBuilderService,

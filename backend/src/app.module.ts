@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { DatabaseModule } from './database/database.module';
+import { QueueModule } from './common/queue/queue.module';
 import { UserModule } from './user/user.module';
 import { ActivityModule } from './activity/activity.module';
 import { RaceModule } from './race/race.module';
@@ -30,6 +31,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
       ttl: 60000,
       limit: 100,
     }]),
+    QueueModule.forRoot(),
     DatabaseModule,
     UserModule,
     ActivityModule,

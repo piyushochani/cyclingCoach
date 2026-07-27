@@ -18,16 +18,19 @@ export class MockQueue {
     arr.push({ data, opts, timestamp: Date.now() });
     this.jobs.set(name, arr);
 
+    const jobId = opts?.jobId || `mock_${Date.now()}`;
+    let returnvalue: unknown;
+
     if (this.directHandler && !executingQueues.has(this.queueName)) {
       executingQueues.add(this.queueName);
       try {
-        await this.directHandler(name, data);
+        returnvalue = await this.directHandler(name, data);
       } finally {
         executingQueues.delete(this.queueName);
       }
     }
 
-    return { id: `mock_${Date.now()}`, name, data, opts };
+    return { id: jobId, name, data, opts, returnvalue };
   }
 
   async getJob(name: string) {
