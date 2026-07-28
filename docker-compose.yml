@@ -1,8 +1,9 @@
 services:
-  # Redis is required for BullMQ background tasks
+  # Redis for BullMQ — started only with --profile production (see docker-compose.prod.yml)
   redis:
     image: redis:7-alpine
     container_name: cycling-coach-redis
+    profiles: ["production"]
     ports:
       - "6379:6379"
     volumes:
@@ -28,13 +29,11 @@ services:
     ports:
       - "3001:3001"
     environment:
-      - MONGODB_URI=mongodb://mongodb:27017/cyclogenai
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - JWT_SECRET=${JWT_SECRET}
+      MONGODB_URI: mongodb://mongodb:27017/cyclogenai
+      REDIS_ENABLED: "false"
+      JWT_SECRET: ${JWT_SECRET}
     depends_on:
       - mongodb
-      - redis
     volumes:
       - ./backend:/app
       - /app/node_modules

@@ -1,0 +1,14 @@
+# Production variables for the cyclogenai-backend Railway service.
+# Railway does not support env vars in railway.toml — set these in the dashboard
+# (Variables tab) or via CLI:
+#
+#   railway variable set REDIS_ENABLED=true --service cyclogenai-backend
+#   railway variable set 'REDIS_HOST=${{Redis.REDISHOST}}' --service cyclogenai-backend
+#   railway variable set 'REDIS_PORT=${{Redis.REDISPORT}}' --service cyclogenai-backend
+#
+# Requires a Redis database service named "Redis" in the same Railway project.
+# Service name in references is case-sensitive.
+
+REDIS_ENABLED=true
+REDIS_HOST=${{Redis.REDISHOST}}
+REDIS_PORT=${{Redis.REDISPORT}}

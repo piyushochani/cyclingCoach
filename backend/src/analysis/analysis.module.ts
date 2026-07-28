@@ -9,6 +9,8 @@ import { SummaryBuilderService } from './summary-builder.service';
 import { PineconeClient } from './pinecone-client';
 import { EmbeddingService } from './embedding.service';
 import { ActivitySyncPipelineService } from './activity-sync-pipeline.service';
+import { EmbeddingRetryService } from './embedding-retry.service';
+import { QueueSchedulerService } from '../common/queue/queue-scheduler.service';
 import { Activity, ActivitySchema } from '../activity/activity.schema';
 import { User, UserSchema } from '../user/user.schema';
 import { Race, RaceSchema } from '../race/race.schema';
@@ -39,6 +41,8 @@ import { createQueueModule } from '../common/queue/conditional-queue';
     PineconeClient,
     EmbeddingService,
     ActivitySyncPipelineService,
+    EmbeddingRetryService,
+    QueueSchedulerService,
   ],
   exports: [AnalysisService, ActivitySyncPipelineService, PineconeClient, EmbeddingService],
 })

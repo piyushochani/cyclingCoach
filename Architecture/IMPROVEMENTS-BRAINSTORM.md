@@ -1,7 +1,33 @@
 # Limitations and Improvement Brainstorm
 
 > Companion to `ARCHITECTURE.md`. Findings from code analysis on 2026-07-26.
-> Ordered by severity within each section. Each item names the file(s) involved so we can act on it directly.
+> **Last updated:** 2026-07-27 — many Phase 1–2 items implemented on `feat/architectureFixes1`.
+
+## Implementation status (feat/architectureFixes1)
+
+| Item | Status |
+| --- | --- |
+| A1 Pinecone summary metadata + backfill script | Done |
+| A2 userId filter on queries | Done |
+| A3 Analysis job payload type | Done |
+| A4 Embedding failure handling | Done |
+| B1 BullModule.forRoot | Done |
+| B2 @Processor workers | Done |
+| B3 Async sync 202 + job polling | Done (frontend updated) |
+| B4 Job retries/backoff | Done |
+| B5 Repeatable embedding-retry sweep | Done (every 6h, Redis only) |
+| B6 Weekly/monthly enqueue (not sync) | Done |
+| C1 Wider RAG gating | Done |
+| C2 Score threshold | Done |
+| C3 Metadata pre-filters from query | Done |
+| C4 Richer docs after LLM analysis | Done |
+| C6 Streaming | Not started |
+| C7 Eval harness | Not started |
+| D1 Mongo indexes | Done |
+| D3 Auth hardening (JWT-only UserId) | Done |
+| D4 Per-user Strava OAuth | Skipped (needs user wiring) |
+| D5 Dead code / Stripe / R2 | Skipped |
+| Production Redis env (Railway) | Done |
 
 ---
 

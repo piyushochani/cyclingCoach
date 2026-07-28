@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api } from '../../lib/api';
+import { api, streamAgentChat } from '../../lib/api';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -382,11 +382,40 @@ const PaceBotChat = () => {
     if (!trimmed) return;
     setMessages((prev) => [...prev, { id: Date.now(), sender: 'user', text: trimmed }]);
     setLoading(true);
+
+    const botId = Date.now() + 1;
+    setMessages((prev) => [...prev, { id: botId, sender: 'bot', text: '' }]);
+
     try {
-      const res = await api.post('/agent/chat', { message: trimmed, chatId: sessionIdRef.current });
-      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: res?.text || 'No response.' }]);
+      await streamAgentChat(trimmed, sessionIdRef.current, (event) => {
+        if (event.type === 'token' && typeof event.data.text === 'string') {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === botId ? { ...m, text: m.text + event.data.text } : m)),
+          );
+        }
+        if (event.type === 'done' && typeof event.data.text === 'string') {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === botId ? { ...m, text: event.data.text } : m)),
+          );
+        }
+        if (event.type === 'error') {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === botId
+                ? { ...m, text: String(event.data.message || 'Sorry, I encountered an error.') }
+                : m,
+            ),
+          );
+        }
+      });
     } catch {
-      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: 'Sorry, I encountered an error processing your request.' }]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === botId
+            ? { ...m, text: 'Sorry, I encountered an error processing your request.' }
+            : m,
+        ),
+      );
     } finally {
       setLoading(false);
     }

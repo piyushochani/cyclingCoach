@@ -6,6 +6,8 @@ import { PlanService } from './plan.service';
 import { ModelChangeService } from './model-change.service';
 import { PlanController } from './plan.controller';
 import { ModelChangeController } from './model-change.controller';
+import { PlanProcessor } from './plan.processor';
+import { createQueueModule } from '../common/queue/conditional-queue';
 
 @Module({
   imports: [
@@ -13,9 +15,10 @@ import { ModelChangeController } from './model-change.controller';
       { name: TrainingPlan.name, schema: TrainingPlanSchema },
       { name: ModelChangeRecommendation.name, schema: ModelChangeRecommendationSchema },
     ]),
+    createQueueModule('plan'),
   ],
   controllers: [PlanController, ModelChangeController],
-  providers: [PlanService, ModelChangeService],
+  providers: [PlanService, ModelChangeService, PlanProcessor],
   exports: [PlanService, ModelChangeService],
 })
 export class PlanModule {}

@@ -18,12 +18,6 @@ export class Subscription extends Document {
   @Prop({ default: 'active', enum: ['active', 'canceled', 'expired', 'past_due'] })
   status: string;
 
-  @Prop({ default: null })
-  stripeCustomerId: string;
-
-  @Prop({ default: null })
-  stripeSubscriptionId: string;
-
   @Prop({ default: false })
   cancelAtPeriodEnd: boolean;
 

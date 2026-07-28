@@ -1,4 +1,5 @@
-import { Controller, Post, Body, UnauthorizedException, Headers } from '@nestjs/common';
+import { Controller, Post, Body, UnauthorizedException, Headers, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { UserId } from '../common/user-id.decorator';
@@ -25,7 +26,37 @@ export class AgentController {
     return this.agentService.chat(userId, body.message, body.chatId);
   }
 
-  @Public()
+  @Post('chat/stream')
+  async chatStream(
+    @Body() body: { message: string; chatId?: string },
+    @UserId() userId: string,
+    @Res() res: Response,
+  ) {
+    if (!userId) {
+      res.status(401).json({ message: 'User ID required' });
+      return;
+    }
+    if (!body.message || !body.message.trim()) {
+      res.status(400).json({ message: 'Please provide a message.' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    try {
+      for await (const event of this.agentService.chatStream(userId, body.message, body.chatId)) {
+        res.write(`event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`);
+      }
+    } catch (err) {
+      res.write(`event: error\ndata: ${JSON.stringify({ message: (err as Error).message || 'Stream failed' })}\n\n`);
+    }
+
+    res.end();
+  }
+
   @Post('telegram-chat')
   async telegramChat(
     @Body() body: { message: string; telegramChatId: string },

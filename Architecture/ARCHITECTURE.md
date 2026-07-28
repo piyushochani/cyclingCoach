@@ -9,6 +9,8 @@ There are two parallel AI stacks in this repo:
 
 This document focuses on the web backend, with notes where the CLI stack differs.
 
+**Related diagrams:** [Strava Sync Pipeline](./STRAVA-SYNC-PIPELINE.md) · [LLM Agent Architecture](./LLM-AGENT-ARCHITECTURE.md) · [Database ERD](./DATABASE-ERD.md) · [Improvements](./IMPROVEMENTS-BRAINSTORM.md)
+
 ---
 
 ## 1. High-Level System Overview
@@ -298,8 +300,9 @@ flowchart TD
 
 Reality check:
 
-- **Redis is not used at runtime.** `.env` has `REDIS_ENABLED=false`, so every queue is a `MockQueue` running jobs in-process. `docker-compose.yml` starts `redis:7-alpine` but the app never reads `REDIS_HOST`/`REDIS_PORT`.
-- If `REDIS_ENABLED=true` were set, jobs would enqueue to a default-localhost Redis with **no worker consuming them** (no `@Processor`/`WorkerHost` classes registered, no `BullModule.forRoot`).
+- **Local dev:** `REDIS_ENABLED=false` in `backend/.env` and `docker-compose.yml` — every queue is a `MockQueue` running jobs in-process; no Redis connection is attempted.
+- **Production:** `REDIS_ENABLED=true` with `REDIS_HOST` / `REDIS_PORT` set via deployment config (Railway service references, `render.yaml`, or `docker-compose.prod.yml`). See [§7.1 Production Redis](#71-production-redis).
+- If `REDIS_ENABLED=true` but Bull processors are not fully wired, jobs may enqueue to Redis with **no worker consuming them** (no `@Processor`/`WorkerHost` classes registered in all modules).
 - No retries, backoff, concurrency limits, dead-letter queue, or repeatable cron jobs are configured anywhere.
 - Rate limiting (`ThrottlerModule`) is in-memory, not Redis-backed, so it does not survive restarts or scale across instances.
 
@@ -310,8 +313,22 @@ Reality check:
 | Group | Variables |
 | --- | --- |
 | Core | `MONGODB_URI`, `PORT`, `CORS_ORIGIN`, `JWT_SECRET` |
-| Queues | `REDIS_ENABLED` (no host/port vars read by code) |
+| Queues | `REDIS_ENABLED`, `REDIS_HOST`, `REDIS_PORT` (host/port used when enabled; see §7.1) |
 | LLM (Google) | `GOOGLE_GENERATIVE_AI_API_KEY`, `GOOGLE_GENERATIVE_AI_SYNC_API_KEYS`, `GOOGLE_GENERATIVE_AI_PLAN_API_KEYS`, `GOOGLE_LLM_MODEL` |
 | LLM (Groq) | `GROQ_API_KEY`, `GROQ_CHAT_MODEL`, `GROQ_FALLBACK_MODELS`, `LLM_PROVIDER` |
 | Vectors | `PINECONE_API_KEY`, `PINECONE_HOST`, `PINECONE_INDEX`, `PINECONE_NAMESPACE` |
 | Integrations | `STRAVA_*`, SMTP/`EMAIL_*`, `CLOUDINARY_*`, `STRIPE_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`, `R2_*` (unused) |
+
+### 7.1 Production Redis
+
+Redis is **disabled** for local development and **enabled** only in production deployments.
+
+| Environment | `REDIS_ENABLED` | `REDIS_HOST` | `REDIS_PORT` | Config source |
+| --- | --- | --- | --- | --- |
+| Local dev (`backend/.env`, `pnpm dev`) | `false` | — | — | Developer machine |
+| Docker Compose (default) | `false` | — | — | `docker-compose.yml` |
+| Docker Compose (production) | `true` | `redis` | `6379` | `docker-compose.prod.yml` + `--profile production` |
+| Railway (`cyclogenai-backend`) | `true` | `${{Redis.REDISHOST}}` | `${{Redis.REDISPORT}}` | Railway dashboard / `backend/railway.variables.example` |
+| Render | `true` | From Render Redis addon | `6379` | `render.yaml` + dashboard |
+
+Railway: add a **Redis** database to the project, then reference its variables from the backend service (service name must match exactly, e.g. `Redis`). Env vars cannot live in `railway.toml` — only build/deploy settings are supported there.

@@ -1,10 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { readFileSync, existsSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
-import { parse as parseYaml } from 'yaml';
 import polyline from '@mapbox/polyline';
 import { Activity } from '../activity/activity.schema';
 import { User } from '../user/user.schema';
@@ -13,6 +9,7 @@ import { AnalysisService } from '../analysis/analysis.service';
 import { NotificationService } from '../notification/notification.service';
 import { GearService } from '../gear/gear.service';
 import { TrainingContextService } from '../training-context/training-context.service';
+import { StravaTokenService } from '../strava-auth/strava-token.service';
 
 function haversineMeters(a: [number, number], b: [number, number]): number {
   const [lat1, lon1] = a;
@@ -38,17 +35,8 @@ function simplifiedLatLng(latlng: [number, number][], minMeters = 30): [number, 
   return result;
 }
 
-const STRAVA_API = 'https://www.strava.com/api/v3';
 const CYCLING_SPORTS = ['ride', 'virtualride', 'ebikeride', 'velomobile', 'handcycle', 'cycling', 'bike', 'bicycle'];
 const STREAM_KEYS = ['time', 'distance', 'latlng', 'altitude', 'velocity_smooth', 'heartrate', 'cadence', 'watts', 'temp', 'moving', 'grade_smooth'];
-
-interface StravaConfig {
-  clientId: string;
-  clientSecret: string;
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-}
 
 function isCyclingSport(sport: string): boolean {
   const s = (sport || '').toLowerCase();
@@ -60,7 +48,6 @@ const SYNC_MONTHS = parseInt(process.env.STRAVA_SYNC_MONTHS || '6', 10);
 @Injectable()
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
-  private config: StravaConfig | null = null;
   private rateLimitHit = false;
 
   constructor(
@@ -71,104 +58,29 @@ export class SyncService {
     private readonly notificationService: NotificationService,
     private readonly gearService: GearService,
     private readonly trainingContext: TrainingContextService,
-  ) {
-    this.loadConfig();
+    private readonly stravaTokens: StravaTokenService,
+  ) {}
+
+  private async userHasStrava(userId: string): Promise<boolean> {
+    const token = await this.stravaTokens.getValidAccessToken(userId);
+    return !!token;
   }
 
-  private loadConfig() {
-    // 1. Try environment variables first
-    const envClientId = process.env.STRAVA_CLIENT_ID;
-    const envClientSecret = process.env.STRAVA_CLIENT_SECRET;
-    if (envClientId && envClientSecret) {
-      this.config = {
-        clientId: envClientId,
-        clientSecret: envClientSecret,
-        accessToken: process.env.STRAVA_ACCESS_TOKEN || '',
-        refreshToken: process.env.STRAVA_REFRESH_TOKEN || '',
-        expiresAt: parseInt(process.env.STRAVA_EXPIRES_AT || '0', 10),
-      };
-      return;
+  private async stravaFetch(userId: string, path: string): Promise<any> {
+    const result = await this.stravaTokens.stravaFetch(userId, path);
+    if (result === null && path.includes('/athlete')) {
+      this.rateLimitHit = true;
     }
-
-    // 2. Fallback to config.yaml
-    const configPaths = [
-      join(homedir(), '.cycling-coach', 'config.yaml'),
-      join(homedir(), '.config', 'cycling-coach', 'config.yaml'),
-      join(homedir(), '.enduragent', 'cycling-coach', 'config.yaml'),
-    ];
-    for (const p of configPaths) {
-      if (existsSync(p)) {
-        try {
-          const raw = readFileSync(p, 'utf-8');
-          const c = parseYaml(raw) as any;
-          const s = c?.strava;
-          if (s?.client_id && s?.client_secret) {
-            this.config = {
-              clientId: String(s.client_id),
-              clientSecret: String(s.client_secret),
-              accessToken: process.env.STRAVA_ACCESS_TOKEN || s.access_token || '',
-              refreshToken: process.env.STRAVA_REFRESH_TOKEN || s.refresh_token || '',
-              expiresAt: parseInt(process.env.STRAVA_EXPIRES_AT || s.expires_at || '0', 10),
-            };
-            return;
-          }
-        } catch {}
-      }
-    }
+    return result;
   }
 
-  private async ensureValidToken(): Promise<string | null> {
-    if (!this.config?.accessToken) return null;
-    const now = Math.floor(Date.now() / 1000);
-    if (this.config.expiresAt > now + 60) return this.config.accessToken;
-    try {
-      const res = await fetch('https://www.strava.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: this.config.clientId,
-          client_secret: this.config.clientSecret,
-          grant_type: 'refresh_token',
-          refresh_token: this.config.refreshToken,
-        }),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      this.config.accessToken = data.access_token;
-      this.config.refreshToken = data.refresh_token;
-      this.config.expiresAt = data.expires_at;
-      return data.access_token;
-    } catch {
-      return null;
-    }
+  private async fetchDetailedActivity(stravaId: number, userId: string): Promise<any> {
+    return this.stravaFetch(userId, `/activities/${stravaId}`);
   }
 
-  private async stravaFetch(path: string): Promise<any> {
-    const token = await this.ensureValidToken();
-    if (!token) return null;
-    try {
-      const res = await fetch(`${STRAVA_API}${path}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 429) {
-        this.rateLimitHit = true;
-        this.logger.warn('Strava API rate limit exhausted (429)');
-        return null;
-      }
-      if (!res.ok) return null;
-      return res.json();
-    } catch {
-      return null;
-    }
-  }
-
-  private async fetchDetailedActivity(stravaId: number): Promise<any> {
-    return this.stravaFetch(`/activities/${stravaId}`);
-  }
-
-  private async fetchActivityStreams(stravaId: number): Promise<any> {
+  private async fetchActivityStreams(stravaId: number, userId: string): Promise<any> {
     const keys = STREAM_KEYS.join(',');
-    return this.stravaFetch(`/activities/${stravaId}/streams?keys=${keys}&key_by_type=true`);
+    return this.stravaFetch(userId, `/activities/${stravaId}/streams?keys=${keys}&key_by_type=true`);
   }
 
   getRateLimitHit(): boolean {
@@ -179,13 +91,13 @@ export class SyncService {
     this.rateLimitHit = false;
   }
 
-  private async fetchAllActivities(): Promise<any[]> {
+  private async fetchAllActivities(userId: string): Promise<any[]> {
     const all: any[] = [];
     const perPage = 100;
     const after = Math.floor(new Date(Date.now() - SYNC_MONTHS * 30 * 24 * 3600 * 1000).getTime() / 1000);
     let page = 1;
     while (true) {
-      const batch = await this.stravaFetch(`/athlete/activities?per_page=${perPage}&page=${page}&after=${after}`);
+      const batch = await this.stravaFetch(userId, `/athlete/activities?per_page=${perPage}&page=${page}&after=${after}`);
       if (!batch || !Array.isArray(batch) || batch.length === 0) break;
       all.push(...batch);
       if (batch.length < perPage) break;
@@ -194,11 +106,11 @@ export class SyncService {
     return all;
   }
 
-  private async fetchRecentActivities(afterEpoch?: number): Promise<any[]> {
+  private async fetchRecentActivities(userId: string, afterEpoch?: number): Promise<any[]> {
     const perPage = 50;
     let url = `/athlete/activities?per_page=${perPage}`;
     if (afterEpoch) url += `&after=${afterEpoch}`;
-    const batch = await this.stravaFetch(url);
+    const batch = await this.stravaFetch(userId, url);
     if (!Array.isArray(batch)) return [];
     return batch;
   }
@@ -230,13 +142,13 @@ export class SyncService {
     let rawActivity: any = null;
     let rawStreams: any = null;
     try {
-      rawActivity = await this.fetchDetailedActivity(stravaId);
+      rawActivity = await this.fetchDetailedActivity(stravaId, userId);
     } catch {
       this.logger.warn(`Failed to fetch detailed activity ${stravaId}, using list data`);
     }
 
     try {
-      const streamsResult = await this.fetchActivityStreams(stravaId);
+      const streamsResult = await this.fetchActivityStreams(stravaId, userId);
       if (streamsResult && Array.isArray(streamsResult)) {
         rawStreams = {};
         for (const entry of streamsResult) {
@@ -354,9 +266,13 @@ export class SyncService {
     if (!userId) return { newActivities: 0 };
     const user = await this.userModel.findById(userId as any).exec();
     if (!user) return { newActivities: 0 };
+    if (!(await this.userHasStrava(String(userId)))) {
+      this.logger.warn(`User ${userId} has no Strava connection — skipping sync`);
+      return { newActivities: 0 };
+    }
 
     const afterEpoch = user.lastSyncAt ? Math.floor(user.lastSyncAt.getTime() / 1000) - 3600 : undefined;
-    const activities = await this.fetchRecentActivities(afterEpoch);
+    const activities = await this.fetchRecentActivities(String(userId), afterEpoch);
     if (activities.length === 0) {
       const now = new Date();
       user.lastSyncAt = now;
@@ -420,11 +336,15 @@ export class SyncService {
     if (!userId) return { newActivities: 0 };
     const user = await this.userModel.findById(userId as any).exec();
     if (!user) return { newActivities: 0 };
+    if (!(await this.userHasStrava(String(userId)))) {
+      this.logger.warn(`User ${userId} has no Strava connection — skipping sync`);
+      return { newActivities: 0 };
+    }
 
     const existingCount = await this.activityModel.countDocuments({ user: userId as any }).exec();
     const allActivities = existingCount > 0
-      ? await this.fetchRecentActivities()
-      : await this.fetchAllActivities();
+      ? await this.fetchRecentActivities(String(userId))
+      : await this.fetchAllActivities(String(userId));
 
     if (allActivities.length === 0) {
       const now = new Date();
@@ -485,8 +405,9 @@ export class SyncService {
     if (!userId) return null;
     const user = await this.userModel.findById(userId as any).exec();
     if (!user) return null;
+    if (!(await this.userHasStrava(String(userId)))) return null;
 
-    const batch = await this.stravaFetch('/athlete/activities?per_page=1');
+    const batch = await this.stravaFetch(String(userId), '/athlete/activities?per_page=1');
     if (!Array.isArray(batch) || batch.length === 0) return null;
     const a = batch[0];
     if (!isCyclingSport(a.sport_type || a.type)) return null;
@@ -537,7 +458,7 @@ export class SyncService {
   }
 
   async syncAthleteGear(userId: any): Promise<number> {
-    const athlete = await this.stravaFetch('/athlete');
+    const athlete = await this.stravaFetch(String(userId), '/athlete');
     if (!athlete || !Array.isArray(athlete.bikes)) return 0;
     return this.gearService.syncBikesFromStrava(
       athlete.bikes.map((b: any) => ({

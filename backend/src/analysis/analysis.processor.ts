@@ -1,17 +1,23 @@
-import { Injectable, OnApplicationBootstrap, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { AnalysisService } from './analysis.service';
+import { EmbeddingRetryService } from './embedding-retry.service';
 import { MockQueue } from '../common/queue/mock-queue';
 
+@Processor('analysis')
 @Injectable()
-export class AnalysisProcessor implements OnApplicationBootstrap {
+export class AnalysisProcessor extends WorkerHost implements OnApplicationBootstrap {
   private readonly logger = new Logger(AnalysisProcessor.name);
 
   constructor(
     private readonly analysisService: AnalysisService,
+    private readonly embeddingRetry: EmbeddingRetryService,
     @InjectQueue('analysis') private readonly queue: any,
-  ) {}
+  ) {
+    super();
+  }
 
   async onApplicationBootstrap() {
     if (this.queue instanceof MockQueue) {
@@ -23,17 +29,20 @@ export class AnalysisProcessor implements OnApplicationBootstrap {
   }
 
   async process(job: Job<any, any, string>): Promise<any> {
-    const { userId, activityId, type } = job.data;
-    this.logger.log(`Starting ${type} analysis for user: ${userId}`);
+    const { userId, activityId } = job.data;
+    const type = job.data.type || job.name;
+    this.logger.log(`Processing analysis job: ${type}${userId ? ` for user ${userId}` : ''}`);
 
     try {
       if (type === 'activity') {
         this.logger.debug(`Generating activity analysis for ${activityId}`);
         await this.analysisService.generateActivityAnalysis(activityId, userId);
       } else if (type === 'weekly') {
-        return await this.analysisService.queueWeeklyReview(userId);
+        return await this.analysisService.generateWeeklyReview(userId);
       } else if (type === 'monthly') {
-        return await this.analysisService.queueMonthlyReview(userId);
+        return await this.analysisService.generateMonthlyReview(userId);
+      } else if (type === 'embedding-retry') {
+        return await this.embeddingRetry.retryFailedEmbeddings();
       } else if (type === 'plan') {
         this.logger.debug(`Plan generation requested for user: ${userId}`);
       }
