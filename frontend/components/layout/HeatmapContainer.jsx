@@ -173,8 +173,8 @@ const HeatmapContainer = ({ activities, days }) => {
             <span className="text-lg text-white/40 transition-colors group-hover:text-white">←</span>
           </button>
 
-          <div className="w-[280px] flex justify-center">
-            <h2 className="text-center font-dmSans text-3xl font-semibold tracking-[-0.02em] text-white">
+          <div className="min-w-0 flex-1 flex justify-center px-2 lg:w-[280px] lg:flex-none">
+            <h2 className="text-center font-dmSans text-xl font-semibold tracking-[-0.02em] text-white sm:text-2xl lg:text-3xl">
               {heatmapTitle}
             </h2>
           </div>
@@ -216,7 +216,7 @@ const HeatmapContainer = ({ activities, days }) => {
                 <div key={rowIndex} className="grid grid-cols-7 gap-2">
                   {row.map((cell, colIndex) => {
                     if (cell.details.empty) {
-                      return <div key={`${rowIndex}-${colIndex}`} className="h-9 w-9" />;
+                      return <div key={`${rowIndex}-${colIndex}`} className="h-7 w-7 sm:h-8 sm:w-8 lg:h-9 lg:w-9" />;
                     }
 
                     const isSelected =
@@ -231,7 +231,7 @@ const HeatmapContainer = ({ activities, days }) => {
                         type="button"
                         onClick={() => setSelectedDay(cell)}
                         title={formatDisplayDate(cell.details.date)}
-                        className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+                        className={`flex h-7 w-7 items-center justify-center rounded-full border transition sm:h-8 sm:w-8 lg:h-9 lg:w-9 ${
                           isSelected
                             ? "scale-105 border-white/70"
                             : "border-transparent hover:border-white/30"

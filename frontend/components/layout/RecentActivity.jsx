@@ -63,14 +63,41 @@ export default function RecentActivity({ activities = [] }) {
           <p className="font-dmSans text-[10px] uppercase tracking-[0.18em] text-white/35">
             Dashboard Feed
           </p>
-          <h2 className="mt-1 font-barlowCondensed text-[30px] font-semibold uppercase tracking-[0.03em] text-white md:text-[34px]">
+          <h2 className="mt-1 font-barlowCondensed text-[26px] font-semibold uppercase tracking-[0.03em] text-white md:text-[34px]">
             Recent Activities
           </h2>
         </div>
-
       </div>
 
-      <div className="overflow-hidden rounded-[20px] border border-white/8 bg-black/20">
+      {/* Mobile & tablet card layout */}
+      <div className="space-y-3 lg:hidden">
+        {recentActivities.length > 0 ? (
+          recentActivities.map((activity, index) => {
+            const activityId = activity?._id || activity?.id || activity?.stravaId || `act-${index}`;
+            const activityName = activity?.title || activity?.name || "Untitled Activity";
+
+            return (
+              <Link key={`${activityId}-${index}-mobile`} href={`/activities/${activityId}`} className="block">
+                <div className="rounded-[16px] border border-white/8 bg-black/20 px-4 py-3 transition-colors duration-200 hover:bg-[#FF5500]/10">
+                  <p className="truncate font-dmSans text-sm font-medium text-white">{activityName}</p>
+                  <p className="mt-1 font-dmSans text-xs text-white/45">{formatDate(activity?.date)}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-jetbrainsMono text-xs text-white/70">
+                    <span>{formatDistance(activity?.distance)}</span>
+                    <span>{formatDuration(activity?.durationSeconds, activity?.duration)}</span>
+                  </div>
+                </div>
+              </Link>
+            );
+          })
+        ) : (
+          <div className="px-2 py-10 text-center font-dmSans text-sm text-white/35">
+            No recent activities yet.
+          </div>
+        )}
+      </div>
+
+      {/* Laptop / desktop table layout */}
+      <div className="hidden overflow-hidden rounded-[20px] border border-white/8 bg-black/20 lg:block">
         <div className="grid grid-cols-4 gap-3 border-b border-white/8 bg-white/[0.03] px-4 py-3 md:px-5">
           <div className="font-dmSans text-[11px] uppercase tracking-[0.16em] text-white/40">Date</div>
           <div className="font-dmSans text-[11px] uppercase tracking-[0.16em] text-white/40">Activity Name</div>
@@ -102,11 +129,11 @@ export default function RecentActivity({ activities = [] }) {
                       <span className="block truncate">{activityName}</span>
                     </div>
 
-                    <div className="text-right font-jetBrainsMono text-sm text-white/85">
+                    <div className="text-right font-jetbrainsMono text-sm text-white/85">
                       {formatDistance(activity?.distance)}
                     </div>
 
-                    <div className="text-right font-jetBrainsMono text-sm text-white/65">
+                    <div className="text-right font-jetbrainsMono text-sm text-white/65">
                       {formatDuration(activity?.durationSeconds, activity?.duration)}
                     </div>
                   </motion.div>
@@ -132,4 +159,3 @@ export default function RecentActivity({ activities = [] }) {
     </motion.section>
   );
 }
-

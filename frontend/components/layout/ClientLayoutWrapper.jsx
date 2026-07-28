@@ -13,7 +13,7 @@ import OnboardingChat from './OnboardingChat';
 import PlanAutoGenerator from './PlanAutoGenerator';
 import { useAutoSync } from '../../lib/useAutoSync';
 
-const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/privacy', '/terms', '/cookie-policy', '/pricing'];
+const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/privacy', '/terms', '/cookie-policy', '/pricing', '/admin', '/admin/login'];
 
 function AuthenticatedShell({ children, isPublic, pathname }) {
   useAutoSync();
@@ -22,7 +22,7 @@ function AuthenticatedShell({ children, isPublic, pathname }) {
       <div className="min-h-screen bg-bg-dark text-text-primary">
         {!isPublic && <PostLoginNavbar />}
         {!isPublic && <ModelChangeBanner />}
-        <main className={!isPublic ? 'pt-[59px]' : ''}>
+        <main className={!isPublic ? 'pt-[63px]' : ''}>
           <PageTransitionWrapper>
             {children}
           </PageTransitionWrapper>
@@ -38,7 +38,12 @@ function AuthenticatedShell({ children, isPublic, pathname }) {
 
 const ClientLayoutWrapper = ({ children }) => {
   const pathname = usePathname();
+  const isAdminRoute = pathname.startsWith('/admin');
   const isPublic = publicPaths.includes(pathname);
+
+  if (isAdminRoute) {
+    return <>{children}</>;
+  }
 
   return (
     <AuthGuard>

@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { api, dispatchDataRefetch } from '../../lib/api';
 import { clearAuthSession } from '../../lib/auth';
 import { getSyncStatus, triggerGlobalSync } from '../../lib/useAutoSync';
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 
 const navLinks = [
   { name: 'Dashboard', href: '/dashboard' },
@@ -133,6 +134,8 @@ const PostLoginNavbar = () => {
     router.push('/');
   };
 
+  useLockBodyScroll(isMobileMenuOpen);
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 flex h-[63px] items-center justify-between border-b border-[#FF5500]/20 bg-[#0A0A0A] px-4 shadow-[0_0_20px_rgba(255,85,0,0.08)] md:px-8">
       {/* Logo */}
@@ -144,7 +147,7 @@ const PostLoginNavbar = () => {
             <img
               src="/images/new_cyclogenAI_logo.png"
               alt="CyclogenAI"
-              className="h-12 w-auto"
+              className="h-9 w-auto md:h-12"
             />
           </motion.div>
         </Link>
@@ -275,12 +278,21 @@ const PostLoginNavbar = () => {
       {/* Mobile Side Drawer */}
       <AnimatePresence>
         {isMobileMenuOpen && (
+          <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="fixed top-0 right-0 h-full w-3/4 border-l border-[#FF5500]/10 bg-[#0A0A0A] z-50 p-8 md:hidden shadow-2xl flex flex-col"
+            className="fixed top-0 right-0 z-50 flex h-full w-[min(320px,85vw)] flex-col overflow-y-auto border-l border-[#FF5500]/10 bg-[#0A0A0A] p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl md:hidden"
           >
             <button
               className="self-end text-white/70 mb-8"
@@ -341,6 +353,7 @@ const PostLoginNavbar = () => {
               </button>
             </div>
           </motion.div>
+          </>
         )}
       </AnimatePresence>
     </nav>

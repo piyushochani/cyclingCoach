@@ -505,7 +505,7 @@ export default function StatisticsPage() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08, duration: 0.4 }}
-          className="mb-6 grid grid-cols-3 gap-3"
+          className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3"
         >
           <InsightCard icon="📏" label="Volume vs Last Month" value={`${performanceSummary.currDistance} km`} trend={performanceSummary.distance} />
           <InsightCard icon="📋" label="Activities vs Last Month" value={`${performanceSummary.currCount}`} trend={performanceSummary.count} />

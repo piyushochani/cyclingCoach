@@ -116,33 +116,67 @@ const MissionControl = ({ races = [], plan: planProp }) => {
           <Loader size={20} />
         </div>
       ) : (
-        <div className="grid grid-cols-7 gap-1 text-center font-dmSans text-sm">
-          {dayNames.map((day, displayIdx) => {
-            const isToday = displayIdx === todayDisplayIdx;
-            const workout = workoutMap[displayIdx];
-            const style = workout ? detectType(workout.type) : typeStyles.rest;
+        <>
+          {/* Mobile & tablet: vertical day list */}
+          <div className="space-y-2 lg:hidden">
+            {dayNames.map((day, displayIdx) => {
+              const isToday = displayIdx === todayDisplayIdx;
+              const workout = workoutMap[displayIdx];
+              const style = workout ? detectType(workout.type) : typeStyles.rest;
 
-            return (
-              <div
-                key={day}
-                className={`flex flex-col items-center gap-1.5 p-2 rounded-md ${
-                  isToday
-                    ? 'bg-accent-orange/20 border border-accent-orange'
-                    : 'bg-bg-dark border border-chain-link-grey'
-                }`}
-              >
-                <p className="font-bebasNeue text-text-primary text-xs">{day}</p>
-                <span className={`h-2 w-2 rounded-full ${style.color}`} />
-                <span className="text-[10px] text-text-secondary leading-tight">
-                  {isToday ? 'Today' : (workout ? style.label : '—')}
-                </span>
-                {workout?.distance ? (
-                  <span className="text-[9px] text-white/30">{parseFloat(workout.distance).toFixed(1)} km</span>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+              return (
+                <div
+                  key={`${day}-mobile`}
+                  className={`flex items-center justify-between rounded-md px-3 py-2.5 ${
+                    isToday
+                      ? 'bg-accent-orange/20 border border-accent-orange'
+                      : 'bg-bg-dark border border-chain-link-grey'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${style.color}`} />
+                    <div>
+                      <p className="font-bebasNeue text-sm text-text-primary">{day}{isToday ? ' · Today' : ''}</p>
+                      <p className="text-xs text-text-secondary">{workout ? style.label : 'Rest'}</p>
+                    </div>
+                  </div>
+                  {workout?.distance ? (
+                    <span className="shrink-0 font-jetbrainsMono text-xs text-white/40">{parseFloat(workout.distance).toFixed(1)} km</span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Laptop / desktop: 7-column grid */}
+          <div className="hidden grid-cols-7 gap-1 text-center font-dmSans text-sm lg:grid">
+            {dayNames.map((day, displayIdx) => {
+              const isToday = displayIdx === todayDisplayIdx;
+              const workout = workoutMap[displayIdx];
+              const style = workout ? detectType(workout.type) : typeStyles.rest;
+
+              return (
+                <div
+                  key={day}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-md ${
+                    isToday
+                      ? 'bg-accent-orange/20 border border-accent-orange'
+                      : 'bg-bg-dark border border-chain-link-grey'
+                  }`}
+                >
+                  <p className="font-bebasNeue text-text-primary text-xs">{day}</p>
+                  <span className={`h-2 w-2 rounded-full ${style.color}`} />
+                  <span className="text-[10px] text-text-secondary leading-tight">
+                    {isToday ? 'Today' : (workout ? style.label : '—')}
+                  </span>
+                  {workout?.distance ? (
+                    <span className="text-[9px] text-white/30">{parseFloat(workout.distance).toFixed(1)} km</span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <motion.button

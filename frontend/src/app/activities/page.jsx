@@ -80,7 +80,7 @@ function FilterSelect({ label, value, onChange, options }) {
         <select
           value={value}
           onChange={onChange}
-          className="appearance-none rounded-xl border border-white/[0.10] bg-surface-cards px-3.5 py-2.5 pr-9 text-sm font-medium text-white outline-none transition-all duration-200 hover:border-white/20 focus:border-[#FF5500]/50 min-w-[140px]"
+          className="appearance-none rounded-xl border border-white/[0.10] bg-surface-cards px-3.5 py-2.5 pr-9 text-sm font-medium text-white outline-none transition-all duration-200 hover:border-white/20 focus:border-[#FF5500]/50 min-w-0 w-full sm:min-w-[140px] sm:w-auto"
         >
           {options.map((o) => {
             const option = typeof o === "string" ? { label: o, value: o } : o;
@@ -97,6 +97,37 @@ function FilterSelect({ label, value, onChange, options }) {
   );
 }
 
+function ActivityCardMobile({ activity, index }) {
+  const meta = getSportMeta(activity.sport);
+  const activityId = activity?._id || activity?.id || activity?.stravaId || `act-${index}`;
+
+  return (
+    <Link href={`/activities/${activityId}`} className="block no-underline">
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="show"
+        className="rounded-xl border border-white/[0.06] bg-black/20 px-4 py-3.5 transition-colors duration-200 hover:bg-[#FF5500]/10"
+      >
+        <div className="flex items-start gap-3">
+          <span className="text-xl leading-none">{meta.icon}</span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">
+              {activity.title || activity.name || "Untitled Activity"}
+            </p>
+            <p className="mt-1 text-[11px] text-white/35">{formatDate(activity.date)}</p>
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-jetbrainsMono text-xs text-white/70">
+              <span>{formatDistance(activity.distance)} km</span>
+              <span>{formatDuration(activity.durationSeconds)}</span>
+              <span>{((activity.elevation ?? activity.elevationGain) || 0).toFixed(1)} m</span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    </Link>
+  );
+}
+
 function ActivityRow({ activity, index }) {
   const meta = getSportMeta(activity.sport);
   const [hovered, setHovered] = useState(false);
@@ -110,7 +141,7 @@ function ActivityRow({ activity, index }) {
         animate="show"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className="grid cursor-pointer grid-cols-[56px_minmax(0,1.5fr)_100px_105px_85px_100px] gap-3 border-b border-white/[0.03] px-4 py-3.5 transition-all duration-200 md:grid-cols-[72px_minmax(0,1.5fr)_110px_120px_100px_110px]"
+        className="grid cursor-pointer grid-cols-[56px_minmax(0,1.5fr)_100px_105px_85px_100px] gap-3 border-b border-white/[0.03] px-4 py-3.5 transition-all duration-200 lg:grid-cols-[72px_minmax(0,1.5fr)_110px_120px_100px_110px]"
         style={{ background: hovered ? "rgba(255,85,0,0.03)" : "transparent" }}
       >
         <div className="flex flex-col gap-1">
@@ -281,7 +312,7 @@ export default function ActivitiesPage() {
           </div>
         </div>
 
-        <div className="mb-6 flex flex-wrap items-center gap-4">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <FilterSelect label="Sort by" value={sortBy} onChange={(e) => setSortBy(e.target.value)} options={SORT_OPTIONS} />
           <FilterSelect
             label="Activity"
@@ -294,7 +325,7 @@ export default function ActivitiesPage() {
             placeholder="Search activities..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="min-w-[240px] flex-1 rounded-xl border border-white/10 bg-[#111318] px-4 py-3 text-sm font-medium text-white outline-none transition-all duration-200 placeholder:text-white/20 focus:border-[#FF5500]/50"
+            className="w-full min-w-0 flex-1 rounded-xl border border-white/10 bg-[#111318] px-4 py-3 text-sm font-medium text-white outline-none transition-all duration-200 placeholder:text-white/20 focus:border-[#FF5500]/50 sm:min-w-[200px]"
           />
         </div>
 
@@ -322,7 +353,26 @@ export default function ActivitiesPage() {
         </p>
 
         <div className="rounded-2xl border border-white/5 bg-[#111318] overflow-hidden shadow-2xl">
-          <div className="grid grid-cols-[56px_minmax(0,1.5fr)_100px_105px_85px_100px] gap-3 border-b border-white/5 px-6 py-4 md:grid-cols-[72px_minmax(0,1.5fr)_110px_120px_100px_110px]">
+          {/* Mobile & tablet cards */}
+          <div className="space-y-2 p-3 lg:hidden">
+            {loading ? (
+              <SkeletonRows />
+            ) : visible.length === 0 ? (
+              <div className="px-3 py-16 text-center">
+                <p className="font-dmSans text-sm text-white/20">No activities found matching your criteria.</p>
+              </div>
+            ) : (
+              <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-2">
+                {visible.map((activity, index) => (
+                  <ActivityCardMobile key={activity._id || activity.id || index} activity={activity} index={index} />
+                ))}
+              </motion.div>
+            )}
+          </div>
+
+          {/* Laptop / desktop table */}
+          <div className="hidden lg:block">
+          <div className="grid grid-cols-[72px_minmax(0,1.5fr)_110px_120px_100px_110px] gap-3 border-b border-white/5 px-6 py-4">
             {["Type", "Activity", "Distance", "Time", "Elev", "Date"].map((h) => (
               <span
                 key={h}
@@ -346,6 +396,7 @@ export default function ActivitiesPage() {
               ))}
             </motion.div>
           )}
+          </div>
         </div>
 
         {hasMore && (
