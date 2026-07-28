@@ -74,6 +74,7 @@ export default function SubscriptionPage() {
     }).finally(() => setLoading(false));
   }, []);
 
+  const subscriptionSwitch = subscription?.subscriptionSwitch ?? false;
   const tier = subscription?.tier || user?.subscriptionTier || "free";
   const isPro = tier === "pro";
 
@@ -146,11 +147,18 @@ export default function SubscriptionPage() {
             Subscription
           </p>
           <h1 className="mt-2 font-barlowCondensed text-5xl uppercase leading-none tracking-wide text-white md:text-6xl">
-            {isPro ? "You are on" : "Upgrade to"}{" "}
-            <span className="text-[#FF5500]">Pro</span>
+            {!subscriptionSwitch ? (
+              <>Full <span className="text-[#FF5500]">Access</span></>
+            ) : isPro ? (
+              <>You are on <span className="text-[#FF5500]">Pro</span></>
+            ) : (
+              <>Upgrade to <span className="text-[#FF5500]">Pro</span></>
+            )}
           </h1>
           <p className="mx-auto mt-3 max-w-xl font-dmSans text-sm text-white/50">
-            {isPro
+            {!subscriptionSwitch
+              ? "Subscription billing is currently disabled. All features are available to every user."
+              : isPro
               ? "Your subscription is active. Enjoy full access to all features."
               : "Unlock AI training plans, race-day tools, and performance analytics."}
           </p>
@@ -191,24 +199,33 @@ export default function SubscriptionPage() {
                 ))}
               </ul>
 
-              {isPro ? (
+              {subscriptionSwitch ? (
+                isPro ? (
+                  <button
+                    onClick={() => window.location.href = '/dashboard'}
+                    className="mt-8 w-full rounded-full border border-white/15 px-8 py-4 text-base font-medium text-white/70 transition hover:border-white/30 hover:text-white"
+                  >
+                    Go to Dashboard
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => openPayment(plan.id)}
+                    className={`mt-8 w-full rounded-full px-8 py-4 text-base font-bold transition active:scale-[0.98] ${
+                      plan.badge
+                        ? "bg-[#FF6B00] text-black hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] hover:scale-[1.02]"
+                        : "border border-white/20 text-white hover:bg-white/5"
+                    }`}
+                    style={plan.badge ? { background: "#FF6B00" } : {}}
+                  >
+                    Subscribe Now
+                  </button>
+                )
+              ) : (
                 <button
                   onClick={() => window.location.href = '/dashboard'}
                   className="mt-8 w-full rounded-full border border-white/15 px-8 py-4 text-base font-medium text-white/70 transition hover:border-white/30 hover:text-white"
                 >
                   Go to Dashboard
-                </button>
-              ) : (
-                <button
-                  onClick={() => openPayment(plan.id)}
-                  className={`mt-8 w-full rounded-full px-8 py-4 text-base font-bold transition active:scale-[0.98] ${
-                    plan.badge
-                      ? "bg-[#FF6B00] text-black hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] hover:scale-[1.02]"
-                      : "border border-white/20 text-white hover:bg-white/5"
-                  }`}
-                  style={plan.badge ? { background: "#FF6B00" } : {}}
-                >
-                  Subscribe Now
                 </button>
               )}
               <p className="mt-4 text-xs text-white/25">

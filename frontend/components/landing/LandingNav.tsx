@@ -28,20 +28,20 @@ export default function LandingNav() {
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
+      className={`fixed inset-x-0 top-0 z-50 flex items-center transition-all duration-300 ${
         scrolled
           ? "border-b border-white/[0.06] bg-[#060608]/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
           : "bg-transparent"
       }`}
     >
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 md:px-8 lg:px-10">
-        <Link href="/" className="flex items-center gap-3">
-          <img
-            src="/images/new_cyclogenAI_logo.png"
-            alt="CyclogenAI"
-            className="h-9 w-auto md:h-10"
-          />
-        </Link>
+      <Link href="/" className="flex shrink-0 items-center gap-3 px-5 py-4 md:px-8 lg:px-10">
+        <img
+          src="/images/new_cyclogenAI_logo.png"
+          alt="CyclogenAI"
+          className="h-9 w-auto md:h-10"
+        />
+      </Link>
+      <div className="mx-auto flex max-w-7xl flex-1 items-center justify-between px-5 py-4 md:px-8 lg:px-10">
 
         <nav className="hidden items-center gap-1 lg:flex">
           {NAV_ITEMS.map((item) => (

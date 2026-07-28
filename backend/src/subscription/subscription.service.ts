@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Subscription } from './subscription.schema';
 import { DummyPaymentService } from '../common/dummy-payment/dummy-payment.service';
+import { isSubscriptionSwitchEnabled, resolveEffectiveTier } from '../common/subscription-config';
 import { User } from '../user/user.schema';
 
 @Injectable()
@@ -17,29 +18,73 @@ export class SubscriptionService {
     return this.subscriptionModel.findOne({ user: userId as any }).exec();
   }
 
-  async getStatus(userId: string): Promise<{ tier: string; status: string; endDate: Date | null; cancelAtPeriodEnd: boolean }> {
+  getConfig(): { subscriptionSwitch: boolean } {
+    return { subscriptionSwitch: isSubscriptionSwitchEnabled() };
+  }
+
+  async getStatus(userId: string): Promise<{
+    tier: string;
+    actualTier: string;
+    subscriptionSwitch: boolean;
+    status: string;
+    endDate: Date | null;
+    cancelAtPeriodEnd: boolean;
+  }> {
+    const user = await this.userModel.findById(userId).select('subscriptionTier').lean().exec();
+    const actualTier = user?.subscriptionTier || 'free';
     const sub = await this.findByUserId(userId);
+    const tier = resolveEffectiveTier(actualTier);
     if (!sub) {
-      return { tier: 'free', status: 'active', endDate: null, cancelAtPeriodEnd: false };
+      return {
+        tier,
+        actualTier,
+        subscriptionSwitch: isSubscriptionSwitchEnabled(),
+        status: 'active',
+        endDate: null,
+        cancelAtPeriodEnd: false,
+      };
     }
     return {
-      tier: sub.tier,
+      tier,
+      actualTier,
+      subscriptionSwitch: isSubscriptionSwitchEnabled(),
       status: sub.status,
       endDate: sub.endDate,
       cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
     };
   }
 
-  async getRenewalStatus(userId: string): Promise<{ daysUntilExpiry: number; tier: string; status: string }> {
+  async getRenewalStatus(userId: string): Promise<{
+    daysUntilExpiry: number;
+    tier: string;
+    actualTier: string;
+    subscriptionSwitch: boolean;
+    status: string;
+  }> {
+    const user = await this.userModel.findById(userId).select('subscriptionTier').lean().exec();
+    const actualTier = user?.subscriptionTier || 'free';
+    const tier = resolveEffectiveTier(actualTier);
     const sub = await this.findByUserId(userId);
     if (!sub || !sub.endDate) {
-      return { daysUntilExpiry: -1, tier: 'free', status: 'active' };
+      return {
+        daysUntilExpiry: -1,
+        tier,
+        actualTier,
+        subscriptionSwitch: isSubscriptionSwitchEnabled(),
+        status: 'active',
+      };
     }
     const now = new Date();
     const end = new Date(sub.endDate);
     const diffTime = end.getTime() - now.getTime();
     const daysUntilExpiry = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
-    return { daysUntilExpiry, tier: sub.tier, status: sub.status };
+    return {
+      daysUntilExpiry,
+      tier,
+      actualTier,
+      subscriptionSwitch: isSubscriptionSwitchEnabled(),
+      status: sub.status,
+    };
   }
 
   async createOrUpdate(userId: string, data: Partial<Subscription>): Promise<Subscription> {

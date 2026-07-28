@@ -6,6 +6,11 @@ import { UserId } from '../common/user-id.decorator';
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
+  @Get('config')
+  getConfig() {
+    return this.subscriptionService.getConfig();
+  }
+
   @Get()
   async getStatus(@UserId() userId: string) {
     return this.subscriptionService.getStatus(userId);

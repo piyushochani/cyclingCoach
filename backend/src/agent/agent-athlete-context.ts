@@ -1,4 +1,5 @@
 import { Model } from 'mongoose';
+import { resolveEffectiveTier } from '../common/subscription-config';
 import { User } from '../user/user.schema';
 import { Activity } from '../activity/activity.schema';
 import { Race } from '../race/race.schema';
@@ -30,7 +31,7 @@ export async function buildAthleteProfile(
     parts.push(`Training week: ${weeks} (started ${start.toISOString().split('T')[0]})`);
   }
   if ((user as any).selectedCoach?.name) parts.push(`Coach: ${(user as any).selectedCoach.name}`);
-  if ((user as any).subscriptionTier) parts.push(`Plan: ${(user as any).subscriptionTier}`);
+  parts.push(`Plan: ${resolveEffectiveTier((user as any).subscriptionTier)}`);
   if (user.onboardingSummary) parts.push(`Background: ${user.onboardingSummary}`);
   if (user.description) parts.push(`Notes: ${user.description}`);
 

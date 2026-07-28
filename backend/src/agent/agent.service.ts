@@ -593,7 +593,6 @@ export class AgentService {
         filter: buildRagQueryFilter(userId, query),
         minScore: DEFAULT_RAG_MIN_SCORE,
       });
-      });
 
       return formatRagMatchesForAgent(matches);
     } catch (err) {
