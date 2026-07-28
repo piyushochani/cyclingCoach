@@ -22,7 +22,7 @@ function AuthenticatedShell({ children, isPublic, pathname }) {
       <div className="min-h-screen bg-bg-dark text-text-primary">
         {!isPublic && <PostLoginNavbar />}
         {!isPublic && <ModelChangeBanner />}
-        <main className={!isPublic ? 'pt-[59px]' : ''}>
+        <main className={!isPublic ? 'pt-[63px]' : ''}>
           <PageTransitionWrapper>
             {children}
           </PageTransitionWrapper>

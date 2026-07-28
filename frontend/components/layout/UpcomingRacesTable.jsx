@@ -44,7 +44,7 @@ const UpcomingRacesTable = ({ races = [], onSelectRace }) => {
           <p className="font-dmSans text-xs text-text-muted">Schedule a race to see it here.</p>
         </div>
       ) : (
-        <div className="overflow-x-hidden">
+        <div className="overflow-x-auto lg:overflow-x-visible">
           <table className="w-full text-left text-sm font-dmSans">
             <thead>
               <tr className="border-b border-elevation-highlight">

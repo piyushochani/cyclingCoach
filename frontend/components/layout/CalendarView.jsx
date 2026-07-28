@@ -70,7 +70,7 @@ const CalendarView = ({ activities = [], races = [], weeklyPlan }) => {
           Prev
         </button>
 
-        <h2 className="font-dmSans text-[1.9rem] font-semibold tracking-[-0.03em] text-white md:text-[2.2rem]">
+        <h2 className="font-dmSans text-xl font-semibold tracking-[-0.03em] text-white sm:text-[1.9rem] md:text-[2.2rem]">
           {format(currentMonth, "MMMM yyyy")}
         </h2>
 
@@ -108,7 +108,7 @@ const CalendarView = ({ activities = [], races = [], weeklyPlan }) => {
               key={day.toISOString()}
               type="button"
               className={[
-                "group relative flex aspect-square min-h-[82px] flex-col items-start justify-between rounded-[16px] border p-3 text-left transition-all duration-150 md:min-h-[92px]",
+                "group relative flex aspect-square min-h-[52px] flex-col items-start justify-between rounded-[12px] border p-2 text-left transition-all duration-150 sm:min-h-[68px] sm:rounded-[14px] md:min-h-[82px] md:rounded-[16px] md:p-3 lg:min-h-[92px]",
                 today
                   ? "border-[#FF5500]/45 bg-[#FF5500]/[0.10] text-white shadow-[inset_0_0_0_1px_rgba(255,85,0,0.10)]"
                   : inCurrentMonth

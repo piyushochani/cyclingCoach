@@ -800,7 +800,49 @@ export default function WeeklyGraph({ activities: apiActivities }) {
             </div>
           </div>
 
-          <div style={{ minWidth: 760 }}>
+          {/* Mobile & tablet: day cards */}
+          <div className="space-y-2 lg:hidden">
+            {activeWeek.planned.map((row, i) => {
+              const perf = activeWeek.performed[i];
+              const status = statusOf(row.activity, perf.activity);
+              const meta = STATUS_META[status];
+
+              return (
+                <div
+                  key={`mobile-${i}`}
+                  className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="font-dmSans text-sm font-bold text-white">{row.day}</p>
+                      <p className="font-dmSans text-[11px] text-white/40">{row.date}</p>
+                    </div>
+                    <span
+                      className="rounded px-2 py-0.5 font-dmSans text-[9px] font-semibold uppercase tracking-wide"
+                      style={{ background: meta.bg, border: `1px solid ${meta.border}`, color: meta.text }}
+                    >
+                      {meta.label}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="rounded-lg bg-[#FF5500]/5 px-3 py-2">
+                      <p className="font-dmSans text-[10px] uppercase tracking-wide text-[#FF5500]/70">Planned</p>
+                      <p className="mt-1 truncate font-dmSans text-sm text-white/80">{activityEmoji(row.activity)} {row.activity}</p>
+                      <p className="font-dmSans text-xs text-white/45">{row.time}</p>
+                    </div>
+                    <div className="rounded-lg bg-white/[0.03] px-3 py-2">
+                      <p className="font-dmSans text-[10px] uppercase tracking-wide text-white/35">Performed</p>
+                      <p className="mt-1 truncate font-dmSans text-sm text-white/80">{activityEmoji(perf.activity)} {perf.activity}</p>
+                      <p className="font-dmSans text-xs text-white/45">{perf.time}{perf.distance ? ` · ${perf.distance}` : ""}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Laptop / desktop: full table */}
+          <div className="hidden lg:block" style={{ minWidth: 760 }}>
             <div
               style={{
                 display: "grid",

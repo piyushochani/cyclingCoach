@@ -594,6 +594,80 @@ export default function RacesPage() {
         </p>
 
         <div style={{ marginBottom: "2rem" }}>
+          {/* Mobile & tablet cards */}
+          <div className="space-y-2 lg:hidden">
+            {loading ? (
+              <div style={{ padding: "2.5rem 16px", fontSize: 13, color: "rgba(255,255,255,0.2)" }}>
+                Loading...
+              </div>
+            ) : visible.length === 0 ? (
+              <div style={{ padding: "2.5rem 16px", fontSize: 13, color: "rgba(255,255,255,0.2)" }}>
+                No races found.
+              </div>
+            ) : (
+              <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-2">
+                {visible.map((race) => (
+                  <motion.div
+                    key={`${race._id}-mobile`}
+                    variants={fadeUp}
+                    className="rounded-xl border border-white/[0.08] bg-[#111318] px-4 py-3.5"
+                    style={{ background: race.position === 1 ? "rgba(255,215,0,0.04)" : undefined }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{race.name}</p>
+                        <p className="mt-1 text-xs text-white/35">
+                          {race.location}
+                          {race.terrain && <span> · {race.terrain}</span>}
+                        </p>
+                      </div>
+                      <span
+                        className="shrink-0 font-jetbrainsMono text-sm font-bold"
+                        style={{
+                          color: race.position === 1 ? "#FFD700" : race.position === 2 ? "#C0C0C0" : race.position === 3 ? "#CD7F32" : "#FF5500",
+                        }}
+                      >
+                        {race.position ? `${race.position}${race.position === 1 ? "st" : race.position === 2 ? "nd" : race.position === 3 ? "rd" : "th"}` : "—"}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-jetbrainsMono text-xs text-white/55">
+                      <span>{race.type}</span>
+                      <span>{formatDate(race.date)}</span>
+                      <span>{race.distance ? `${parseFloat(race.distance).toFixed(2)} km` : "—"}</span>
+                      <span>{race.time || "—"}</span>
+                      {race.elevationGain > 0 && <span>{parseFloat(race.elevationGain).toFixed(1)} m</span>}
+                    </div>
+                    <div className="mt-3 flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setChatRaceId(race._id)}
+                        className="text-xs text-white/40 hover:text-[#7C8CFF]"
+                      >
+                        Chat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(race)}
+                        className="text-xs text-white/40 hover:text-[#FF5500]"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(race._id)}
+                        className="text-xs text-white/40 hover:text-red-400"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </div>
+
+          {/* Laptop / desktop table */}
+          <div className="hidden lg:block">
           {/* Header Row */}
           <div
             style={{
@@ -713,6 +787,7 @@ export default function RacesPage() {
               ))}
             </motion.div>
           )}
+          </div>
         </div>
 
         {/* Load More */}
