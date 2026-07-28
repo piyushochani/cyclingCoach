@@ -78,7 +78,7 @@ export function slotWorkouts(
   const orderedDays = [...availableDays];
 
   // Monday is always rest — remove from available
-  const filtered = orderedDays.filter((d) => d !== "mon");
+  const filtered: DayOfWeek[] = orderedDays.filter((d) => d !== "mon");
   if (filtered.length === 0) {
     filtered.push("tue", "wed", "fri");
   }
