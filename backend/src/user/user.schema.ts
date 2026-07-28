@@ -76,12 +76,6 @@ export class User extends Document {
   subscriptionEndDate: Date;
 
   @Prop({ default: null })
-  stripeCustomerId: string;
-
-  @Prop({ default: null })
-  stripeSubscriptionId: string;
-
-  @Prop({ default: null })
   stravaUpdatedAt: Date;
 
   @Prop({ default: false })

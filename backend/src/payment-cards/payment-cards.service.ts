@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PaymentCard } from './payment-card.schema';
@@ -34,8 +34,6 @@ export class PaymentCardsService {
     expiryMonth: number;
     expiryYear: number;
     brand: string;
-    stripePaymentMethodId?: string;
-    cardFingerprint?: string;
   }): Promise<ReturnType<typeof toPublicCard>> {
     const cardCount = await this.cardModel.countDocuments({ user: userId as any }).exec();
 

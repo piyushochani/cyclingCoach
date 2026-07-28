@@ -1,6 +1,10 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Public } from '../common/public.decorator';
+import { AdminAuthGuard } from '../admin/admin-auth.guard';
 import { getAllKeyStatuses, validateGeminiKey } from '../common/gemini-key-validator';
 
+@Public()
+@UseGuards(AdminAuthGuard)
 @Controller('gemini')
 export class GeminiStatusController {
   @Get('status')

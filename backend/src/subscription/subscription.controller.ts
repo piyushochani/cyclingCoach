@@ -1,4 +1,4 @@
-﻿import { Controller, Get, Post, Body, UsePipes, ValidationPipe } from '@nestjs/common';
+﻿import { Controller, Get, Post, Body, BadRequestException } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 import { UserId } from '../common/user-id.decorator';
 
@@ -14,6 +14,18 @@ export class SubscriptionController {
   @Get('renewal-status')
   async renewalStatus(@UserId() userId: string) {
     return this.subscriptionService.getRenewalStatus(userId);
+  }
+
+  @Post('purchase')
+  async purchase(
+    @UserId() userId: string,
+    @Body() body: { planId: string; cardNumber: string; expiry: string; cvc: string },
+  ) {
+    if (!body.planId) throw new BadRequestException('planId is required');
+    if (!body.cardNumber || !body.expiry || !body.cvc) {
+      throw new BadRequestException('cardNumber, expiry, and cvc are required');
+    }
+    return this.subscriptionService.purchase(userId, body.planId, body.cardNumber, body.expiry, body.cvc);
   }
 
   @Post('cancel')

@@ -13,7 +13,7 @@ import OnboardingChat from './OnboardingChat';
 import PlanAutoGenerator from './PlanAutoGenerator';
 import { useAutoSync } from '../../lib/useAutoSync';
 
-const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/privacy', '/terms', '/cookie-policy', '/pricing'];
+const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/privacy', '/terms', '/cookie-policy', '/pricing', '/admin', '/admin/login'];
 
 function AuthenticatedShell({ children, isPublic, pathname }) {
   useAutoSync();
@@ -38,7 +38,12 @@ function AuthenticatedShell({ children, isPublic, pathname }) {
 
 const ClientLayoutWrapper = ({ children }) => {
   const pathname = usePathname();
+  const isAdminRoute = pathname.startsWith('/admin');
   const isPublic = publicPaths.includes(pathname);
+
+  if (isAdminRoute) {
+    return <>{children}</>;
+  }
 
   return (
     <AuthGuard>

@@ -52,6 +52,14 @@ export default function SubscriptionPage() {
   const [user, setUser] = useState<any>(null);
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showPayment, setShowPayment] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<string>("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [cvc, setCvc] = useState("");
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("cyclogenai_user");
@@ -69,6 +77,49 @@ export default function SubscriptionPage() {
 
   const tier = subscription?.tier || user?.subscriptionTier || "free";
   const isPro = tier === "pro";
+
+  const openPayment = (planId: string) => {
+    setSelectedPlan(planId);
+    setShowPayment(true);
+    setError("");
+    setSuccess(false);
+    setCardNumber("");
+    setExpiry("");
+    setCvc("");
+  };
+
+  const handlePurchase = async () => {
+    setError("");
+    setPaying(true);
+    try {
+      const result: any = await api.post("/subscription/purchase", {
+        planId: selectedPlan,
+        cardNumber,
+        expiry,
+        cvc,
+      });
+      setSuccess(true);
+      setSubscription((prev: any) => ({ ...prev, tier: "pro", status: "active", endDate: result.endDate }));
+      setTimeout(() => {
+        setShowPayment(false);
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message || "Payment failed");
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const formatCardNumber = (val: string) => {
+    const digits = val.replace(/\D/g, "").slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, "$1 ");
+  };
+
+  const formatExpiry = (val: string) => {
+    const digits = val.replace(/\D/g, "").slice(0, 4);
+    if (digits.length > 2) return digits.slice(0, 2) + "/" + digits.slice(2);
+    return digits;
+  };
 
   if (loading) {
     return (
@@ -148,18 +199,17 @@ export default function SubscriptionPage() {
                   </button>
                 </Link>
               ) : (
-                <Link href="/signup">
-                  <button
-                    className={`mt-8 w-full rounded-full px-8 py-4 text-base font-bold transition active:scale-[0.98] ${
-                      plan.badge
-                        ? "bg-[#FF6B00] text-black hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] hover:scale-[1.02]"
-                        : "border border-white/20 text-white hover:bg-white/5"
-                    }`}
-                    style={plan.badge ? { background: "#FF6B00" } : {}}
-                  >
-                    Start Free Trial
-                  </button>
-                </Link>
+                <button
+                  onClick={() => openPayment(plan.id)}
+                  className={`mt-8 w-full rounded-full px-8 py-4 text-base font-bold transition active:scale-[0.98] ${
+                    plan.badge
+                      ? "bg-[#FF6B00] text-black hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] hover:scale-[1.02]"
+                      : "border border-white/20 text-white hover:bg-white/5"
+                  }`}
+                  style={plan.badge ? { background: "#FF6B00" } : {}}
+                >
+                  Subscribe Now
+                </button>
               )}
               <p className="mt-4 text-xs text-white/25">
                 14-day free trial · No credit card required
@@ -168,6 +218,87 @@ export default function SubscriptionPage() {
           ))}
         </div>
       </motion.main>
+
+      {showPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-md rounded-3xl border border-white/[0.07] bg-[#0C0E12] p-8"
+          >
+            <button
+              onClick={() => setShowPayment(false)}
+              className="absolute right-4 top-4 text-white/40 hover:text-white"
+            >
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            <h2 className="text-2xl font-bold text-white">
+              {selectedPlan === "yearly" ? "$130/yr" : "$12/mo"} · Pro Plan
+            </h2>
+            <p className="mt-1 text-sm text-white/40">Enter your card details to subscribe</p>
+
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="text-xs font-medium text-white/50 uppercase tracking-wider">Card Number</label>
+                <input
+                  type="text"
+                  placeholder="1111 1111 1111 1111"
+                  value={cardNumber}
+                  onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                  className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-[#FF6B00]/50"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-white/50 uppercase tracking-wider">Expiry</label>
+                  <input
+                    type="text"
+                    placeholder="MM/YY"
+                    value={expiry}
+                    onChange={(e) => setExpiry(formatExpiry(e.target.value))}
+                    className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-[#FF6B00]/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-white/50 uppercase tracking-wider">CVC</label>
+                  <input
+                    type="text"
+                    placeholder="123"
+                    value={cvc}
+                    onChange={(e) => setCvc(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                    className="mt-1.5 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/30 outline-none transition focus:border-[#FF6B00]/50"
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <p className="text-sm text-red-400">{error}</p>
+              )}
+
+              {success ? (
+                <div className="rounded-xl bg-green-500/10 p-4 text-center text-sm text-green-400">
+                  Subscription activated! Redirecting...
+                </div>
+              ) : (
+                <button
+                  onClick={handlePurchase}
+                  disabled={paying || !cardNumber || !expiry || !cvc}
+                  className="mt-2 w-full rounded-full bg-[#FF6B00] px-8 py-4 text-base font-bold text-black transition hover:shadow-[0_0_30px_rgba(255,107,0,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {paying ? "Processing..." : `Pay ${selectedPlan === "yearly" ? "$130" : "$12"}`}
+                </button>
+              )}
+
+              <p className="text-center text-xs text-white/25">
+                Test card: 1111 1111 1111 1111 · Exp: 11/11 · CVC: 111
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
