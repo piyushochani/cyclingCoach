@@ -70,6 +70,14 @@ export const STEPS = [
   },
 ] as const;
 
+export const FREE_FEATURES = [
+  "Performance analytics dashboard",
+  "Strava & device sync",
+  "Basic ride history",
+  "Manual activity logging",
+  "Community forum access",
+] as const;
+
 export const MONTHLY_FEATURES = [
   "AI-powered training plans",
   "Strava & device sync",

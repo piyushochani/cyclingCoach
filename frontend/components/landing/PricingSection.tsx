@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { MONTHLY_FEATURES, YEARLY_FEATURES } from "./landing-data";
+import { FREE_FEATURES, MONTHLY_FEATURES, YEARLY_FEATURES } from "./landing-data";
 import { clearSignupStorage } from "./clearSignupStorage";
 
 const plans: {
