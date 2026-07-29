@@ -4,9 +4,11 @@ import { BestEffortRecord, BestEffortRecordSchema, Segment, SegmentSchema, Segme
 import { BestEffortsService } from './best-efforts.service';
 import { BestEffortsController } from './best-efforts.controller';
 import { NotificationModule } from '../notification/notification.module';
+import { StravaAuthModule } from '../strava-auth/strava-auth.module';
 
 @Module({
   imports: [
+    StravaAuthModule,
     MongooseModule.forFeature([
       { name: BestEffortRecord.name, schema: BestEffortRecordSchema },
       { name: Segment.name, schema: SegmentSchema },

@@ -6,6 +6,7 @@ import { EmbeddingService } from './embedding.service';
 import { DataProcessorService } from './data-processor.service';
 import { SummaryBuilderService } from './summary-builder.service';
 import { Activity } from '../activity/activity.schema';
+import { truncateForMetadata } from './rag-context.util';
 
 @Injectable()
 export class ActivitySyncPipelineService {
@@ -63,6 +64,7 @@ export class ActivitySyncPipelineService {
           hasPower: processed.hasPowerData,
           hasHeartRate: processed.hasHrData,
           hasCadence: processed.hasCadenceData,
+          summary: truncateForMetadata(summaryText),
         },
       }]);
 

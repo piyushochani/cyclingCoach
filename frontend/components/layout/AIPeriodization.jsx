@@ -1,21 +1,57 @@
-// frontend/components/layout/AIPeriodization.jsx
 "use client";
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { TypewriterText } from '../../components/ui/TypewriterText';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
+import { TypewriterText } from '../ui/TypewriterText';
 
-const periodizationData = [
-  { name: 'Base', duration: 8, fill: '#3498DB' }, // Info blue
-  { name: 'Build', duration: 6, fill: '#FF6B00' }, // Accent orange
-  { name: 'Peak', duration: 2, fill: '#FFD700' }, // Podium gold
-  { name: 'Taper', duration: 1, fill: '#2ECC71' }, // Success green
-  { name: 'Race', duration: 1, fill: '#E74C3C' }, // Error red
-];
+const PHASE_COLORS = {
+  Base: '#3498DB',
+  Build: '#FF6B00',
+  Peak: '#FFD700',
+  Taper: '#2ECC71',
+  Race: '#E74C3C',
+};
 
-const AIPeriodization = () => {
-  const currentWeek = 10; // Example: Current week in the training block
+function derivePhase(relativeWeek) {
+  if (relativeWeek == null || relativeWeek < 0) return 'Base';
+  const cycleWeek = relativeWeek % 18;
+  if (cycleWeek < 8) return 'Base';
+  if (cycleWeek < 14) return 'Build';
+  if (cycleWeek < 16) return 'Peak';
+  if (cycleWeek < 17) return 'Taper';
+  return 'Race';
+}
+
+function buildPeriodizationData() {
+  return [
+    { name: 'Base', duration: 8, fill: PHASE_COLORS.Base },
+    { name: 'Build', duration: 6, fill: PHASE_COLORS.Build },
+    { name: 'Peak', duration: 2, fill: PHASE_COLORS.Peak },
+    { name: 'Taper', duration: 1, fill: PHASE_COLORS.Taper },
+    { name: 'Race', duration: 1, fill: PHASE_COLORS.Race },
+  ];
+}
+
+const AIPeriodization = ({ weeklyPlan, relativeWeek }) => {
+  const periodizationData = useMemo(() => buildPeriodizationData(), []);
+
+  const currentWeek = useMemo(() => {
+    if (relativeWeek != null) return Math.max(0, relativeWeek) + 1;
+    if (weeklyPlan?.relativeWeek != null) return weeklyPlan.relativeWeek + 1;
+    return null;
+  }, [relativeWeek, weeklyPlan]);
+
+  const currentPhase = useMemo(() => {
+    const rw = relativeWeek ?? weeklyPlan?.relativeWeek;
+    return derivePhase(rw);
+  }, [relativeWeek, weeklyPlan]);
+
+  const coachMessage = weeklyPlan?.coachNotes
+    || weeklyPlan?.rawText
+    || (currentPhase
+      ? `Your current training phase is "${currentPhase}". Follow your weekly plan and prioritize recovery on rest days.`
+      : 'Generate a weekly plan to receive personalized periodization insights from your AI coach.');
 
   return (
     <motion.div
@@ -26,19 +62,16 @@ const AIPeriodization = () => {
     >
       <h2 className="font-bebasNeue text-2xl text-text-primary mb-4">AI Periodization Insights</h2>
 
-      {/* Coach's Letter Card */}
       <div className="relative bg-bg-dark p-6 rounded-md mb-8 border border-chain-link-grey overflow-hidden">
-        {/* Noise texture overlay */}
-        <div className="absolute inset-0 z-0 opacity-10" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239C92AC' fill-opacity='0.19'%3E%3Cpath d='M1 0h1v1H1V0zm3 0h1v1H4V0zM0 2h1v1H0V2zm2 2h1v1H2V4zm0-2h1v1H2V2zm0 4h1v1H2V6zM4 4h1v1H4V4zm0 2h1v1H4V6zM6 0h1v1H6V0zm-1 2h1v1H5V2zm-2 2h1v1H3V4zm-2 2h1v1H1V6zM5 0h1v1H5V0zM3 2h1v1H3V2zM0 4h1v1H0V4zM2 0h1v1H2V0zM4 2h1v1H4V2zM6 2h1v1H6V2zM3 4h1v1H3V4zM1 4h1v1H1V4zM0 6h1v1H0V6zM3 0h1v1H3V0zM6 4h1v1H6V4z'%3E%3C/path%3E%3C/g%3E%3C/svg%3E")` }}></div>
+        <div className="absolute inset-0 z-0 opacity-10" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%239C92AC' fill-opacity='0.19'%3E%3Cpath d='M1 0h1v1H1V0zm3 0h1v1H4V0zM0 2h1v1H0V2zm2 2h1v1H2V4zm0-2h1v1H2V2zm0 4h1v1H2V6zM4 4h1v1H4V4zm0 2h1v1H4V6zM6 0h1v1H6V0zm-1 2h1v1H5V2zm-2 2h1v1H3V4zm-2 2h1v1H1V6zM5 0h1v1H5V0zM3 2h1v1H3V2zM0 4h1v1H0V4zM2 0h1v1H2V0zM4 2h1v1H4V2zM6 2h1v1H6V2zM3 4h1v1H3V4zM1 4h1v1H1V4zM0 6h1v1H0V6zM3 0h1v1H3V0zM6 4h1v1H6V4z'%3E%3C/path%3E%3C/g%3E%3C/svg%3E")` }} />
         <div className="relative z-10">
           <p className="font-dmSans text-text-primary italic mb-4">
-            <TypewriterText text="Dear Athlete, your current training phase is 'Build'. We've intensified your interval sessions to maximize anaerobic threshold and boost your VO2 max. Remember to prioritize recovery on your off days. Consistency is key!" />
+            <TypewriterText text={coachMessage} />
           </p>
           <p className="font-dmSans text-sm text-text-secondary text-right">- Coach AI</p>
         </div>
       </div>
 
-      {/* Periodization Timeline Bar Chart */}
       <h3 className="font-bebasNeue text-xl text-text-primary mb-3">Your Training Cycles</h3>
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
@@ -53,16 +86,21 @@ const AIPeriodization = () => {
               contentStyle={{ backgroundColor: 'var(--color-bg-dark)', borderColor: 'var(--color-accent-orange)', borderRadius: '8px' }}
               labelStyle={{ color: 'var(--color-accent-orange)', fontFamily: 'var(--font-dm-sans)' }}
               itemStyle={{ color: 'var(--color-text-primary)', fontFamily: 'var(--font-dm-sans)' }}
+              formatter={(value) => [`${value} weeks`, 'Duration']}
             />
-            <Bar dataKey="duration" fill="currentColor">
-              {
-                periodizationData.map((entry, index) => (
-                  <Bar key={`bar-${index}`} fill={entry.fill} />
-                ))
-              }
+            <Bar dataKey="duration" radius={[0, 4, 4, 0]}>
+              {periodizationData.map((entry) => (
+                <Cell key={entry.name} fill={entry.fill} />
+              ))}
             </Bar>
-            {/* "YOU ARE HERE" marker */}
-            <ReferenceLine x={currentWeek} stroke="#FF6B00" strokeDasharray="3 3" label={{ value: 'YOU ARE HERE', fill: '#FF6B00', position: 'top' }} />
+            {currentWeek != null && (
+              <ReferenceLine
+                x={currentWeek}
+                stroke="#FF6B00"
+                strokeDasharray="3 3"
+                label={{ value: 'YOU ARE HERE', fill: '#FF6B00', position: 'top', fontSize: 10 }}
+              />
+            )}
           </BarChart>
         </ResponsiveContainer>
       </div>

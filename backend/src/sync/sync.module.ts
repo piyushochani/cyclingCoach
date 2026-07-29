@@ -10,9 +10,11 @@ import { NotificationModule } from '../notification/notification.module';
 import { GearModule } from '../gear/gear.module';
 import { TrainingContextModule } from '../training-context/training-context.module';
 import { createQueueModule } from '../common/queue/conditional-queue';
+import { StravaAuthModule } from '../strava-auth/strava-auth.module';
 
 @Module({
   imports: [
+    StravaAuthModule,
     MongooseModule.forFeature([
       { name: Activity.name, schema: ActivitySchema },
       { name: User.name, schema: UserSchema },

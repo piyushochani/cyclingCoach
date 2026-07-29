@@ -1,0 +1,32 @@
+[
+  {
+    "userId": "REPLACE_WITH_TEST_USER_ID",
+    "query": "How did my threshold rides go recently?",
+    "expectedActivityIds": [],
+    "description": "Threshold session retrieval — seed expectedActivityIds from Mongo after first run"
+  },
+  {
+    "userId": "REPLACE_WITH_TEST_USER_ID",
+    "query": "Show me my long endurance rides from the last month",
+    "expectedActivityIds": [],
+    "description": "Endurance rides with date filter"
+  },
+  {
+    "userId": "REPLACE_WITH_TEST_USER_ID",
+    "query": "What interval or VO2max sessions have I done?",
+    "expectedActivityIds": [],
+    "description": "High-intensity session retrieval"
+  },
+  {
+    "userId": "REPLACE_WITH_TEST_USER_ID",
+    "query": "Tell me about my race-like efforts",
+    "expectedActivityIds": [],
+    "description": "Race session type filter"
+  },
+  {
+    "userId": "REPLACE_WITH_TEST_USER_ID",
+    "query": "How was my riding last week?",
+    "expectedActivityIds": [],
+    "description": "Recent date window filter"
+  }
+]

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { getToken } from '../../lib/api';
 
-const publicPaths = ['/', '/login', '/signup', '/forgot-password'];
+const publicPaths = ['/', '/login', '/signup', '/forgot-password', '/privacy', '/terms', '/cookie-policy', '/pricing', '/admin', '/admin/login'];
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -13,6 +13,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const isPublic = publicPaths.includes(pathname);
+    const isAdminRoute = pathname.startsWith('/admin');
+
+    if (isAdminRoute) {
+      setChecked(true);
+      return;
+    }
+
     if (isPublic) {
       setChecked(true);
       return;

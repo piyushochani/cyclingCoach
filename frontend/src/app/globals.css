@@ -60,3 +60,36 @@ html {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
 }
+
+/* Landing page */
+.landing-page {
+  --landing-accent: #ff6b00;
+}
+
+.landing-hero-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 20%, transparent 70%);
+}
+
+.landing-orb {
+  background: radial-gradient(circle, rgba(255, 107, 0, 0.35) 0%, transparent 70%);
+}
+
+.landing-orb-b {
+  background: radial-gradient(circle, rgba(255, 140, 0, 0.2) 0%, transparent 70%);
+}
+
+.landing-glow {
+  background: radial-gradient(ellipse at center, rgba(255, 107, 0, 0.25) 0%, transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-page * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

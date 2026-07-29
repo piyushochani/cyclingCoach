@@ -1,36 +1,23 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { readFileSync, existsSync } from 'fs';
-import { homedir } from 'os';
-import { join } from 'path';
-import { parse as parseYaml } from 'yaml';
 import { BestEffortRecord, Segment, SegmentEffort, BestEffortsSyncStatus } from './best-efforts.schema';
 import { NotificationService } from '../notification/notification.service';
+import { StravaTokenService } from '../strava-auth/strava-token.service';
 
 const STRAVA_BEST_EFFORT_NAMES = [
   '1,000m', '5,000m', '10,000m', '20,000m', '30,000m', '40,000m', '50,000m',
 ] as const;
 
 const CYCLING_SPORTS = ['cycling', 'bike', 'ride', 'bicycle'];
-const STRAVA_API = 'https://www.strava.com/api/v3';
 
 function isCyclingSport(sport: string): boolean {
   return CYCLING_SPORTS.includes((sport || '').toLowerCase());
 }
 
-interface StravaConfig {
-  clientId: string;
-  clientSecret: string;
-  accessToken: string;
-  refreshToken: string;
-  expiresAt: number;
-}
-
 @Injectable()
 export class BestEffortsService {
   private readonly logger = new Logger(BestEffortsService.name);
-  private config: StravaConfig | null = null;
 
   constructor(
     @InjectModel(BestEffortRecord.name) private bestEffortModel: Model<BestEffortRecord>,
@@ -38,9 +25,8 @@ export class BestEffortsService {
     private readonly notificationService: NotificationService,
     @InjectModel(SegmentEffort.name) private segmentEffortModel: Model<SegmentEffort>,
     @InjectModel(BestEffortsSyncStatus.name) private syncStatusModel: Model<BestEffortsSyncStatus>,
-  ) {
-    this.loadConfig();
-  }
+    private readonly stravaTokens: StravaTokenService,
+  ) {}
 
   async getCachedResults(userId: any) {
     return this.getStoredResults(userId);
@@ -98,94 +84,15 @@ export class BestEffortsService {
     }
   }
 
-  private loadConfig() {
-    // 1. Try environment variables first
-    const envClientId = process.env.STRAVA_CLIENT_ID;
-    const envClientSecret = process.env.STRAVA_CLIENT_SECRET;
-    if (envClientId && envClientSecret) {
-      this.config = {
-        clientId: envClientId,
-        clientSecret: envClientSecret,
-        accessToken: process.env.STRAVA_ACCESS_TOKEN || '',
-        refreshToken: process.env.STRAVA_REFRESH_TOKEN || '',
-        expiresAt: parseInt(process.env.STRAVA_EXPIRES_AT || '0', 10),
-      };
-      return;
-    }
-
-    // 2. Fallback to config.yaml
-    const configPaths = [
-      join(homedir(), '.cycling-coach', 'config.yaml'),
-      join(homedir(), '.config', 'cycling-coach', 'config.yaml'),
-      join(homedir(), '.enduragent', 'cycling-coach', 'config.yaml'),
-    ];
-
-    for (const filePath of configPaths) {
-      if (existsSync(filePath)) {
-        try {
-          const raw = readFileSync(filePath, 'utf-8');
-          const config = parseYaml(raw) as any;
-          const s = config?.strava;
-          if (s?.client_id && s?.client_secret) {
-            this.config = {
-              clientId: String(s.client_id),
-              clientSecret: String(s.client_secret),
-              accessToken: process.env.STRAVA_ACCESS_TOKEN || s.access_token || '',
-              refreshToken: process.env.STRAVA_REFRESH_TOKEN || s.refresh_token || '',
-              expiresAt: parseInt(process.env.STRAVA_EXPIRES_AT || s.expires_at || '0', 10),
-            };
-            return;
-          }
-        } catch {}
-      }
-    }
-  }
-
-  private async ensureValidToken(): Promise<string | null> {
-    if (!this.config?.accessToken) return null;
-    const now = Math.floor(Date.now() / 1000);
-    if (this.config.expiresAt > now + 60) return this.config.accessToken;
-
-    try {
-      const res = await fetch('https://www.strava.com/oauth/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          client_id: this.config.clientId,
-          client_secret: this.config.clientSecret,
-          grant_type: 'refresh_token',
-          refresh_token: this.config.refreshToken,
-        }),
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      this.config.accessToken = data.access_token;
-      this.config.refreshToken = data.refresh_token;
-      this.config.expiresAt = data.expires_at;
-      return data.access_token;
-    } catch {
-      return null;
-    }
-  }
-
-  private async stravaFetch(path: string): Promise<any> {
-    const token = await this.ensureValidToken();
-    if (!token) return null;
-    try {
-      const res = await fetch(`${STRAVA_API}${path}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) return null;
-      return res.json();
-    } catch {
-      return null;
-    }
+  private async stravaFetch(userId: string, path: string): Promise<any> {
+    return this.stravaTokens.stravaFetch(userId, path);
   }
 
   private async compute(userId: any) {
+    const uid = String(userId._id || userId);
     const allActivities: any[] = [];
     for (let page = 1; page <= 4; page++) {
-      const batch = await this.stravaFetch(`/athlete/activities?per_page=50&page=${page}`);
+      const batch = await this.stravaFetch(uid, `/athlete/activities?per_page=50&page=${page}`);
       if (!batch || !Array.isArray(batch) || batch.length === 0) break;
       allActivities.push(...batch);
     }
@@ -248,7 +155,7 @@ export class BestEffortsService {
   private async syncSegmentEfforts(activities: any[], userId: any) {
     for (const act of activities) {
       if (!isCyclingSport(act.type || '')) continue;
-      const detail = await this.stravaFetch(`/activities/${act.id}?include_all_efforts=true`);
+      const detail = await this.stravaFetch(String(userId._id || userId), `/activities/${act.id}?include_all_efforts=true`);
       if (!detail) continue;
 
       if (detail.segment_efforts) {

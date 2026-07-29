@@ -5,6 +5,7 @@ import { Activity } from './activity.schema';
 import { GearService } from '../gear/gear.service';
 
 const CYCLING_FILTER = { sport: { $regex: /ride|cycling|bike|bicycle|velomobile|handcycle/i } };
+const LIST_PROJECTION = '-rawActivity -rawStreams -polyline';
 
 @Injectable()
 export class ActivityService {
@@ -18,7 +19,10 @@ export class ActivityService {
   }
 
   findAllByUserId(userId: any): Promise<Activity[]> {
-    return this.activityModel.find({ ...CYCLING_FILTER, user: userId as any }).exec();
+    return this.activityModel
+      .find({ ...CYCLING_FILTER, user: userId as any })
+      .select(LIST_PROJECTION)
+      .exec();
   }
 
   async findOne(id: string, userId?: any): Promise<Activity | null> {
@@ -26,14 +30,14 @@ export class ActivityService {
     
     // 1. Try finding by MongoDB _id
     if (Types.ObjectId.isValid(id)) {
-      const act = await this.activityModel.findOne({ _id: id, ...userIdFilter }).exec();
+      const act = await this.activityModel.findOne({ _id: id, ...userIdFilter }).select('-rawActivity').exec();
       if (act) return act;
     }
 
     // 2. Fallback: Try finding by Strava ID (only if the id is purely numeric)
     if (/^\d+$/.test(id)) {
       const stravaId = parseInt(id, 10);
-      return this.activityModel.findOne({ stravaId, ...userIdFilter }).exec();
+      return this.activityModel.findOne({ stravaId, ...userIdFilter }).select('-rawActivity').exec();
     }
 
     return null;

@@ -691,7 +691,11 @@ export function buildAgentSystemPrompt(
   }
 
   if (retrievedContext) {
-    parts.push('# Retrieved History\n\n' + retrievedContext);
+    parts.push(
+      '# Retrieved History\n\n' +
+      retrievedContext +
+      '\n\nUse the retrieved ride history above when answering. Cite specific dates and session types from these entries when they are relevant to the athlete\'s question.',
+    );
   }
 
   if (faqContext) {
@@ -722,7 +726,11 @@ export function buildCompactAgentSystemPrompt(
   }
 
   if (retrievedContext) {
-    parts.push('# Retrieved History\n\n' + retrievedContext);
+    parts.push(
+      '# Retrieved History\n\n' +
+      retrievedContext +
+      '\n\nUse the retrieved ride history above when answering. Cite specific dates and session types when relevant.',
+    );
   }
 
   if (faqContext) {

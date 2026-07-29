@@ -336,7 +336,7 @@ const TrainingCalendarPage = () => {
             </button>
           </div>
 
-          <div className="grid min-h-[680px] grid-cols-1 lg:grid-cols-[minmax(0,1.05fr)_380px]">
+          <div className="grid min-h-0 grid-cols-1 lg:min-h-[680px] lg:grid-cols-[minmax(0,1.05fr)_380px]">
             <div className="border-b border-white/10 p-4 md:p-6 lg:border-b-0 lg:border-r lg:border-white/10 lg:p-8">
               <div className="rounded-[24px] border border-white/10 bg-black p-4 md:p-6">
                 <div className="mb-6 flex items-center justify-between">
@@ -384,7 +384,7 @@ const TrainingCalendarPage = () => {
                         key={day.toISOString()}
                         onClick={() => setSelectedDay(day)}
                         className={[
-                          "group flex aspect-square min-h-[84px] flex-col items-center rounded-[16px] border p-2 transition-all duration-150 md:min-h-[92px] relative",
+                          "group relative flex aspect-square min-h-[52px] flex-col items-center rounded-[12px] border p-1.5 transition-all duration-150 sm:min-h-[68px] sm:rounded-[14px] sm:p-2 md:min-h-[84px] md:rounded-[16px] lg:min-h-[92px]",
                           isSelected
                             ? "border-[#FF5500]/45 bg-[#FF5500]/[0.10]"
                             : today

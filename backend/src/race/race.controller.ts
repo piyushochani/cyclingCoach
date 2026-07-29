@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { UserId } from '../common/user-id.decorator';
 import { RaceService } from './race.service';
 import { CreateRaceDto, UpdateRaceDto } from './dto/race.dto';
@@ -14,9 +14,11 @@ export class RaceController {
   }
 
   @Get(':id')
-  findById(@Param('id') id: string, @UserId() userId: string) {
+  async findById(@Param('id') id: string, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.raceService.findById(id);
+    const race = await this.raceService.findById(id, userId);
+    if (!race) throw new NotFoundException('Race not found');
+    return race;
   }
 
   @Post()

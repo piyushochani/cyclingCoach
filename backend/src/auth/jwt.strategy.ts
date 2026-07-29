@@ -12,15 +12,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
   ) {
-    const secret = process.env.JWT_SECRET || 'fallback-dev-only';
-    if (!process.env.JWT_SECRET) {
-      Logger.warn('JWT_SECRET is not set — auth-protected routes will reject all requests');
+    const isProduction = process.env.NODE_ENV === 'production';
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      if (isProduction) {
+        throw new Error('JWT_SECRET must be set in production');
+      }
+      Logger.warn('JWT_SECRET is not set — using insecure dev-only fallback');
     }
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: secret,
+      secretOrKey: secret || 'fallback-dev-only',
     });
   }
 

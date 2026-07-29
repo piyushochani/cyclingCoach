@@ -9,17 +9,14 @@ import { useMemo, useState } from "react";
  *
  * HOOKING UP YOUR OWN BACKEND
  * ----------------------------
- * This component ships with generated mock data so it's runnable on its
- * own. To wire up real data, replace `generateMockData()` below with
- * your own fetch, or better, pass real entries in via the `entries` prop:
+ * Pass real entries via the `entries` prop:
  *
  *   <TrainingChart entries={myEntries} />
  *
  * where `myEntries` is an array of:
  *   { date: "2026-03-14", distanceKm: 12.4, timeMin: 65, elevGainM: 180 }
  *
- * One entry per activity/day. The component handles all the weekly /
- * monthly bucketing and unit formatting for you.
+ * One entry per activity/day. Use mapActivitiesToChartEntries() from lib/component-data.
  */
 
 // ---------- Config ----------
@@ -40,48 +37,6 @@ const METRIC_CONFIG = {
   time: { field: "timeMin", unit: "h", formatAxis: (v) => `${v}` },
   elevGain: { field: "elevGainM", unit: "m", formatAxis: (v) => `${v}` },
 };
-
-// ---------- Mock data generation ----------
-// Deterministic pseudo-random so the chart looks the same on every render.
-
-function seededRandom(seed) {
-  let s = seed;
-  return () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
-}
-
-function generateMockData() {
-  const rand = seededRandom(42);
-  const entries = [];
-  const start = new Date();
-  start.setDate(start.getDate() - 365);
-  start.setHours(0, 0, 0, 0);
-
-  for (let i = 0; i < 365; i++) {
-    const date = new Date(start);
-    date.setDate(start.getDate() + i);
-
-    // Roughly 3-4 active days per week, with a seasonal ramp-up
-    const monthProgress = i / 365;
-    const seasonalBoost = 0.4 + monthProgress * 1.3;
-    const isActive = rand() < 0.45 * seasonalBoost;
-    if (!isActive) continue;
-
-    const distanceKm = +(rand() * 14 * seasonalBoost + 1).toFixed(1);
-    const timeMin = Math.round(distanceKm * (4.5 + rand() * 2));
-    const elevGainM = Math.round(distanceKm * (8 + rand() * 20));
-
-    entries.push({
-      date: date.toISOString().slice(0, 10),
-      distanceKm,
-      timeMin,
-      elevGainM,
-    });
-  }
-  return entries;
-}
 
 // ---------- Bucketing helpers ----------
 
@@ -197,7 +152,7 @@ export default function TrainingChart({ entries }) {
   const [metric, setMetric] = useState("distance");
   const [period, setPeriod] = useState("monthly");
 
-  const data = useMemo(() => entries ?? generateMockData(), [entries]);
+  const data = useMemo(() => entries || [], [entries]);
 
   const buckets = useMemo(() => {
     const raw = bucketEntries(data, period);
@@ -215,6 +170,15 @@ export default function TrainingChart({ entries }) {
   );
 
   const unit = metric === "time" ? "h" : metric === "elevGain" ? "m" : "km";
+
+  if (data.length === 0) {
+    return (
+      <div className="tc-card flex flex-col items-center justify-center py-16 gap-2">
+        <p className="font-dmSans text-sm text-white/40">No activity data to chart yet.</p>
+        <p className="font-dmSans text-xs text-white/25">Sync activities from Strava to see your training history.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="tc-card">

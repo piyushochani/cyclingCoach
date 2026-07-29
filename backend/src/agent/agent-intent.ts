@@ -42,7 +42,8 @@ export function classifyIntent(message: string): ChatIntent {
 }
 
 export function shouldUseRag(intent: ChatIntent): boolean {
-  return intent === 'activities';
+  const excluded: ChatIntent[] = ['greeting', 'strava', 'gear', 'faq'];
+  return !excluded.includes(intent);
 }
 
 export function shouldLoadAgentMemory(intent: ChatIntent): boolean {

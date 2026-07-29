@@ -1,3 +1,5 @@
+# Railway config-as-code supports build/deploy settings only — env vars are set in the
+# Railway dashboard (or via `railway variable set`). See railway.variables.example.
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"

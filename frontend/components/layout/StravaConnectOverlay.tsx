@@ -76,7 +76,7 @@ export default function StravaConnectOverlay({ children }: { children: React.Rea
       const stored = localStorage.getItem("cyclogenai_user");
       if (!stored) return false;
       const u = JSON.parse(stored);
-      return !!(u.stravaUpdatedAt || u.isStravaUpToDate);
+      return !!(u.stravaAccessToken || u.stravaUpdatedAt || u.isStravaUpToDate);
     } catch { return false; }
   }, []);
 

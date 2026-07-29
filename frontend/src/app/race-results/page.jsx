@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
 import { useDataRefetch } from "../../../lib/useDataRefetch";
 import RaceChatModal from "../../../components/ui/RaceChatModal";
+import SeasonSummaryStrip from "../../../components/layout/SeasonSummaryStrip";
 
 const TYPE_OPTIONS = ["All", "Road", "Crit", "Time Trial", "Circuit", "Gravel"];
 const TERRAIN_OPTIONS = ["", "Flat", "Rolling", "Hilly", "Mountainous"];
@@ -161,15 +162,6 @@ export default function RacesPage() {
     return races
       .filter((r) => new Date(r.date) > now)
       .sort((a, b) => new Date(a.date) - new Date(b.date))[0] || null;
-  }, [races]);
-
-  const stats = useMemo(() => {
-    const total = races.length;
-    const best = Math.min(...races.map((r) => r.position).filter((p) => p));
-    const totalDist = races.reduce((s, r) => s + (parseFloat(r.distance) || 0), 0);
-    const totalElev = races.reduce((s, r) => s + (parseFloat(r.elevationGain) || 0), 0);
-    const podiums = races.filter((r) => r.position && r.position <= 3).length;
-    return { total, best: isFinite(best) ? best : null, totalDist, totalElev, podiums };
   }, [races]);
 
   const visible = sorted.slice(0, visibleCount);
@@ -349,58 +341,7 @@ export default function RacesPage() {
           </motion.div>
         )}
 
-        {/* Season Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          style={{
-            background: "#0D0D0D",
-            border: "1px solid rgba(255,255,255,0.06)",
-            borderRadius: 12,
-            padding: "1.25rem 1.5rem",
-            marginBottom: "2rem",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
-            gap: 16,
-          }}
-        >
-          {[
-            { label: "Total Races", value: stats.total },
-            { label: "Best Finish", value: stats.best ? `${stats.best}${stats.best === 1 ? "st" : stats.best === 2 ? "nd" : stats.best === 3 ? "rd" : "th"}` : "\u2014" },
-            { label: "Total km", value: `${stats.totalDist.toFixed(2)} km` },
-            { label: "Total Elev", value: `${stats.totalElev.toFixed(1)} m` },
-            { label: "Podiums", value: stats.podiums },
-          ].map((s) => (
-            <div key={s.label} style={{ textAlign: "center" }}>
-              <p
-                style={{
-                  fontFamily: "'Bebas Neue', 'Impact', sans-serif",
-                  fontSize: "1.8rem",
-                  fontWeight: 400,
-                  letterSpacing: "0.04em",
-                  margin: 0,
-                  color: "#fff",
-                  lineHeight: 1.1,
-                }}
-              >
-                {s.value}
-              </p>
-              <p
-                style={{
-                  margin: "2px 0 0",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  letterSpacing: "0.08em",
-                  textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.3)",
-                }}
-              >
-                {s.label}
-              </p>
-            </div>
-          ))}
-        </motion.div>
+        <SeasonSummaryStrip races={races} />
 
         {/* Filters */}
         <motion.div
@@ -653,6 +594,80 @@ export default function RacesPage() {
         </p>
 
         <div style={{ marginBottom: "2rem" }}>
+          {/* Mobile & tablet cards */}
+          <div className="space-y-2 lg:hidden">
+            {loading ? (
+              <div style={{ padding: "2.5rem 16px", fontSize: 13, color: "rgba(255,255,255,0.2)" }}>
+                Loading...
+              </div>
+            ) : visible.length === 0 ? (
+              <div style={{ padding: "2.5rem 16px", fontSize: 13, color: "rgba(255,255,255,0.2)" }}>
+                No races found.
+              </div>
+            ) : (
+              <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-2">
+                {visible.map((race) => (
+                  <motion.div
+                    key={`${race._id}-mobile`}
+                    variants={fadeUp}
+                    className="rounded-xl border border-white/[0.08] bg-[#111318] px-4 py-3.5"
+                    style={{ background: race.position === 1 ? "rgba(255,215,0,0.04)" : undefined }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{race.name}</p>
+                        <p className="mt-1 text-xs text-white/35">
+                          {race.location}
+                          {race.terrain && <span> · {race.terrain}</span>}
+                        </p>
+                      </div>
+                      <span
+                        className="shrink-0 font-jetbrainsMono text-sm font-bold"
+                        style={{
+                          color: race.position === 1 ? "#FFD700" : race.position === 2 ? "#C0C0C0" : race.position === 3 ? "#CD7F32" : "#FF5500",
+                        }}
+                      >
+                        {race.position ? `${race.position}${race.position === 1 ? "st" : race.position === 2 ? "nd" : race.position === 3 ? "rd" : "th"}` : "—"}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-jetbrainsMono text-xs text-white/55">
+                      <span>{race.type}</span>
+                      <span>{formatDate(race.date)}</span>
+                      <span>{race.distance ? `${parseFloat(race.distance).toFixed(2)} km` : "—"}</span>
+                      <span>{race.time || "—"}</span>
+                      {race.elevationGain > 0 && <span>{parseFloat(race.elevationGain).toFixed(1)} m</span>}
+                    </div>
+                    <div className="mt-3 flex gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setChatRaceId(race._id)}
+                        className="text-xs text-white/40 hover:text-[#7C8CFF]"
+                      >
+                        Chat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(race)}
+                        className="text-xs text-white/40 hover:text-[#FF5500]"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(race._id)}
+                        className="text-xs text-white/40 hover:text-red-400"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </div>
+
+          {/* Laptop / desktop table */}
+          <div className="hidden lg:block">
           {/* Header Row */}
           <div
             style={{
@@ -772,6 +787,7 @@ export default function RacesPage() {
               ))}
             </motion.div>
           )}
+          </div>
         </div>
 
         {/* Load More */}

@@ -10,6 +10,9 @@ import Loader from '../../../components/ui/Loader';
 import { api } from '../../../lib/api';
 import { useDataRefetch } from '../../../lib/useDataRefetch';
 import AnalysisModal from '../../../components/ui/AnalysisModal';
+import TrainingChart from '../../../components/layout/week_month_statisticspage';
+import PRProgressionChart from '../../../components/layout/PRProgressionChart';
+import { mapActivitiesToChartEntries } from '../../../lib/component-data';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -502,7 +505,7 @@ export default function StatisticsPage() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08, duration: 0.4 }}
-          className="mb-6 grid grid-cols-3 gap-3"
+          className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3"
         >
           <InsightCard icon="📏" label="Volume vs Last Month" value={`${performanceSummary.currDistance} km`} trend={performanceSummary.distance} />
           <InsightCard icon="📋" label="Activities vs Last Month" value={`${performanceSummary.currCount}`} trend={performanceSummary.count} />
@@ -592,6 +595,12 @@ export default function StatisticsPage() {
             </button>
           </div>
         </motion.div>
+
+        {/* Strava-style training chart + PR progression */}
+        <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <TrainingChart entries={mapActivitiesToChartEntries(activities)} />
+          <PRProgressionChart bestEfforts={bestEfforts} />
+        </div>
 
         {/* Trend Charts Row */}
         <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">

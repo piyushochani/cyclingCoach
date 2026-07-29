@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Param, Body, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Param, Body, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { UserId } from '../common/user-id.decorator';
 import { RaceChatService } from './race-chat.service';
 
@@ -7,9 +7,11 @@ export class RaceChatController {
   constructor(private readonly raceChatService: RaceChatService) {}
 
   @Get()
-  findByRace(@Param('raceId') raceId: string, @UserId() userId: string) {
+  async findByRace(@Param('raceId') raceId: string, @UserId() userId: string) {
     if (!userId) throw new UnauthorizedException('User ID required');
-    return this.raceChatService.findByRace(raceId);
+    const chat = await this.raceChatService.findByRace(raceId, userId);
+    if (!chat) throw new NotFoundException('Race chat not found');
+    return chat;
   }
 
   @Post()

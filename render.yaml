@@ -46,4 +46,8 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
       - key: REDIS_ENABLED
-        value: "false"
+        value: "true"
+      - key: REDIS_HOST
+        sync: false
+      - key: REDIS_PORT
+        value: "6379"

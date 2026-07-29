@@ -1,0 +1,11 @@
+# Production overlay for docker-compose.yml
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile production up -d
+services:
+  backend:
+    environment:
+      REDIS_ENABLED: "true"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      - mongodb
+      - redis

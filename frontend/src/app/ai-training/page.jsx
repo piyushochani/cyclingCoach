@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import { api } from '../../../lib/api';
 import { useDataRefetch } from '../../../lib/useDataRefetch';
 import ScheduleRaceModal from '../../../components/layout/ScheduleRaceModal';
+import UpcomingRacesTable from '../../../components/layout/UpcomingRacesTable';
+import AIPeriodization from '../../../components/layout/AIPeriodization';
 import Loader from '../../../components/ui/Loader';
 
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -278,6 +280,9 @@ const AITrainingPage = () => {
               </motion.div>
             )}
 
+            {/* ── PERIODIZATION ── */}
+            <AIPeriodization weeklyPlan={weeklyPlan} relativeWeek={getCurrentRelativeWeek()} />
+
             {/* ── WEEKLY SCHEDULE ── */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
               <div className="lg:col-span-2">
@@ -383,41 +388,9 @@ const AITrainingPage = () => {
                 </motion.div>
               </div>
 
-              {/* Right Panel - All Upcoming Races */}
+              {/* Right Panel - Upcoming Races Table */}
               <div>
-                <motion.div
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: 0.2 }}
-                  className="rounded-2xl border border-white/5 bg-[#111318] p-6"
-                >
-                  <h2 className="font-barlowCondensed text-2xl uppercase tracking-wide text-white mb-4">All Upcoming Races</h2>
-                  {upcomingRaces.length === 0 ? (
-                    <p className="font-dmSans text-sm text-white/30">No races scheduled yet.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {upcomingRaces.map((race, i) => {
-                        const dl = daysLeft(race.date);
-                        return (
-                          <div key={race._id || i} className="rounded-xl border border-white/5 bg-black/30 p-4 hover:border-[#FF5500]/20 transition-colors">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className={`text-[10px] font-semibold font-dmSans uppercase tracking-wider ${priorityBadge(race.priority).split(' ').slice(0, -1).join(' ')}`}>
-                                Type {race.priority}
-                              </span>
-                              <span className="font-jetbrainsMono text-xs text-[#FF5500]">{dl}d</span>
-                            </div>
-                            <p className="font-dmSans text-sm font-medium text-white">{race.name}</p>
-                            <div className="flex items-center gap-3 mt-1.5 text-xs text-white/40 font-dmSans">
-                              <span>{race.type || '-'}</span>
-                              {race.distance && <span>{race.distance} km</span>}
-                              {race.location && <span>{race.location}</span>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </motion.div>
+                <UpcomingRacesTable races={races} />
               </div>
             </div>
           </div>

@@ -69,7 +69,7 @@ export default function ChangePasswordPage() {
         <div className="rounded-[24px] border border-white/10 bg-[#111318]/90 p-8 shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-xl">
           <div className="mb-8 text-center">
             <Link href="/dashboard" className="inline-flex items-center gap-2">
-              <img src="/images/cyclogen_logo.png" alt="Cyclogen" className="h-8 w-auto" />
+              <img src="/images/new_cyclogenAI_logo.png" alt="Cyclogen" className="h-8 w-auto" />
               <span className="font-barlowCondensed text-2xl uppercase tracking-[0.08em] text-white">
                 CyclogenAI
               </span>

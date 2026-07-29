@@ -17,8 +17,11 @@ export class RaceService {
     return this.raceModel.find({ user: userId as any }).lean().exec();
   }
 
-  findById(id: string): Promise<Race | null> {
-    return this.raceModel.findById(id).populate('racePlan dietPlan raceNutrition aiSuggestions raceChat').exec();
+  findById(id: string, userId: string): Promise<Race | null> {
+    return this.raceModel
+      .findOne({ _id: id, user: userId as any })
+      .populate('racePlan dietPlan raceNutrition aiSuggestions raceChat')
+      .exec();
   }
 
   create(race: Partial<Race>): Promise<Race> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { api } from "./api";
+import { api, postSyncAndWait } from "./api";
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const STORAGE_KEY = "cyclogenai_last_sync";
@@ -131,7 +131,7 @@ export async function triggerGlobalSync(): Promise<boolean> {
 
   setSyncStatus("syncing");
   try {
-    await api.post("/sync/refresh", {});
+    await postSyncAndWait("/sync/refresh");
     api.post("/best-efforts/refresh", {}).catch(() => {});
     const now = Date.now();
     setLastSyncTime(now);
@@ -160,7 +160,7 @@ async function triggerIncrementalSync(): Promise<boolean> {
   const current = getSyncStatus();
   if (current === "syncing") return false;
   try {
-    await api.post("/sync/incremental", {});
+    await postSyncAndWait("/sync/incremental");
     setLastSyncTime(Date.now());
     return true;
   } catch {
