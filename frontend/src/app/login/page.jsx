@@ -112,7 +112,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-4 text-center">
-            <Link href="/forgot-password" className="font-dmSans text-sm text-white/40 transition hover:text-white/60">
+            <Link href="/forgot-password" prefetch={false} className="font-dmSans text-sm text-white/40 transition hover:text-white/60">
               Forgot password?
             </Link>
           </div>
