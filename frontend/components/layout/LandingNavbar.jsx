@@ -35,20 +35,12 @@ const LandingNavbar = () => {
     >
       {/* CyclogenAI Logo */}
       <Link href="/">
-        <motion.div className="flex items-center cursor-pointer">
-          {/* Spinning Chainring SVG Placeholder */}
-          <motion.svg
-            className="w-8 h-8 text-accent-orange mr-2"
-            viewBox="0 0 100 100"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-          >
-            <circle cx="50" cy="50" r="40" stroke="currentColor" strokeWidth="8" fill="none" />
-            <path d="M50 10 L50 90 M15 50 L85 50" stroke="currentColor" strokeWidth="4" />
-          </motion.svg>
-          <span className="font-barlowCondensed text-2xl text-text-primary uppercase tracking-wide">
-            CyclogenAI
-          </span>
+        <motion.div className="flex items-center cursor-pointer" whileHover={{ scale: 1.05 }}>
+          <img
+            src="/images/new_cyclogenAI_logo.png"
+            alt="CyclogenAI"
+            className="h-12 w-auto md:h-16"
+          />
         </motion.div>
       </Link>
 

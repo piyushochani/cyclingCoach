@@ -41,3 +41,5 @@ packages/sport-duathlon/
 .env
 .vercel
 .env*
+backend/dev-log.txt
+backend/dev-pid.txt

@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
-import { completeAuthSession, isAuthenticated } from "../../../lib/auth";
+import { completeAuthSession } from "../../../lib/auth";
 import { triggerBackgroundSyncAfterAuth } from "../../../lib/useAutoSync";
 
 export default function LoginPage() {
@@ -14,12 +14,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (isAuthenticated()) {
-      router.replace("/dashboard");
-    }
-  }, [router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

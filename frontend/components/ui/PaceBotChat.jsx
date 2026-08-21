@@ -212,14 +212,9 @@ const PaceBotChat = () => {
       setMessages([]);
 
       if (savedSessionRef.current) {
-        setShowingContinuePrompt(true);
-        setTimeout(() => {
-          setMessages([{
-            id: Date.now(),
-            sender: 'bot',
-            text: `Your session has expired. Send /continue to pick up where you left off, or type a new message to start a fresh conversation.`,
-          }]);
-        }, 300);
+        // Silently restore the previous session instead of prompting to continue.
+        sessionIdRef.current = savedSessionRef.current.sessionId;
+        setMessages(savedSessionRef.current.messages || []);
         return;
       }
     }

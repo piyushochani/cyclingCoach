@@ -22,6 +22,7 @@ import { AgentModule } from './agent/agent.module';
 import { GeminiStatusModule } from './gemini-status/gemini-status.module';
 import { HealthModule } from './health/health.module';
 import { AdminModule } from './admin/admin.module';
+import { ApiUsageModule } from './apiusage/api-usage.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { QueueModule } from './common/queue/queue.module';
 import { JobsModule } from './common/queue/jobs.module';
@@ -54,6 +55,7 @@ import { DummyPaymentModule } from './common/dummy-payment/dummy-payment.module'
     AgentModule,
     GeminiStatusModule,
     HealthModule,
+    ApiUsageModule,
     DummyPaymentModule,
     JobsModule,
   ],

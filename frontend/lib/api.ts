@@ -71,7 +71,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('cyclogenai_signed_in');
       localStorage.removeItem('cyclogenai_user');
-      window.location.href = '/login';
+      window.location.href = '/';
     }
     throw new ApiError('Session expired', 401);
   }
@@ -130,7 +130,7 @@ export async function streamAgentChat(
     if (typeof window !== 'undefined') {
       localStorage.removeItem('cyclogenai_signed_in');
       localStorage.removeItem('cyclogenai_user');
-      window.location.href = '/login';
+      window.location.href = '/';
     }
     throw new ApiError('Session expired', 401);
   }

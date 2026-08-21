@@ -137,7 +137,7 @@ const PostLoginNavbar = () => {
   useLockBodyScroll(isMobileMenuOpen);
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-40 flex h-[63px] items-center justify-between border-b border-[#FF5500]/20 bg-[#0A0A0A] px-4 shadow-[0_0_20px_rgba(255,85,0,0.08)] md:px-8">
+    <nav className="fixed top-0 left-0 right-0 z-40 grid h-[63px] grid-cols-[auto_1fr_auto] items-center border-b border-[#FF5500]/20 bg-[#0A0A0A] px-4 shadow-[0_0_20px_rgba(255,85,0,0.08)] md:px-8">
       {/* Logo */}
         <Link href="/dashboard">
           <motion.div
@@ -153,7 +153,7 @@ const PostLoginNavbar = () => {
         </Link>
 
       {/* Desktop Navigation */}
-      <div className="hidden md:flex items-center space-x-1">
+      <div className="hidden md:flex items-center justify-center space-x-1">
         {navLinks.map((link) => (
           <div key={link.name} className="relative">
             <Link

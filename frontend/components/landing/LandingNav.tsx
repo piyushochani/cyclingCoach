@@ -28,7 +28,7 @@ export default function LandingNav() {
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 flex items-center transition-all duration-300 ${
+      className={`fixed inset-x-0 top-0 z-50 grid grid-cols-[1fr_auto_1fr] items-center transition-all duration-300 ${
         scrolled
           ? "border-b border-white/[0.06] bg-[#060608]/80 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,0.4)]"
           : "bg-transparent"
@@ -38,24 +38,24 @@ export default function LandingNav() {
         <img
           src="/images/new_cyclogenAI_logo.png"
           alt="CyclogenAI"
-          className="h-9 w-auto md:h-10"
+          className="h-12 w-auto md:h-14"
         />
       </Link>
-      <div className="mx-auto flex max-w-7xl flex-1 items-center justify-between px-5 py-4 md:px-8 lg:px-10">
 
-        <nav className="hidden items-center gap-1 lg:flex">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => scrollToSection(item.id)}
-              className="rounded-lg px-3.5 py-2 text-sm font-medium text-white/55 transition hover:bg-white/[0.04] hover:text-white"
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
+      <nav className="hidden items-center justify-center gap-1 lg:flex">
+        {NAV_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => scrollToSection(item.id)}
+            className="rounded-lg px-3.5 py-2 text-sm font-medium text-white/55 transition hover:bg-white/[0.04] hover:text-white"
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
 
+      <div className="flex items-center justify-end gap-3 px-5 py-4 md:px-8 lg:px-10">
         <div className="hidden items-center gap-3 md:flex">
           <Link
             href="/login"

@@ -15,6 +15,7 @@ import { TrainingContextService } from '../training-context/training-context.ser
 import { logKeyHealth } from '../common/gemini-key-validator';
 import { callGroqSimple } from '../common/groq-client';
 import { isGeminiQuotaError } from '../common/llm-config';
+import { ApiUsageService } from '../apiusage/api-usage.service';
 import { PineconeClient } from './pinecone-client';
 import { buildRichSummary } from './rag-context.util';
 import { DEFAULT_QUEUE_JOB_OPTIONS } from '../common/queue/queue.module';
@@ -192,6 +193,7 @@ export class AnalysisService {
     @InjectQueue('analysis') private readonly analysisQueue: any,
     private readonly trainingContext: TrainingContextService,
     private readonly pinecone: PineconeClient,
+    private readonly apiUsageService: ApiUsageService,
   ) {
     logKeyHealth(this.logger, 'sync').catch(() => {});
   }
@@ -635,12 +637,44 @@ One or two specific, actionable recommendations based on this ride and the athle
       return 'AI analysis is not configured. Please set GOOGLE_GENERATIVE_AI_SYNC_API_KEYS in your environment.';
     }
 
+    let unhealthyHashes: string[] = [];
+    try {
+      unhealthyHashes = await this.apiUsageService.getUnhealthyHashes();
+      if (unhealthyHashes.length > 0) {
+        const before = apiKeys.length;
+        const set = new Set(unhealthyHashes);
+        apiKeys = apiKeys.filter((k) => !set.has(this.apiUsageService.getKeyHash(k)));
+        if (apiKeys.length !== before) {
+          this.logger.warn(
+            `Skipping ${before - apiKeys.length} exhausted/invalid Gemini key(s); remaining ${apiKeys.length}`,
+          );
+        }
+        if (apiKeys.length === 0) {
+          this.logger.warn('All Gemini keys marked unhealthy — will fall back to Groq.');
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Could not read API health for rotation: ${err}`);
+    }
+
     const temperature = opts?.temperature ?? 0.7;
     const maxTokens = opts?.maxTokens ?? 2048;
 
     const maxAttempts = apiKeys.length * 2;
     const fallbackModel = 'gemini-2.0-flash-lite';
     let usedFallback = false;
+    let groqTried = false;
+
+    const tryGroqFallback = async (): Promise<string | null> => {
+      if (groqTried) return null;
+      groqTried = true;
+      this.logger.warn('Falling back to Groq');
+      return callGroqSimple(this.logger, prompt, {
+        temperature,
+        maxTokens,
+        skipKeyHashes: unhealthyHashes,
+      });
+    };
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const key = apiKeys[attempt % apiKeys.length];
@@ -665,8 +699,7 @@ One or two specific, actionable recommendations based on this ride and the athle
           const errBody = await response.text().catch(() => '');
           this.logger.warn(`LLM rate limited — quota likely exhausted for key`);
           if (isGeminiQuotaError(response.status, errBody)) {
-            this.logger.warn('Gemini quota exhausted — falling back to Groq');
-            const groqAnswer = await callGroqSimple(this.logger, prompt, { temperature, maxTokens });
+            const groqAnswer = await tryGroqFallback();
             if (groqAnswer) return groqAnswer;
             return 'Sorry, the AI analysis service is currently unavailable due to API quota limits. Please try again later or add more API keys.';
           }
@@ -676,7 +709,7 @@ One or two specific, actionable recommendations based on this ride and the athle
             await new Promise((r) => setTimeout(r, 2000));
             continue;
           }
-          const groqAnswer = await callGroqSimple(this.logger, prompt, { temperature, maxTokens });
+          const groqAnswer = await tryGroqFallback();
           if (groqAnswer) return groqAnswer;
           return 'Sorry, the AI analysis service is currently unavailable due to API quota limits. Please try again later or add more API keys.';
         }
@@ -690,21 +723,30 @@ One or two specific, actionable recommendations based on this ride and the athle
         if (!response.ok) {
           const errText = await response.text();
           this.logger.error(`Gemini API error: ${response.status} ${errText}`);
+          const groqAnswer = await tryGroqFallback();
+          if (groqAnswer) return groqAnswer;
           return 'Sorry, the AI analysis service encountered an error. Please try again later.';
         }
 
         const data = await response.json();
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        return text || 'No analysis could be generated.';
+        if (text) return text;
+        const groqAnswer = await tryGroqFallback();
+        if (groqAnswer) return groqAnswer;
+        return 'No analysis could be generated.';
       } catch (err) {
         this.logger.error(`LLM call failed (attempt ${attempt + 1}): ${err}`);
         if (attempt === maxAttempts - 1) {
+          const groqAnswer = await tryGroqFallback();
+          if (groqAnswer) return groqAnswer;
           return 'Sorry, the AI analysis service is currently unavailable.';
         }
         await new Promise((r) => setTimeout(r, 3000));
       }
     }
 
+    const finalGroqAnswer = await tryGroqFallback();
+    if (finalGroqAnswer) return finalGroqAnswer;
     return 'Sorry, the AI analysis service is currently unavailable.';
   }
 }

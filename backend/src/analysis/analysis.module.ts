@@ -17,6 +17,7 @@ import { Race, RaceSchema } from '../race/race.schema';
 import { NotificationModule } from '../notification/notification.module';
 import { PlanModule } from '../plan/plan.module';
 import { TrainingContextModule } from '../training-context/training-context.module';
+import { ApiUsageModule } from '../apiusage/api-usage.module';
 import { createQueueModule } from '../common/queue/conditional-queue';
 
 @Module({
@@ -30,6 +31,7 @@ import { createQueueModule } from '../common/queue/conditional-queue';
     NotificationModule,
     PlanModule,
     TrainingContextModule,
+    ApiUsageModule,
   ],
   controllers: [AnalysisController],
   providers: [

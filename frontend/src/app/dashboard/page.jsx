@@ -5,15 +5,13 @@ import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { api } from "../../../lib/api";
 import { useDataRefetch } from "../../../lib/useDataRefetch";
-import WeeklyGoalCard from "../../../components/layout/WeeklyGoalCard";
+import ProfileGoalCard from "../../../components/layout/ProfileGoalCard";
 import WeeklyScheduleCard from "../../../components/layout/WeekScheduleCard";
 import StatsYearCard from "../../../components/layout/StatsYearCard";
 import HeatmapContainer from "../../../components/layout/HeatmapContainer";
 import WeeklyGraph from "../../../components/layout/WeeklyGraph";
 import WeatherWidget from "../../../components/layout/WeatherWidget";
 import RecentActivity from "../../../components/layout/RecentActivity";
-import ProfileContainer from "../../../components/layout/ProfileContainer";
-import MissionControl from "../../../components/layout/MissionControl";
 
 const DashboardPage = () => {
   const pathname = usePathname();
@@ -109,10 +107,8 @@ const DashboardPage = () => {
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="flex flex-col gap-5">
-            <ProfileContainer user={user} />
-            <WeeklyGoalCard activities={activities} />
+            <ProfileGoalCard user={user} activities={activities} />
             <WeeklyScheduleCard plan={weeklyPlan} />
-            <MissionControl races={races} plan={weeklyPlan} />
           </div>
 
           <div className="flex flex-col gap-5">

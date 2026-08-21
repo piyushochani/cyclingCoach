@@ -106,7 +106,7 @@ function buildDayDataFromPlan(workout, dayOffset, startDate) {
 
   if (workout && workout.type !== 'rest') {
     const label = WORKOUT_LABELS[workout.type] || workout.type || "Workout";
-    const dist = workout.distance ? `${(workout.distance / 1000).toFixed(2)} km` : "—";
+    const dist = workout.distance ? `${Number(workout.distance).toFixed(2)} km` : "—";
     return { day: dayName, date: dateStr, activity: label, time: "—", distance: dist };
   }
   return { day: dayName, date: dateStr, activity: "Rest", time: "—", distance: "—" };

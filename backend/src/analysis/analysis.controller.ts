@@ -88,7 +88,7 @@ export class AnalysisController {
 
     for (const relativeWeek of [0, 1]) {
       const existing = await this.trainingContext.getWeeklyPlan(userId, relativeWeek);
-      if (existing && existing.workouts && existing.workouts.length > 0) continue;
+      if (hasUsableWorkouts(existing)) continue;
 
       try {
         const result = await this.analysisService.generateNextWeekPlan(recentActivities, userId);
@@ -122,4 +122,13 @@ function getCurrentWeekNumber(): number {
   const start = new Date(now.getFullYear(), 0, 1);
   const diff = now.getTime() - start.getTime();
   return Math.ceil(diff / (7 * 24 * 60 * 60 * 1000));
+}
+
+/** A plan is only usable if it has at least one workout carrying real detail (dayOfWeek + type).
+ *  This guards against stale/corrupt plans whose workouts were stored as { _id }-only. */
+function hasUsableWorkouts(plan: any): boolean {
+  if (!plan || !Array.isArray(plan.workouts)) return false;
+  return plan.workouts.some(
+    (w: any) => w && w.dayOfWeek != null && w.type != null,
+  );
 }
