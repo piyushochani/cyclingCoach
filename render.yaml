@@ -9,8 +9,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3001
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
@@ -46,7 +44,7 @@ services:
       - key: CLOUDINARY_API_SECRET
         sync: false
       - key: REDIS_ENABLED
-        value: "true"
+        value: "false"
       - key: REDIS_HOST
         sync: false
       - key: REDIS_PORT
