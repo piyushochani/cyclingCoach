@@ -23,6 +23,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [otpRequired, setOtpRequired] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +33,8 @@ export default function SignupPage() {
     if (!email) { setError("Email is required"); return; }
     setLoading(true);
     try {
-      await api.post("/auth/signup-request", { email });
+      const res = await api.post("/auth/signup-request", { email });
+      setOtpRequired(res?.otpRequired !== false);
       setStep(1);
     } catch (err) {
       setError(err.message || "Failed to send OTP");
@@ -44,7 +46,10 @@ export default function SignupPage() {
   const verifySignup = async (e) => {
     e.preventDefault();
     setError("");
-    if (!firstName || !password || !code) { setError("First name, password, and OTP are required"); return; }
+    if (!firstName || !password || (otpRequired && !code)) {
+      setError(otpRequired ? "First name, password, and OTP are required" : "First name and password are required");
+      return;
+    }
     if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
     setLoading(true);
     try {
@@ -127,15 +132,19 @@ export default function SignupPage() {
             <>
               <h1 className="font-barlowCondensed text-3xl uppercase tracking-[0.04em] text-white">Complete profile</h1>
               <p className="mt-1 font-dmSans text-sm text-white/50">
-                Code sent to <span className="text-white/70">{email}</span>
+                {otpRequired
+                  ? <>Code sent to <span className="text-white/70">{email}</span> &mdash; enter it below</>
+                  : <>Setting up your account for <span className="text-white/70">{email}</span></>}
               </p>
 
               <form onSubmit={verifySignup} className="mt-4 flex flex-col gap-3 max-h-[50vh] overflow-y-auto pr-1 signup-scroll">
-                <div>
-                  <label className="font-dmSans text-xs uppercase tracking-[0.16em] text-white/40">OTP Code</label>
-                  <input type="text" value={code} onChange={(e) => setCode(e.target.value)}
-                    className={`${inputClass} text-center text-xl tracking-[0.3em]`} placeholder="000000" maxLength={6} />
-                </div>
+                {otpRequired && (
+                  <div>
+                    <label className="font-dmSans text-xs uppercase tracking-[0.16em] text-white/40">OTP Code</label>
+                    <input type="text" value={code} onChange={(e) => setCode(e.target.value)}
+                      className={`${inputClass} text-center text-xl tracking-[0.3em]`} placeholder="000000" maxLength={6} />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>

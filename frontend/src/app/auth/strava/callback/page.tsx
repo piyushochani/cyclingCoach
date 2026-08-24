@@ -31,7 +31,11 @@ function StravaCallbackInner() {
     const code = searchParams.get("code");
     if (!code) {
       setStatus("error");
-      setMessage("No authorization code received from Strava.");
+      setMessage(
+        searchParams.get("error") === "access_denied"
+          ? "Strava authorization was cancelled. Nothing was connected."
+          : "No authorization code received from Strava."
+      );
       return;
     }
 

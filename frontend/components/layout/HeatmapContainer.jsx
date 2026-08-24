@@ -47,11 +47,17 @@ const HeatmapContainer = ({ activities, days }) => {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
+  const now = new Date();
+  const currentMonthKey = now.getFullYear() * 12 + now.getMonth();
+  const viewMonthKey = viewDate.getFullYear() * 12 + viewDate.getMonth();
+  const canGoNext = viewMonthKey < currentMonthKey;
+
   const prevMonth = () => {
     setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
 
   const nextMonth = () => {
+    if (!canGoNext) return;
     setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
@@ -181,10 +187,15 @@ const HeatmapContainer = ({ activities, days }) => {
 
           <button
             onClick={nextMonth}
-            className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-white/[0.03] transition-all hover:border-white/20 hover:bg-white/10 active:scale-95"
+            disabled={!canGoNext}
+            className={`group flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-white/[0.03] transition-all active:scale-95 ${
+              canGoNext
+                ? "hover:border-white/20 hover:bg-white/10"
+                : "cursor-not-allowed opacity-30"
+            }`}
             aria-label="Next month"
           >
-            <span className="text-lg text-white/40 transition-colors group-hover:text-white">→</span>
+            <span className={`text-lg transition-colors ${canGoNext ? "text-white/40 group-hover:text-white" : "text-white/25"}`}>→</span>
           </button>
         </div>
       </div>
@@ -225,6 +236,12 @@ const HeatmapContainer = ({ activities, days }) => {
                       !selectedDay.details.empty &&
                       selectedDay.details.dayNumber === cell.details.dayNumber;
 
+                    const cellDate = cell.details.date;
+                    const isToday =
+                      cellDate.getFullYear() === now.getFullYear() &&
+                      cellDate.getMonth() === now.getMonth() &&
+                      cellDate.getDate() === now.getDate();
+
                     return (
                       <button
                         key={`${rowIndex}-${colIndex}`}
@@ -234,11 +251,15 @@ const HeatmapContainer = ({ activities, days }) => {
                         className={`flex h-7 w-7 items-center justify-center rounded-full border transition sm:h-8 sm:w-8 lg:h-9 lg:w-9 ${
                           isSelected
                             ? "scale-105 border-white/70"
-                            : "border-transparent hover:border-white/30"
+                            : isToday
+                              ? "border-white/30 hover:border-white/50"
+                              : "border-transparent hover:border-white/30"
                         }`}
                       >
                         <span
-                          className={`flex h-8 w-8 items-center justify-center rounded-full font-dmSans text-[11px] font-medium ${dotClasses[cell.level]}`}
+                          className={`flex h-8 w-8 items-center justify-center rounded-full font-dmSans text-[11px] font-medium ${dotClasses[cell.level]} ${
+                            isToday ? "font-semibold ring-2 ring-white/60" : ""
+                          }`}
                         >
                           {cell.details.dayNumber}
                         </span>

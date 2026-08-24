@@ -1,10 +1,11 @@
-import { Controller, Post, Body, UnauthorizedException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import { Controller, Post, Get, Body, UnauthorizedException, ConflictException, BadRequestException, ServiceUnavailableException, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { SyncService } from '../sync/sync.service';
 import { Public } from '../common/public.decorator';
 
 const SYNC_MONTHS = parseInt(process.env.STRAVA_SYNC_MONTHS || '6', 10);
+const OTP_ENABLED = process.env.OTP_ENABLED !== 'false';
 
 @Public()
 @Controller('auth')
@@ -38,13 +39,30 @@ export class AuthController {
     };
   }
 
+  @Get('config')
+  getConfig() {
+    return {
+      otpEnabled: OTP_ENABLED,
+      otpMethod: OTP_ENABLED
+        ? this.authService.getOtpMethod()
+        : null,
+    };
+  }
+
   @Post('signup-request')
   async signupRequest(@Body() body: { email: string }) {
     if (!body.email) throw new BadRequestException('Email is required');
     const existing = await this.authService.findUserByEmail(body.email);
     if (existing) throw new ConflictException('Email already registered');
-    await this.authService.createOtp(body.email, 'signup');
-    return { message: 'OTP sent to email' };
+    if (!OTP_ENABLED) {
+      return { message: 'OTP verification is disabled', otpRequired: false };
+    }
+    try {
+      await this.authService.createOtp(body.email, 'signup');
+    } catch (err: any) {
+      throw new ServiceUnavailableException('Could not send OTP email. Please try again.');
+    }
+    return { message: 'OTP sent to email', otpRequired: true };
   }
 
   @Post('signup-verify')
@@ -54,14 +72,23 @@ export class AuthController {
     heightCm?: number; weightKg?: number;
     goal?: string; cyclingYears?: number; ftp?: number;
   }) {
-    if (!body.email || !body.code || !body.password || !body.firstName) {
+    if (!body.email || !body.password || !body.firstName) {
       throw new BadRequestException('Email, password, and first name are required');
     }
     if (body.password.length < 6) {
       throw new BadRequestException('Password must be at least 6 characters');
     }
-    const valid = await this.authService.verifyOtp(body.email, body.code, 'signup');
-    if (!valid) throw new UnauthorizedException('Invalid or expired OTP');
+    if (OTP_ENABLED) {
+      if (!body.code) throw new BadRequestException('OTP code is required');
+      let valid = false;
+      try {
+        valid = await this.authService.verifyOtp(body.email, body.code, 'signup');
+      } catch (err: any) {
+        this.logger.error(`OTP verification failed for ${body.email}: ${err.message}`);
+        throw new ServiceUnavailableException('Could not verify OTP. Please try again.');
+      }
+      if (!valid) throw new UnauthorizedException('Invalid or expired OTP');
+    }
     const user = await this.authService.signup(body.email, body.password, {
       firstName: body.firstName,
       lastName: body.lastName,
@@ -128,9 +155,16 @@ export class AuthController {
   @Post('forgot-password-request')
   async forgotPasswordRequest(@Body() body: { email: string }) {
     if (!body.email) throw new BadRequestException('Email is required');
+    if (!OTP_ENABLED) {
+      return { message: 'If the email exists, an OTP has been sent', otpDisabled: true };
+    }
     const user = await this.authService.findUserByEmail(body.email);
     if (!user) return { message: 'If the email exists, an OTP has been sent' };
-    await this.authService.createOtp(body.email, 'password-reset');
+    try {
+      await this.authService.createOtp(body.email, 'password-reset');
+    } catch (err: any) {
+      throw new ServiceUnavailableException('Could not send OTP email. Please try again.');
+    }
     return { message: 'If the email exists, an OTP has been sent' };
   }
 
@@ -142,7 +176,13 @@ export class AuthController {
     if (body.password.length < 6) {
       throw new BadRequestException('Password must be at least 6 characters');
     }
-    const valid = await this.authService.verifyOtp(body.email, body.code, 'password-reset');
+    let valid = false;
+    try {
+      valid = await this.authService.verifyOtp(body.email, body.code, 'password-reset');
+    } catch (err: any) {
+      this.logger.error(`OTP verification failed for ${body.email}: ${err.message}`);
+      throw new ServiceUnavailableException('Could not verify OTP. Please try again.');
+    }
     if (!valid) throw new UnauthorizedException('Invalid or expired OTP');
     await this.authService.updatePassword(body.email, body.password);
     const user = await this.authService.findUserByEmail(body.email);

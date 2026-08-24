@@ -7,6 +7,7 @@ import { Otp, OtpSchema } from './auth.schema';
 import { EmailModule } from '../email/email.module';
 import { SyncModule } from '../sync/sync.module';
 import { AuthService } from './auth.service';
+import { ClerkOtpService } from './clerk-otp.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 
@@ -23,7 +24,7 @@ import { JwtStrategy } from './jwt.strategy';
     SyncModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, ClerkOtpService, JwtStrategy],
   exports: [AuthService, JwtModule, PassportModule],
 })
 export class AuthModule {}

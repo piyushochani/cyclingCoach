@@ -21,7 +21,7 @@ export class StravaAuthService {
     const { clientId } = this.tokenService.requireAppCredentials();
     const redirectUri = this.tokenService.getRedirectUri();
     const state = Buffer.from(JSON.stringify({ userId })).toString('base64url');
-    const url = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&approval_prompt=force&scope=read,activity:read_all,profile:read_all&state=${state}`;
+    const url = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read,activity:read_all,profile:read_all&state=${state}`;
     return { url };
   }
 

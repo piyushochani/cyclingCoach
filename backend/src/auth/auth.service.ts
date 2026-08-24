@@ -5,6 +5,7 @@ import * as bcrypt from 'bcrypt';
 import { User } from '../user/user.schema';
 import { Otp } from './auth.schema';
 import { EmailService } from '../email/email.service';
+import { ClerkOtpService, ClerkOtpRef } from './clerk-otp.service';
 
 @Injectable()
 export class AuthService {
@@ -14,7 +15,14 @@ export class AuthService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Otp.name) private otpModel: Model<Otp>,
     private readonly emailService: EmailService,
+    private readonly clerkOtpService: ClerkOtpService,
   ) {}
+
+  getOtpMethod(): 'smtp' | 'clerk' {
+    return (process.env.OTP_METHOD || 'smtp').trim().toLowerCase() === 'clerk'
+      ? 'clerk'
+      : 'smtp';
+  }
 
   async findUserByEmail(email: string): Promise<User | null> {
     return this.userModel.findOne({ email }).exec();
@@ -34,19 +42,62 @@ export class AuthService {
 
   async createOtp(email: string, type: string): Promise<string> {
     await this.otpModel.updateMany({ email, type, used: false }, { used: true });
-    const code = this.generateOtpCode();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    if (this.getOtpMethod() === 'clerk') {
+      let ref: ClerkOtpRef;
+      try {
+        ref = await this.clerkOtpService.sendOtp(email);
+      } catch (err: any) {
+        this.logger.error(`Failed to send ${type} OTP via Clerk to ${email}: ${err.message}`);
+        throw new Error(`Failed to send OTP via Clerk: ${err.message}`);
+      }
+      await this.otpModel.create({
+        email,
+        code: '',
+        provider: 'clerk',
+        providerRef: JSON.stringify(ref),
+        type,
+        expiresAt,
+      });
+      return '';
+    }
+
+    const code = this.generateOtpCode();
     await this.otpModel.create({ email, code, type, expiresAt });
-    this.emailService.sendOtpEmail(email, code, type).catch((err) => {
-      this.logger.error(`Failed to send OTP email: ${err.message}`);
-    });
+    try {
+      await this.emailService.sendOtpEmail(email, code, type);
+    } catch (err: any) {
+      this.logger.error(`Failed to send ${type} OTP email to ${email}: ${err.message}`);
+      throw new Error(`Failed to send OTP email: ${err.message}`);
+    }
     return code;
   }
 
   async verifyOtp(email: string, code: string, type: string): Promise<boolean> {
-    const otp = await this.otpModel.findOne({ email, code, type, used: false });
+    const otp = await this.otpModel
+      .findOne({ email, type, used: false })
+      .sort({ createdAt: -1 });
     if (!otp) return false;
     if (new Date() > otp.expiresAt) return false;
+
+    if (otp.provider === 'clerk') {
+      let ref: ClerkOtpRef;
+      try {
+        ref = JSON.parse(otp.providerRef || '{}');
+      } catch {
+        return false;
+      }
+      if (!ref?.emailAddressId || !ref?.verificationId) return false;
+      const ok = await this.clerkOtpService.verifyOtp(ref, code);
+      if (ok) {
+        otp.used = true;
+        await otp.save();
+      }
+      return ok;
+    }
+
+    if (otp.code !== code) return false;
     otp.used = true;
     await otp.save();
     return true;

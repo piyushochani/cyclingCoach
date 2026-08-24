@@ -37,6 +37,12 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
+      - key: OTP_ENABLED
+        value: "true"
+      - key: OTP_METHOD
+        value: "clerk"
+      - key: CLERK_SECRET_KEY
+        sync: false
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY

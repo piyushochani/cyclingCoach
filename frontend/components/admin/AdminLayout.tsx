@@ -8,6 +8,7 @@ import { clearAdminSession, getAdminUsername } from "../../lib/admin-auth";
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard" },
   { href: "/admin/users", label: "Users" },
+  { href: "/admin/userpasswords", label: "User Passwords" },
   { href: "/admin/system", label: "System" },
   { href: "/admin/notifications", label: "Notifications" },
   { href: "/admin/audit-log", label: "Audit Log" },

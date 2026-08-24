@@ -6,8 +6,14 @@ export class Otp extends Document {
   @Prop({ required: true })
   email: string;
 
-  @Prop({ required: true })
+  @Prop()
   code: string;
+
+  @Prop()
+  provider?: string;
+
+  @Prop()
+  providerRef?: string;
 
   @Prop({ required: true })
   type: string;

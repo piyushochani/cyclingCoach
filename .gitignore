@@ -43,3 +43,5 @@ packages/sport-duathlon/
 .env*
 backend/dev-log.txt
 backend/dev-pid.txt
+system design opencode.txt
+current_system_design_opencode.txt

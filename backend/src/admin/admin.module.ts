@@ -16,6 +16,7 @@ import { AdminAuthService } from './admin-auth.service';
 import { AdminAuthGuard } from './admin-auth.guard';
 import { AdminAuthController } from './admin-auth.controller';
 import { AdminController, AdminUsersController } from './admin-users.controller';
+import { AdminUserPasswordsController } from './admin-userpasswords.controller';
 import { AdminSystemController, AdminNotificationsController, AdminAuditController } from './admin-system.controller';
 import { AdminService, AdminUsersService } from './admin.service';
 
@@ -42,6 +43,7 @@ import { AdminService, AdminUsersService } from './admin.service';
     AdminSystemController,
     AdminNotificationsController,
     AdminAuditController,
+    AdminUserPasswordsController,
   ],
   providers: [
     AdminAuthService,
