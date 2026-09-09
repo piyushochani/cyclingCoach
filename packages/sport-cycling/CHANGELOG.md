@@ -1,5 +1,15 @@
 # @enduragent/sport-cycling
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies [0b9381f]
+- Updated dependencies [3418139]
+- Updated dependencies [3418139]
+- Updated dependencies [3418139]
+  - @enduragent/core@0.0.2
+
 ## 0.0.1
 
 ### Patch Changes
