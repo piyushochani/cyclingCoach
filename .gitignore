@@ -45,3 +45,6 @@ backend/dev-log.txt
 backend/dev-pid.txt
 system design opencode.txt
 current_system_design_opencode.txt
+
+# Stale documentation (moved out of the codebase)
+ignorethis/
