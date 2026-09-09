@@ -56,10 +56,10 @@ export default function GeneralFooter() {
             </h4>
             <ul className="space-y-2.5">
               {[
-                { name: "Terms of Service", href: "#" },
-                { name: "Privacy Policy", href: "#" },
-                { name: "Cookie Policy", href: "#" },
-                { name: "Data Processing", href: "#" },
+                { name: "Terms of Service", href: "/terms" },
+                { name: "Privacy Policy", href: "/privacy" },
+                { name: "Cookie Policy", href: "/cookie-policy" },
+                { name: "Legal", href: "/privacy" },
               ].map((link) => (
                 <li key={link.name}>
                   <Link

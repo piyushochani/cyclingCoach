@@ -21,14 +21,8 @@ export class PaymentCard extends Document {
   @Prop({ required: true })
   brand: string;
 
-  @Prop({ default: null })
-  stripePaymentMethodId: string;
-
   @Prop({ default: false })
   isDefault: boolean;
-
-  @Prop({ default: null })
-  cardFingerprint: string;
 }
 
 export const PaymentCardSchema = SchemaFactory.createForClass(PaymentCard);

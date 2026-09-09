@@ -52,8 +52,10 @@ export class EmbeddingService {
         );
 
         if (res.status === 429) {
-          this.logger.warn(`Embedding rate limited — ${res.statusText}`);
-          return [];
+          this.logger.warn(`Embedding rate limited (429) — rotating key and retrying`);
+          this.rotateKey();
+          await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
         }
 
         if (!res.ok) {
@@ -62,7 +64,11 @@ export class EmbeddingService {
         }
 
         const data = await res.json();
-        return data?.embedding?.values ?? [];
+        const values = data?.embedding?.values ?? [];
+        if (!values.length) {
+          throw new Error('Gemini embedding returned empty vector');
+        }
+        return values;
       } catch (err) {
         if (attempt === maxAttempts - 1) throw err;
         this.logger.warn(`Embedding attempt ${attempt + 1} failed, retrying: ${err}`);

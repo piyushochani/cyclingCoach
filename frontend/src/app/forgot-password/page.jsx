@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -15,6 +15,18 @@ export default function ForgotPasswordPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [otpEnabled, setOtpEnabled] = useState(true);
+
+  useEffect(() => {
+    api.get("/auth/config").then((c) => setOtpEnabled(c?.otpEnabled !== false)).catch(() => {});
+  }, []);
+
+  const SUPPORT_EMAIL = "ochanipiyush07@gmail.com";
+  const gmailComposeUrl = () => {
+    const subject = "Password reset request - CyclogenAI";
+    const body = `Hi,\n\nI have forgotten my password for my CyclogenAI account.\n\nAccount email: ${email || "<your account email>"}\n\nPlease help me regain access.\n\nThanks`;
+    return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(SUPPORT_EMAIL)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  };
 
   const requestOtp = async (e) => {
     e.preventDefault();
@@ -68,7 +80,7 @@ export default function ForgotPasswordPage() {
         <div className="rounded-[24px] border border-[#FF5500]/15 bg-[#111318]/95 p-8 shadow-[0_0_60px_rgba(255,85,0,0.08)] backdrop-blur-xl">
           <div className="mb-8 flex flex-col items-center">
             <Link href="/">
-              <img src="/images/cyclogen_logo.png" alt="Cyclogen" className="h-15 w-40" />
+              <img src="/images/new_cyclogenAI_logo.png" alt="Cyclogen" className="h-15 w-40" />
             </Link>
             <div className="mt-3">
               <Link href="/" className="font-dmSans text-xs text-white/30 transition hover:text-white/50">&larr; Back to home</Link>
@@ -149,6 +161,28 @@ export default function ForgotPasswordPage() {
                   </motion.p>
                 )}
               </form>
+
+              {!otpEnabled && (
+                <div className="mt-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                  <p className="font-dmSans text-sm text-amber-300/90">
+                    Demo project notice: OTP email verification is unavailable for non-domain (demo) projects, so reset codes can&apos;t be emailed right now.
+                  </p>
+                  <p className="mt-2 font-dmSans text-sm text-white/50">
+                    For now, send us a mail from your account address and the admin will reset your password manually.
+                  </p>
+                  <a
+                    href={gmailComposeUrl()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#FF5500] px-4 py-2.5 font-dmSans text-sm font-semibold text-white shadow-[0_8px_30px_rgba(255,85,0,0.3)] transition hover:bg-[#e04a00]"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Email {SUPPORT_EMAIL}
+                  </a>
+                </div>
+              )}
 
               <p className="mt-6 text-center font-dmSans text-sm text-white/40">
                 <Link href="/login" className="text-[#FF5500] transition hover:text-white underline underline-offset-2 decoration-[#FF5500]/30 hover:decoration-[#FF5500]">Back to login</Link>

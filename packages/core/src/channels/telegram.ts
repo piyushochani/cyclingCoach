@@ -72,10 +72,15 @@ async function callBackend(
   telegramChatId: string,
 ): Promise<string> {
   const url = `${backendUrl()}/agent/telegram-chat`;
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (webhookSecret) {
+    headers["x-telegram-secret"] = webhookSecret;
+  }
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ message, telegramChatId }),
     });
 

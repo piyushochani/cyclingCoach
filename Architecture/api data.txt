@@ -1,0 +1,91 @@
+====================================================================================================
+                     API SECURITY AUDIT FINDINGS
+====================================================================================================
+
+Audited: 2026-07-27
+Fixed:   2026-07-27
+Branch:  dev
+Scope:   NestJS web backend (backend/src) — production path used by the frontend
+Note:    CLI coach packages (packages/sport-cycling, packages/core) are a separate stack;
+         guardrail rows marked "CLI only" are not wired into the web backend.
+
+====================================================================================================
+                         FINDINGS
+====================================================================================================
+
+# | Category       | Issue                                                          | Severity | Status | Location
+---|----------------|----------------------------------------------------------------|----------|--------|-------------------------------------------------------
+1  | Data Isolation | GET /races/:id returns ANY race by ID — no userId filter       | CRITICAL | FIXED  | race.service.ts findById + race.controller.ts
+2  | Data Isolation | GET /races/:raceId/plan returns plan for ANY raceId            | CRITICAL | FIXED  | race-plan.service.ts findByRace + controller
+3  | Data Isolation | GET /races/:raceId/chat returns chat for ANY raceId             | CRITICAL | FIXED  | race-chat.service.ts findByRace + controller
+4  | Data Leakage   | passwordHash returned on User GET/PUT endpoints                | CRITICAL | FIXED  | user.service.ts (.select('-passwordHash'))
+5  | Data Leakage   | Activity list returns rawActivity, rawStreams, polyline        | HIGH     | FIXED  | activity.service.ts (LIST_PROJECTION on findAllByUserId)
+6  | Data Leakage   | Activity detail returns rawActivity (full Strava payload)      | HIGH     | FIXED  | activity.service.ts findOne excludes rawActivity
+7  | Data Isolation | POST .../activities/:id/review reads activity without user check| HIGH    | FIXED  | analysis.service.ts (user-scoped findOne)
+8  | Data Leakage   | GET /gemini/status was public, exposed key metadata            | MEDIUM   | FIXED  | gemini-status.controller.ts (removed @Public)
+9  | Data Leakage   | GET /gemini/check-key was public, accepted arbitrary keys      | MEDIUM   | FIXED  | gemini-status.controller.ts (requires JWT)
+10 | Data Leakage   | Payment cards returned stripePaymentMethodId + fingerprint     | MEDIUM   | FIXED  | payment-cards.service.ts (toPublicCard helper)
+11 | Auth           | POST /agent/telegram-chat required JWT (Telegram has no token) | MEDIUM   | FIXED  | agent.controller.ts (@Public + optional TELEGRAM_WEBHOOK_SECRET)
+12 | Auth           | @UserId() decorator fallback to x-user-id header               | LOW      | FIXED  | user-id.decorator.ts (JWT sub only)
+13 | Auth           | JWT_SECRET fell back to insecure default in production         | MEDIUM   | FIXED  | jwt.strategy.ts (throws if unset in production)
+14 | Data Leakage   | POST /users create returned full doc w/ passwordHash           | CRITICAL | FIXED  | user.service.ts create strips passwordHash from response
+15 | Guardrails     | No min confidence threshold on Pinecone RAG results             | GAP      | FIXED  | agent.service.ts (MIN_RAG_SCORE = 0.7)
+
+--- RESOLVED (prior audit, unchanged) ---
+
+16 | Data Leakage   | Subscription returned stripeCustomerId / stripeSubscriptionId  | LOW      | FIXED  | subscription.service.ts
+17 | Data Leakage   | Full user doc (w/ passwordHash) loaded into LLM context        | MEDIUM   | FIXED  | agent-athlete-context.ts
+
+--- REMAINING GAPS ---
+
+18 | Data Leakage   | No global response serialization layer (ClassSerializer/DTOs)  | HIGH     | OPEN   | entire backend
+19 | Guardrails     | No content moderation / safety filter for user input           | GAP      | OPEN   | nowhere in web backend
+20 | Guardrails     | No PII redaction before injecting into LLM prompts             | GAP      | OPEN   | agent-athlete-context.ts
+21 | Guardrails     | Web backend has no programmatic plan/feasibility validation    | GAP      | OPEN   | CLI packages only (feasibility.ts, plan-validator.ts)
+22 | Infra          | PaymentCardsModule not imported in app.module.ts               | LOW      | OPEN   | payment-cards.module.ts (code ready, routes inactive)
+
+--- GUARDRAILS (web backend) ---
+
+23 | Guardrails     | "Never invent / Never guess" directives in agent prompts       | PRESENT  |        | agent-system-prompt.ts
+24 | Guardrails     | Intent-based tool restriction (scoped per intent)              | PRESENT  |        | agent-intent.ts
+25 | Guardrails     | Max 10 tool-calling steps, 30 msg history limit                | PRESENT  |        | agent.service.ts
+26 | Guardrails     | LLM provider fallback chain (Gemini ↔ Groq)                   | PRESENT  |        | agent.service.ts
+27 | Guardrails     | FAQ search fallback: semantic → keyword (threshold 0.3)        | PRESENT  |        | faq.service.ts
+28 | Guardrails     | Global JWT auth guard + throttling                             | PRESENT  |        | app.module.ts
+29 | Guardrails     | User endpoints scoped to own email via JWT                     | PRESENT  |        | user.controller.ts
+30 | Guardrails     | Activity findOne scoped to userId                              | PRESENT  |        | activity.service.ts
+
+--- GUARDRAILS (CLI packages only — NOT used by web backend) ---
+
+31 | Guardrails     | Feasibility math check (FTP vs experience level)               | CLI ONLY |        | packages/sport-cycling/src/feasibility.ts
+32 | Guardrails     | Plan validation (max 10% weekly increase, recovery days)       | CLI ONLY |        | packages/sport-cycling/src/plan-validator.ts
+33 | Guardrails     | Confidence scoring for model changes (low=no change)           | CLI ONLY |        | packages/sport-cycling/src/model-scorer.ts
+
+====================================================================================================
+                    FIXES APPLIED (2026-07-27)
+====================================================================================================
+
+  - Race/plan/chat GET endpoints now filter by userId; create/chat verify race ownership
+  - User service excludes passwordHash from all API responses
+  - Activity list excludes rawActivity, rawStreams, polyline; detail excludes rawActivity only
+  - deepReviewActivity / generateActivityAnalysis verify activity belongs to requesting user
+  - Gemini status endpoints require JWT (removed @Public)
+  - Telegram chat endpoint is @Public with optional TELEGRAM_WEBHOOK_SECRET header validation
+  - Removed x-user-id header spoofing from @UserId() decorator
+  - JWT_SECRET required in production (NODE_ENV=production)
+  - Payment card responses strip Stripe internal fields (ready when module is enabled)
+  - Pinecone RAG results filtered by minimum score (0.7)
+
+====================================================================================================
+                    REMAINING RECOMMENDATIONS
+====================================================================================================
+
+  - Add ClassSerializerInterceptor + @Exclude() DTOs for defense-in-depth
+  - Add input moderation before LLM calls
+  - Wire packages/sport-cycling feasibility + plan-validator into web plan generation
+  - Import PaymentCardsModule in app.module.ts when payment feature goes live
+  - Set TELEGRAM_WEBHOOK_SECRET in production for Telegram webhook auth
+
+====================================================================================================
+                    END OF DOCUMENT
+====================================================================================================

@@ -4,6 +4,8 @@ import { ValidationPipe } from '@nestjs/common';
 import express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
 
 process.on('unhandledRejection', (reason) => {
   console.error('Unhandled Rejection:', reason);

@@ -1,5 +1,10 @@
 import { Logger } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { GroqConfig, loadGroqConfig } from './llm-config';
+
+export function groqKeyHash(key: string): string {
+  return createHash('sha256').update(key).digest('hex').slice(0, 16);
+}
 
 function parseRetryAfterMs(response: Response, body: string): number {
   const header = response.headers.get('retry-after');
@@ -23,18 +28,24 @@ function modelsToTry(config: GroqConfig, preferred?: string): string[] {
 export async function groqChatCompletion(
   logger: Logger,
   body: Record<string, any>,
-  opts?: { preferredModel?: string },
+  opts?: { preferredModel?: string; skipKeyHashes?: string[] },
 ): Promise<any | null> {
   const config = loadGroqConfig();
   if (!config) return null;
 
   const models = modelsToTry(config, opts?.preferredModel);
+  const skipSet = new Set(opts?.skipKeyHashes || []);
 
   for (const model of models) {
     const requestBody = { ...body, model };
 
     for (let keyIdx = 0; keyIdx < config.apiKeys.length; keyIdx++) {
       const apiKey = config.apiKeys[keyIdx];
+
+      if (skipSet.has(groqKeyHash(apiKey))) {
+        logger.warn(`Skipping Groq key ${keyIdx + 1}/${config.apiKeys.length} — marked unhealthy`);
+        continue;
+      }
 
       for (let attempt = 0; attempt < 5; attempt++) {
         try {
@@ -81,7 +92,7 @@ export async function groqChatCompletion(
 export async function callGroqChat(
   logger: Logger,
   messages: Array<{ role: string; content?: string | null; tool_calls?: any[]; tool_call_id?: string }>,
-  opts?: { tools?: any[]; temperature?: number; maxTokens?: number; model?: string },
+  opts?: { tools?: any[]; temperature?: number; maxTokens?: number; model?: string; skipKeyHashes?: string[] },
 ): Promise<{ content?: string; tool_calls?: any[] } | null> {
   const body: Record<string, any> = {
     messages,
@@ -90,7 +101,10 @@ export async function callGroqChat(
   };
   if (opts?.tools?.length) body.tools = opts.tools;
 
-  const data = await groqChatCompletion(logger, body, { preferredModel: opts?.model });
+  const data = await groqChatCompletion(logger, body, {
+    preferredModel: opts?.model,
+    skipKeyHashes: opts?.skipKeyHashes,
+  });
   const choice = data?.choices?.[0];
   if (!choice?.message) return null;
   return choice.message;
@@ -99,12 +113,17 @@ export async function callGroqChat(
 export async function callGroqSimple(
   logger: Logger,
   prompt: string,
-  opts?: { temperature?: number; maxTokens?: number; model?: string },
+  opts?: { temperature?: number; maxTokens?: number; model?: string; skipKeyHashes?: string[] },
 ): Promise<string | null> {
   const message = await callGroqChat(
     logger,
     [{ role: 'user', content: prompt }],
-    { temperature: opts?.temperature ?? 0.3, maxTokens: opts?.maxTokens ?? 512, model: opts?.model },
+    {
+      temperature: opts?.temperature ?? 0.3,
+      maxTokens: opts?.maxTokens ?? 512,
+      model: opts?.model,
+      skipKeyHashes: opts?.skipKeyHashes,
+    },
   );
   return message?.content || null;
 }

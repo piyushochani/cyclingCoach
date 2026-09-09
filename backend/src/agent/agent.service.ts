@@ -39,9 +39,24 @@ import {
   loadChatApiKeys,
   loadGroqConfig,
 } from '../common/llm-config';
+import { buildRagQueryFilter, DEFAULT_RAG_MIN_SCORE, formatRagMatchesForAgent } from '../analysis/rag-context.util';
 
 const MAX_STEPS = 10;
 const MAX_HISTORY_MESSAGES = 30;
+const MIN_RAG_SCORE = 0.7;
+
+export interface AgentStreamEvent {
+  type: 'status' | 'token' | 'done' | 'error';
+  data: Record<string, unknown>;
+}
+
+function chunkText(text: string, size = 20): string[] {
+  const chunks: string[] = [];
+  for (let i = 0; i < text.length; i += size) {
+    chunks.push(text.slice(i, i + size));
+  }
+  return chunks;
+}
 
 interface GeminiMessage {
   role: 'user' | 'model' | 'function';
@@ -232,7 +247,7 @@ export class AgentService {
 
     let retrievedContext = '';
     if (shouldUseRag(intent)) {
-      retrievedContext = await this.retrieveContext(message);
+      retrievedContext = await this.retrieveContext(message, userId);
     }
 
     let faqContext = '';
@@ -370,24 +385,216 @@ export class AgentService {
     return { text: finalText || 'No response generated.' };
   }
 
-  private async retrieveContext(query: string): Promise<string> {
+  async *chatStream(userId: string, message: string, chatId?: string): AsyncGenerator<AgentStreamEvent> {
+    if (!this.configured) {
+      yield { type: 'error', data: { message: 'AI analysis is not configured.' } };
+      return;
+    }
+
+    this.apiKeys = loadChatApiKeys();
+    const provider = getLlmProvider();
+    const cid = chatId || 'default';
+    const tz = 'UTC';
+    const intent = classifyIntent(message);
+
+    if (intent === 'greeting') {
+      const { firstName } = await buildAthleteProfile(this.userModel, userId);
+      const text = buildGreetingReply(firstName);
+      for (const chunk of chunkText(text)) {
+        yield { type: 'token', data: { text: chunk } };
+      }
+      await this.chatStore.appendMessage(userId, cid, 'user', message);
+      await this.chatStore.appendMessage(userId, cid, 'assistant', text);
+      yield { type: 'done', data: { text } };
+      return;
+    }
+
+    yield { type: 'status', data: { phase: 'context' } };
+
+    const { messages: history } = await this.chatStore.load(userId, cid);
+    const { profile } = await buildAthleteProfile(this.userModel, userId);
+    const { loadActivities, loadPlan } = contextBlocksForIntent(intent);
+    const extraBlocks: string[] = [];
+
+    if (loadActivities) {
+      const summary = await buildActivitySummary(this.activityModel, userId, 5);
+      if (summary) extraBlocks.push(summary);
+    }
+
+    if (loadPlan) {
+      try {
+        const plan = await this.trainingContext.getCurrentWeekPlan(userId);
+        if (plan) extraBlocks.push(`Current weekly plan:\n${JSON.stringify(plan, null, 2)}`);
+      } catch (err) {
+        this.logger.warn(`Failed to load weekly plan: ${err}`);
+      }
+    }
+
+    try {
+      const raceContext = await buildRaceContext(this.raceModel, userId);
+      if (raceContext) extraBlocks.push(raceContext);
+    } catch (err) {
+      this.logger.warn(`Failed to load race context: ${err}`);
+    }
+
+    if (intent === 'month') {
+      try {
+        extraBlocks.push(await buildMonthSummary(this.activityModel, userId));
+      } catch (err) {
+        this.logger.warn(`Month summary failed: ${err}`);
+      }
+    }
+
+    let agentMemory = '';
+    if (shouldLoadAgentMemory(intent)) {
+      agentMemory = await this.memoryService.getContext(userId);
+    }
+
+    let retrievedContext = '';
+    if (shouldUseRag(intent)) {
+      yield { type: 'status', data: { phase: 'rag' } };
+      retrievedContext = await this.retrieveContext(message, userId);
+    }
+
+    let faqContext = '';
+    if (shouldSearchFaq(intent)) {
+      try {
+        const faqResults = await this.faqService.search(message, 3);
+        if (faqResults.length > 0) {
+          faqContext = '# FAQ Knowledge\n\nThe following are relevant answers from the app FAQ. Use them to answer the athlete\'s question about how the app works:\n\n' +
+            faqResults.map((r) => `Q: ${r.chunk.question}\nA: ${r.chunk.content}\n`).join('\n');
+        }
+      } catch (err) {
+        this.logger.warn(`FAQ search failed: ${err}`);
+      }
+    }
+
+    const athleteContext = mergeAthleteContext(profile, agentMemory, extraBlocks);
+    const systemPrompt = buildAgentSystemPrompt(athleteContext, tz, retrievedContext, intent, faqContext);
+    const groqSystemPrompt = buildCompactAgentSystemPrompt(athleteContext, tz, retrievedContext, intent, faqContext);
+
+    const allowedToolNames = toolNamesForIntent(intent);
+    const toolDeclarations = allowedToolNames.length === 0
+      ? []
+      : this.tools.filter((t) => allowedToolNames.includes(t.declaration.name)).map((t) => t.declaration);
+
+    const recentHistory = history.slice(-MAX_HISTORY_MESSAGES);
+    let geminiHistory: GeminiMessage[] = recentHistory.map((m) => ({
+      role: m.role === 'assistant' ? 'model' : m.role as 'user' | 'model',
+      parts: [{ text: m.content }],
+    }));
+    geminiHistory.push({ role: 'user', parts: [{ text: message }] });
+
+    let stepCount = 0;
+    let finalText = '';
+
+    while (stepCount < MAX_STEPS) {
+      stepCount++;
+      yield { type: 'status', data: { phase: 'thinking', step: stepCount } };
+
+      let result: any = null;
+      if (provider === 'groq') {
+        result = await this.callGroq(groqSystemPrompt, geminiHistory, toolDeclarations);
+        if (!result) result = await this.callGemini(systemPrompt, geminiHistory, toolDeclarations);
+      } else {
+        result = await this.callGemini(systemPrompt, geminiHistory, toolDeclarations);
+        if (!result) {
+          this.logger.warn('Gemini unavailable — falling back to Groq');
+          result = await this.callGroq(groqSystemPrompt, geminiHistory, toolDeclarations);
+        }
+      }
+
+      if (!result) {
+        finalText = 'Sorry, the AI service is currently unavailable.';
+        break;
+      }
+
+      const candidate = result.candidates?.[0];
+      if (!candidate?.content?.parts) {
+        finalText = 'No response could be generated.';
+        break;
+      }
+
+      const parts = candidate.content.parts;
+      const responseParts: GeminiPart[] = [];
+      let hasFunctionCall = false;
+
+      for (const part of parts) {
+        if (part.functionCall) {
+          hasFunctionCall = true;
+          const fc = part.functionCall;
+          yield { type: 'status', data: { phase: 'tool', name: fc.name } };
+
+          const tool = this.tools.find((t) => t.declaration.name === fc.name);
+          let resultData: any;
+          if (tool) {
+            try {
+              resultData = await tool.execute(fc.args || {}, this.buildToolDeps(userId));
+            } catch (err) {
+              resultData = { error: `Tool execution failed: ${(err as Error).message}` };
+            }
+          } else {
+            resultData = { error: `Unknown tool: ${fc.name}` };
+          }
+
+          responseParts.push({
+            functionResponse: { name: fc.name, response: { result: resultData } },
+          });
+        } else if (part.text) {
+          finalText = part.text;
+        }
+      }
+
+      geminiHistory.push({
+        role: 'model',
+        parts: parts.map((p: GeminiPart) => {
+          if (p.functionCall) {
+            return { functionCall: { name: p.functionCall.name, args: p.functionCall.args } };
+          }
+          return { text: p.text || '' };
+        }),
+      });
+
+      if (hasFunctionCall) {
+        geminiHistory.push({ role: 'function', parts: responseParts });
+      }
+
+      if (!hasFunctionCall) {
+        if (finalText) {
+          for (const chunk of chunkText(finalText)) {
+            yield { type: 'token', data: { text: chunk } };
+          }
+        }
+        break;
+      }
+    }
+
+    if (stepCount >= MAX_STEPS && !finalText) {
+      finalText = 'I apologize, but I was unable to complete my analysis. Please try asking a more specific question.';
+      for (const chunk of chunkText(finalText)) {
+        yield { type: 'token', data: { text: chunk } };
+      }
+    }
+
+    await this.chatStore.appendMessage(userId, cid, 'user', message);
+    if (finalText) {
+      await this.chatStore.appendMessage(userId, cid, 'assistant', finalText);
+    }
+
+    yield { type: 'done', data: { text: finalText || 'No response generated.' } };
+  }
+
+  private async retrieveContext(query: string, userId: string): Promise<string> {
     if (!this.embedder.isConfigured || !this.pinecone.isConfigured) return '';
 
     try {
       const vector = await this.embedder.embedText(query);
-      const { matches } = await this.pinecone.query(vector, 5);
-
-      if (!matches || matches.length === 0) return '';
-
-      const lines = matches.map((m: any) => {
-        const meta = m.metadata as any;
-        if (meta?.kind === 'profile') {
-          return `[Athlete Profile] ${meta.summary}`;
-        }
-        return `[Activity] ${meta.summary}`;
+      const { matches } = await this.pinecone.query(vector, 5, {
+        filter: buildRagQueryFilter(userId, query),
+        minScore: DEFAULT_RAG_MIN_SCORE,
       });
 
-      return 'Here are some semantically relevant items from the athlete\'s history:\n' + lines.join('\n');
+      return formatRagMatchesForAgent(matches);
     } catch (err) {
       this.logger.warn(`RAG query failed: ${err}`);
       return '';

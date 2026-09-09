@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api } from '../../lib/api';
+import { api, streamAgentChat } from '../../lib/api';
+import { useDeviceType } from '../../hooks/useDeviceType';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const DAY_NAMES_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -140,6 +141,9 @@ function validateOptimizeReason(reason) {
 }
 
 const PaceBotChat = () => {
+  const deviceType = useDeviceType();
+  const isMobile = deviceType === 'mobile';
+  const isTablet = deviceType === 'tablet';
   const [isOpen, setIsOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -164,6 +168,12 @@ const PaceBotChat = () => {
   }, []);
 
   useEffect(() => { loadFromStorage(); }, [loadFromStorage]);
+
+  useEffect(() => {
+    if (isOpen && isMobile) {
+      setIsFullscreen(true);
+    }
+  }, [isOpen, isMobile]);
 
   useEffect(() => {
     const handler = () => loadFromStorage();
@@ -202,14 +212,9 @@ const PaceBotChat = () => {
       setMessages([]);
 
       if (savedSessionRef.current) {
-        setShowingContinuePrompt(true);
-        setTimeout(() => {
-          setMessages([{
-            id: Date.now(),
-            sender: 'bot',
-            text: `Your session has expired. Send /continue to pick up where you left off, or type a new message to start a fresh conversation.`,
-          }]);
-        }, 300);
+        // Silently restore the previous session instead of prompting to continue.
+        sessionIdRef.current = savedSessionRef.current.sessionId;
+        setMessages(savedSessionRef.current.messages || []);
         return;
       }
     }
@@ -382,11 +387,40 @@ const PaceBotChat = () => {
     if (!trimmed) return;
     setMessages((prev) => [...prev, { id: Date.now(), sender: 'user', text: trimmed }]);
     setLoading(true);
+
+    const botId = Date.now() + 1;
+    setMessages((prev) => [...prev, { id: botId, sender: 'bot', text: '' }]);
+
     try {
-      const res = await api.post('/agent/chat', { message: trimmed, chatId: sessionIdRef.current });
-      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: res?.text || 'No response.' }]);
+      await streamAgentChat(trimmed, sessionIdRef.current, (event) => {
+        if (event.type === 'token' && typeof event.data.text === 'string') {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === botId ? { ...m, text: m.text + event.data.text } : m)),
+          );
+        }
+        if (event.type === 'done' && typeof event.data.text === 'string') {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === botId ? { ...m, text: event.data.text } : m)),
+          );
+        }
+        if (event.type === 'error') {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === botId
+                ? { ...m, text: String(event.data.message || 'Sorry, I encountered an error.') }
+                : m,
+            ),
+          );
+        }
+      });
     } catch {
-      setMessages((prev) => [...prev, { id: Date.now() + 1, sender: 'bot', text: 'Sorry, I encountered an error processing your request.' }]);
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === botId
+            ? { ...m, text: 'Sorry, I encountered an error processing your request.' }
+            : m,
+        ),
+      );
     } finally {
       setLoading(false);
     }
@@ -460,7 +494,7 @@ const PaceBotChat = () => {
   return (
     <>
       <motion.button
-        className="fixed bottom-8 right-8 z-50 w-16 h-16 rounded-full bg-[#FF5500] shadow-lg flex items-center justify-center cursor-pointer"
+        className="fixed bottom-[max(2rem,env(safe-area-inset-bottom))] right-[max(1.5rem,env(safe-area-inset-right))] z-50 flex h-14 w-14 items-center justify-center rounded-full bg-[#FF5500] shadow-lg cursor-pointer md:bottom-8 md:right-8 md:h-16 md:w-16"
         whileHover={{ scale: 1.1, boxShadow: '0 0 15px rgba(255, 85, 0, 0.7)' }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsOpen(!isOpen)}
@@ -482,8 +516,14 @@ const PaceBotChat = () => {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.97 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            className={`fixed bottom-28 right-8 z-50 bg-black rounded-2xl border border-white/10 shadow-2xl flex flex-col overflow-hidden ${
-              isFullscreen ? 'w-[90vw] h-[85vh]' : 'w-[420px] h-[560px]'
+            className={`fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl ${
+              isMobile
+                ? 'inset-x-3 bottom-[max(5.5rem,env(safe-area-inset-bottom))] top-[max(4.5rem,env(safe-area-inset-top))]'
+                : isTablet && !isFullscreen
+                  ? 'bottom-28 right-6 h-[min(560px,calc(100vh-8rem))] w-[min(420px,calc(100vw-3rem))]'
+                  : ''
+            } lg:bottom-28 lg:right-8 lg:inset-x-auto lg:top-auto ${
+              isFullscreen ? 'lg:h-[85vh] lg:w-[90vw]' : 'lg:h-[560px] lg:w-[420px]'
             }`}
           >
             <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">

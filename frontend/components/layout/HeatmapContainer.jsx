@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { activityDistanceKm, fmtDist, fmtDuration, getActivityId } from "../../lib/component-data";
 
 const defaultDays = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -46,11 +47,17 @@ const HeatmapContainer = ({ activities, days }) => {
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
 
+  const now = new Date();
+  const currentMonthKey = now.getFullYear() * 12 + now.getMonth();
+  const viewMonthKey = viewDate.getFullYear() * 12 + viewDate.getMonth();
+  const canGoNext = viewMonthKey < currentMonthKey;
+
   const prevMonth = () => {
     setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   };
 
   const nextMonth = () => {
+    if (!canGoNext) return;
     setViewDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
   };
 
@@ -68,7 +75,7 @@ const HeatmapContainer = ({ activities, days }) => {
     const dayMap = {};
     for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
       const date = new Date(year, month, dayNum);
-      dayMap[dayNum] = { date, activities: [], totalTime: 0, totalDistance: 0 };
+      dayMap[dayNum] = { date, activities: [], totalTime: 0, totalDistance: 0, totalCalories: 0 };
     }
 
     if (activities) {
@@ -79,7 +86,8 @@ const HeatmapContainer = ({ activities, days }) => {
           if (dayMap[dayNum]) {
             dayMap[dayNum].activities.push(a);
             dayMap[dayNum].totalTime += a.durationSeconds || 0;
-            dayMap[dayNum].totalDistance += a.distance || 0;
+            dayMap[dayNum].totalDistance += activityDistanceKm(a);
+            dayMap[dayNum].totalCalories += a.calories || 0;
           }
         }
       }
@@ -97,19 +105,16 @@ const HeatmapContainer = ({ activities, days }) => {
       const day = dayMap[dayNum];
       const count = day.activities.length;
       const level = count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : 3;
-      const hours = (day.totalTime / 3600).toFixed(1);
-      const dist = (day.totalDistance / 1000).toFixed(2);
-
       cells.push({
         level,
         details: {
           date: day.date,
           dayNumber: dayNum,
           activities: count,
-          activityIds: day.activities.map((a, i) => a._id || a.id || a.stravaId || `act-${i}`),
-          time: `${hours} hrs`,
-          distance: `${dist} km`,
-          calories: `${(day.totalDistance * 28 / 1000).toFixed(2)} kcal`,
+          activityIds: day.activities.map((a, i) => getActivityId(a) || `act-${i}`),
+          time: fmtDuration(day.totalTime),
+          distance: `${fmtDist(day.totalDistance)} km`,
+          calories: day.totalCalories > 0 ? `${Math.round(day.totalCalories)} kcal` : '—',
         },
       });
     }
@@ -174,18 +179,23 @@ const HeatmapContainer = ({ activities, days }) => {
             <span className="text-lg text-white/40 transition-colors group-hover:text-white">←</span>
           </button>
 
-          <div className="w-[280px] flex justify-center">
-            <h2 className="text-center font-dmSans text-3xl font-semibold tracking-[-0.02em] text-white">
+          <div className="min-w-0 flex-1 flex justify-center px-2 lg:w-[280px] lg:flex-none">
+            <h2 className="text-center font-dmSans text-xl font-semibold tracking-[-0.02em] text-white sm:text-2xl lg:text-3xl">
               {heatmapTitle}
             </h2>
           </div>
 
           <button
             onClick={nextMonth}
-            className="group flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-white/[0.03] transition-all hover:border-white/20 hover:bg-white/10 active:scale-95"
+            disabled={!canGoNext}
+            className={`group flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/5 bg-white/[0.03] transition-all active:scale-95 ${
+              canGoNext
+                ? "hover:border-white/20 hover:bg-white/10"
+                : "cursor-not-allowed opacity-30"
+            }`}
             aria-label="Next month"
           >
-            <span className="text-lg text-white/40 transition-colors group-hover:text-white">→</span>
+            <span className={`text-lg transition-colors ${canGoNext ? "text-white/40 group-hover:text-white" : "text-white/25"}`}>→</span>
           </button>
         </div>
       </div>
@@ -217,7 +227,7 @@ const HeatmapContainer = ({ activities, days }) => {
                 <div key={rowIndex} className="grid grid-cols-7 gap-2">
                   {row.map((cell, colIndex) => {
                     if (cell.details.empty) {
-                      return <div key={`${rowIndex}-${colIndex}`} className="h-9 w-9" />;
+                      return <div key={`${rowIndex}-${colIndex}`} className="h-7 w-7 sm:h-8 sm:w-8 lg:h-9 lg:w-9" />;
                     }
 
                     const isSelected =
@@ -226,20 +236,30 @@ const HeatmapContainer = ({ activities, days }) => {
                       !selectedDay.details.empty &&
                       selectedDay.details.dayNumber === cell.details.dayNumber;
 
+                    const cellDate = cell.details.date;
+                    const isToday =
+                      cellDate.getFullYear() === now.getFullYear() &&
+                      cellDate.getMonth() === now.getMonth() &&
+                      cellDate.getDate() === now.getDate();
+
                     return (
                       <button
                         key={`${rowIndex}-${colIndex}`}
                         type="button"
                         onClick={() => setSelectedDay(cell)}
                         title={formatDisplayDate(cell.details.date)}
-                        className={`flex h-9 w-9 items-center justify-center rounded-full border transition ${
+                        className={`flex h-7 w-7 items-center justify-center rounded-full border transition sm:h-8 sm:w-8 lg:h-9 lg:w-9 ${
                           isSelected
                             ? "scale-105 border-white/70"
-                            : "border-transparent hover:border-white/30"
+                            : isToday
+                              ? "border-white/30 hover:border-white/50"
+                              : "border-transparent hover:border-white/30"
                         }`}
                       >
                         <span
-                          className={`flex h-8 w-8 items-center justify-center rounded-full font-dmSans text-[11px] font-medium ${dotClasses[cell.level]}`}
+                          className={`flex h-8 w-8 items-center justify-center rounded-full font-dmSans text-[11px] font-medium ${dotClasses[cell.level]} ${
+                            isToday ? "font-semibold ring-2 ring-white/60" : ""
+                          }`}
                         >
                           {cell.details.dayNumber}
                         </span>

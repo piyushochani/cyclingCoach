@@ -1,36 +1,37 @@
-import { DynamicModule, Global, Module } from '@nestjs/common';
+import { DynamicModule, Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { MongooseModule } from '@nestjs/mongoose';
-import { isRedisEnabled, resolveRedisConnection } from './queue.constants';
-import { BackgroundJob, BackgroundJobSchema } from './job-status.schema';
-import { JobStatusService } from './job-status.service';
-import { QueueEnqueueService } from './queue-enqueue.service';
-import { JobsController } from './jobs.controller';
 
-@Global()
 @Module({})
 export class QueueModule {
   static forRoot(): DynamicModule {
-    const redisEnabled = isRedisEnabled();
-    const imports: DynamicModule['imports'] = [
-      MongooseModule.forFeature([{ name: BackgroundJob.name, schema: BackgroundJobSchema }]),
-    ];
+    const redisEnabled = process.env.REDIS_ENABLED !== 'false';
 
-    if (redisEnabled) {
-      imports.push(
-        BullModule.forRoot({
-          connection: resolveRedisConnection(),
-        }),
-      );
+    if (!redisEnabled) {
+      return {
+        module: QueueModule,
+        imports: [],
+        exports: [],
+      };
     }
 
     return {
       module: QueueModule,
-      global: true,
-      imports,
-      controllers: [JobsController],
-      providers: [JobStatusService, QueueEnqueueService],
-      exports: [JobStatusService, QueueEnqueueService, ...(redisEnabled ? [BullModule] : [])],
+      imports: [
+        BullModule.forRoot({
+          connection: {
+            host: process.env.REDIS_HOST || 'localhost',
+            port: parseInt(process.env.REDIS_PORT || '6379', 10),
+          },
+        }),
+      ],
+      exports: [BullModule],
     };
   }
 }
+
+export const DEFAULT_QUEUE_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: { type: 'exponential' as const, delay: 2000 },
+  removeOnComplete: true,
+  removeOnFail: { count: 100 },
+};

@@ -111,12 +111,38 @@ export class PineconeClient {
     });
   }
 
-  async query(vector: number[], topK = 10): Promise<{ matches: PineconeMatch[] }> {
+  async query(
+    vector: number[],
+    topK = 10,
+    options?: { filter?: Record<string, unknown>; minScore?: number },
+  ): Promise<{ matches: PineconeMatch[] }> {
     if (!this.isConfigured) return { matches: [] };
-    return this.request('POST', '/query', {
+
+    const body: Record<string, unknown> = {
       vector,
       topK,
       includeMetadata: true,
+      namespace: this.namespace || undefined,
+    };
+    if (options?.filter) body.filter = options.filter;
+
+    const result = await this.request<{ matches: PineconeMatch[] }>('POST', '/query', body);
+    let matches = result.matches || [];
+    if (options?.minScore != null) {
+      matches = matches.filter((m) => m.score >= options.minScore!);
+    }
+    return { matches };
+  }
+
+  async updateMetadata(id: string, metadata: Record<string, unknown>): Promise<void> {
+    if (!this.isConfigured) return;
+    const cleanMeta: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(metadata)) {
+      if (val !== null && val !== undefined) cleanMeta[k] = val;
+    }
+    await this.request('POST', '/vectors/update', {
+      id,
+      setMetadata: cleanMeta,
       namespace: this.namespace || undefined,
     });
   }

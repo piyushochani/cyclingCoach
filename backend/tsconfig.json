@@ -11,6 +11,7 @@
     "sourceMap": true,
     "outDir": "./dist",
     "ignoreDeprecations": "6.0",
+    "skipLibCheck": true,
     "baseUrl": "./",
     "incremental": true,
     "types": ["node"]

@@ -159,8 +159,7 @@ const WeatherWidget = () => {
     );
   }, []);
 
-  if (loading) return <Skeleton />;
-  if (error || !weather) return <FallbackLink />;
+  if (loading || error || !weather) return null;
 
   return (
     <AnimatePresence>
@@ -174,27 +173,25 @@ const WeatherWidget = () => {
         className="group flex cursor-pointer items-center gap-2 no-underline"
         title="Open weather forecast"
       >
-        {weather.time.map((date, i) => {
-          const meta      = getWeatherMeta(weather.weathercode[i]);
-          const high      = `${Math.round(weather.temperature_2m_max[i])}°`;
-          const low       = `${Math.round(weather.temperature_2m_min[i])}°`;
-          const windSpeed = Math.round(weather.wind_speed_10m_max[i]);
-          const windDeg   = weather.wind_direction_10m_dominant[i];
-          const label     = i === 0 ? "Today" : "Tomorrow";
+        {(() => {
+          const meta      = getWeatherMeta(weather.weathercode[0]);
+          const high      = `${Math.round(weather.temperature_2m_max[0])}°`;
+          const low       = `${Math.round(weather.temperature_2m_min[0])}°`;
+          const windSpeed = Math.round(weather.wind_speed_10m_max[0]);
+          const windDeg   = weather.wind_direction_10m_dominant[0];
 
           return (
             <DayPill
-              key={date}
-              label={label}
+              label="Today"
               meta={meta}
               high={high}
               low={low}
               windSpeed={windSpeed}
               windDeg={windDeg}
-              isToday={i === 0}
+              isToday={true}
             />
           );
-        })}
+        })()}
       </motion.a>
     </AnimatePresence>
   );

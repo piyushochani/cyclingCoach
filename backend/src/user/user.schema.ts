@@ -76,10 +76,19 @@ export class User extends Document {
   subscriptionEndDate: Date;
 
   @Prop({ default: null })
-  stripeCustomerId: string;
+  stravaAccessToken: string;
 
   @Prop({ default: null })
-  stripeSubscriptionId: string;
+  stravaRefreshToken: string;
+
+  @Prop({ default: null })
+  stravaExpiresAt: number;
+
+  @Prop({ default: null })
+  stravaAthleteId: number;
+
+  @Prop({ default: null })
+  stravaConnectedAt: Date;
 
   @Prop({ default: null })
   stravaUpdatedAt: Date;

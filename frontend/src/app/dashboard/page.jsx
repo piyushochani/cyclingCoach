@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { usePathname } from "next/navigation";
 import { api } from "../../../lib/api";
 import { useDataRefetch } from "../../../lib/useDataRefetch";
-import WeeklyGoalCard from "../../../components/layout/WeeklyGoalCard";
+import ProfileGoalCard from "../../../components/layout/ProfileGoalCard";
 import WeeklyScheduleCard from "../../../components/layout/WeekScheduleCard";
 import StatsYearCard from "../../../components/layout/StatsYearCard";
 import HeatmapContainer from "../../../components/layout/HeatmapContainer";
@@ -20,6 +20,7 @@ const DashboardPage = () => {
   const [races, setRaces] = useState([]);
   const [weeklyPlan, setWeeklyPlan] = useState(null);
   const [syncInfo, setSyncInfo] = useState(null);
+  const [user, setUser] = useState(null);
   const refetchKey = useDataRefetch();
 
   const loadDashboardData = useCallback(() => {
@@ -32,7 +33,13 @@ const DashboardPage = () => {
     ])
       .then(([statsData, activitiesData, racesData, weeklyPlanData, syncData]) => {
         setStats(statsData);
-        setActivities(activitiesData);
+        const seen = new Set();
+        setActivities((activitiesData || []).filter((a) => {
+          const key = (a.stravaId != null && a.stravaId !== 0) ? a.stravaId : a.name + a.distance;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        }));
         setRaces(racesData);
         setWeeklyPlan(weeklyPlanData);
         setSyncInfo(syncData);
@@ -41,6 +48,10 @@ const DashboardPage = () => {
 
   useEffect(() => {
     loadDashboardData();
+    try {
+      const stored = localStorage.getItem('cyclogenai_user');
+      if (stored) setUser(JSON.parse(stored));
+    } catch {}
   }, [loadDashboardData, refetchKey]);
 
   const statCards = useMemo(() => stats
@@ -96,7 +107,7 @@ const DashboardPage = () => {
 
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="flex flex-col gap-5">
-            <WeeklyGoalCard activities={activities} />
+            <ProfileGoalCard user={user} activities={activities} />
             <WeeklyScheduleCard plan={weeklyPlan} />
           </div>
 

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DataProcessorService, ProcessedActivity } from './data-processor.service';
 import { PineconeClient } from './pinecone-client';
 import { EmbeddingService } from './embedding.service';
+import { DEFAULT_RAG_MIN_SCORE, formatRagMatchesForReview } from './rag-context.util';
 
 export interface AthleteProfile {
   ftp: number | null;
@@ -62,13 +63,13 @@ export class ContextBuilderService {
     const summary = this.buildSummary(processed, prevProcessed);
     const weatherNote = this.buildWeatherNote(processed);
     const trainingPhaseNote = this.buildTrainingPhaseNote(processed, prevProcessed);
-    const historicalContext = await this.buildHistoricalContext(processed);
+    const historicalContext = await this.buildHistoricalContext(processed, user?._id?.toString());
 
     return { athlete, activities: processed, summary, weatherNote, trainingPhaseNote, historicalContext };
   }
 
-  private async buildHistoricalContext(activities: ProcessedActivity[]): Promise<string> {
-    if (!this.pinecone.isConfigured || !this.embedder.isConfigured || activities.length === 0) {
+  private async buildHistoricalContext(activities: ProcessedActivity[], userId?: string): Promise<string> {
+    if (!this.pinecone.isConfigured || !this.embedder.isConfigured || activities.length === 0 || !userId) {
       return '';
     }
 
@@ -78,20 +79,12 @@ export class ContextBuilderService {
       ).join('. ');
 
       const vector = await this.embedder.embedText(queryText);
-      const result = await this.pinecone.query(vector, 5);
+      const result = await this.pinecone.query(vector, 5, {
+        filter: { userId: { $eq: userId } },
+        minScore: DEFAULT_RAG_MIN_SCORE,
+      });
 
-      if (!result.matches || result.matches.length === 0) return '';
-
-      const entries = result.matches
-        .filter((m) => m.metadata && m.metadata.summary)
-        .map((m, i) => {
-          const meta = m.metadata as any;
-          return `[Relevant Past Activity ${i + 1}] (relevance: ${(m.score * 100).toFixed(0)}%)\n${meta.summary}`;
-        });
-
-      if (entries.length === 0) return '';
-
-      return `## Relevant Historical Activities (from knowledge base)\n${entries.join('\n\n')}`;
+      return formatRagMatchesForReview(result.matches);
     } catch (err) {
       this.logger.warn(`Pinecone RAG query failed: ${err}`);
       return '';

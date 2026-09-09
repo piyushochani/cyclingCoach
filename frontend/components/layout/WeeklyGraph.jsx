@@ -15,16 +15,70 @@ function getWeekNumber(d) {
   return 1 + Math.round(((date - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
 }
 
+/**
+ * Returns a stable YYYY-MM-DD string for the Monday of the week containing `d`,
+ * computed entirely in local time. Used as the plan lookup key to avoid ISO week
+ * numbering edge-cases and UTC/local timezone shifts.
+ */
+function getMondayKey(d) {
+  const date = new Date(d);
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function weekKey(d) {
+  const iso = new Date(d);
+  iso.setHours(0, 0, 0, 0);
+  // ISO week-year is the year of the week's Thursday.
+  iso.setDate(iso.getDate() + 3 - ((iso.getDay() + 6) % 7));
   const wn = getWeekNumber(d);
-  return `${d.getFullYear()}-W${String(wn).padStart(2, "0")}`;
+  return `${iso.getFullYear()}-W${String(wn).padStart(2, "0")}`;
 }
 
 function weekStartDate(key) {
   const parts = key.split("-W");
-  const year = parseInt(parts[0]);
-  const wn = parseInt(parts[1]);
-  return new Date(year, 0, 1 + (wn - 1) * 7);
+  const year = parseInt(parts[0], 10);
+  const wn = parseInt(parts[1], 10);
+  // ISO week 1 always contains Jan 4; its Monday is the anchor for week numbering.
+  const jan4 = new Date(year, 0, 4);
+  jan4.setHours(0, 0, 0, 0);
+  const week1Monday = new Date(jan4);
+  week1Monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  const start = new Date(week1Monday);
+  start.setDate(week1Monday.getDate() + (wn - 1) * 7);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
+function formatWeekDateRange(startDate) {
+  const end = new Date(startDate);
+  end.setDate(startDate.getDate() + 6);
+  const fmt = (d) =>
+    `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return `${fmt(startDate)} → ${fmt(end)}`;
+}
+
+/** Keep month labels only where they won't overlap on the x-axis. */
+function pickVisibleMonthLabels(monthPts, minGap = 56) {
+  if (monthPts.length === 0) return [];
+  if (monthPts.length === 1) return monthPts;
+
+  const picked = [monthPts[0]];
+  for (let i = 1; i < monthPts.length; i++) {
+    const pt = monthPts[i];
+    if (pt.x - picked[picked.length - 1].x >= minGap) {
+      picked.push(pt);
+    }
+  }
+
+  const last = monthPts[monthPts.length - 1];
+  const lastPicked = picked[picked.length - 1];
+  if (last !== lastPicked && last.x - lastPicked.x >= minGap) {
+    picked.push(last);
+  }
+
+  return picked;
 }
 
 const DAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
@@ -64,14 +118,30 @@ function buildDayDataFromPlan(workout, dayOffset, startDate) {
 
   if (workout && workout.type !== 'rest') {
     const label = WORKOUT_LABELS[workout.type] || workout.type || "Workout";
-    const dist = workout.distance ? `${(workout.distance / 1000).toFixed(2)} km` : "—";
-    return { day: dayName, date: dateStr, activity: label, time: "—", distance: dist };
+    const dist = workout.distance ? `${Number(workout.distance).toFixed(2)} km` : "—";
+    const extra = [workout.zoneBreakdown, workout.terrain].filter(Boolean).join(" · ");
+    return {
+      day: dayName, date: dateStr, activity: label, time: extra || "—", distance: dist,
+      notes: workout.notes || "",
+      importance: workout.importance || "medium",
+      isPlan: true,
+    };
   }
-  return { day: dayName, date: dateStr, activity: "Rest", time: "—", distance: "—" };
+  return { day: dayName, date: dateStr, activity: "Rest", time: "—", distance: "—", isPlan: true };
 }
 
-function buildWeeklyData(activities, weeklyPlansMap = {}) {
+function buildWeeklyData(activities, weeklyPlans = []) {
   if (!activities || activities.length === 0) return [];
+
+  // Index plans by the Monday date key (local YYYY-MM-DD) of their startDate.
+  // This is more reliable than ISO week string comparison because it operates
+  // purely on local calendar dates, avoiding UTC/timezone edge-cases.
+  const plansByMonday = {};
+  for (const plan of weeklyPlans) {
+    if (!plan.startDate) continue;
+    const key = getMondayKey(new Date(plan.startDate));
+    plansByMonday[key] = plan;
+  }
 
   const weeks = {};
   for (const a of activities) {
@@ -79,7 +149,8 @@ function buildWeeklyData(activities, weeklyPlansMap = {}) {
     const key = weekKey(d);
     if (!weeks[key]) {
       const start = weekStartDate(key);
-      const monthLabel = d.toLocaleString("en", { month: "short" }).toUpperCase();
+      start.setHours(0, 0, 0, 0);
+      const monthLabel = start.toLocaleString("en", { month: "short" }).toUpperCase();
       weeks[key] = {
         week: key,
         km: 0, hrs: 0, elev: 0,
@@ -91,6 +162,7 @@ function buildWeeklyData(activities, weeklyPlansMap = {}) {
             day.setDate(start.getDate() + i);
             return `${String(day.getDate()).padStart(2, "0")}/${String(day.getMonth() + 1).padStart(2, "0")}`;
           }),
+          label: formatWeekDateRange(start),
         },
         startDate: start,
         dayBuckets: {},
@@ -104,19 +176,19 @@ function buildWeeklyData(activities, weeklyPlansMap = {}) {
     weeks[key].dayBuckets[dayName].push(a);
   }
 
-  let prevMonth = null;
   return Object.values(weeks).map((w) => {
     const performed = DAY_NAMES.map((_, i) => buildDayData(w.startDate, i, w.dayBuckets[DAY_NAMES[i]]));
-    const plan = weeklyPlansMap[w.week];
-    const planned = plan && plan.workouts?.length
+    // Match plan using the robust Monday-date key
+    const monKey = getMondayKey(w.startDate);
+    const plan = plansByMonday[monKey];
+    const hasPlan = !!(plan && plan.workouts?.length);
+    const planned = hasPlan
       ? DAY_NAMES.map((_, i) => {
-          const wo = plan.workouts.find((w) => w.dayOfWeek === i);
+          const wo = plan.workouts.find((pw) => pw.dayOfWeek === i);
           return buildDayDataFromPlan(wo, i, w.startDate);
         })
-      : performed;
-    const m = w.month === prevMonth ? null : w.month;
-    prevMonth = w.month;
-    return { ...w, planned, performed, month: m, activities: Object.values(w.dayBuckets).flat() };
+      : null; // null = no LLM plan for this week
+    return { ...w, planned, performed, hasPlan, activities: Object.values(w.dayBuckets).flat() };
   }).sort((a, b) => a.week.localeCompare(b.week));
 }
 
@@ -181,13 +253,14 @@ const controlButtonStyle = (variant = "default", disabled = false) => ({
 });
 
 export default function WeeklyGraph({ activities: apiActivities }) {
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [activeIdx, setActiveIdx] = useState(Number.MAX_SAFE_INTEGER);
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [zoomLevel, setZoomLevel] = useState(0);
   const [weeklyPlans, setWeeklyPlans] = useState([]);
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   const svgRef = useRef(null);
+  const chartContainerRef = useRef(null);
   const refetchKey = useDataRefetch();
 
   useEffect(() => {
@@ -196,31 +269,116 @@ export default function WeeklyGraph({ activities: apiActivities }) {
       .catch(() => {});
   }, [refetchKey]);
 
-  const weeklyPlansMap = useMemo(() => {
-    const map = {};
-    for (const plan of weeklyPlans) {
-      if (!plan.startDate) continue;
-      const d = new Date(plan.startDate);
-      const key = weekKey(d);
-      map[key] = plan;
-    }
-    return map;
-  }, [weeklyPlans]);
 
-  const weeklyData = useMemo(() => buildWeeklyData(apiActivities || [], weeklyPlansMap), [apiActivities, weeklyPlansMap]);
+  const weeklyData = useMemo(() => {
+    const data = buildWeeklyData(apiActivities || [], weeklyPlans);
+    // Always extend the graph to include the current week, even if empty
+    const now = new Date();
+    const currentKey = weekKey(now);
+    if (data.length === 0 || data[data.length - 1].week !== currentKey) {
+      const start = weekStartDate(currentKey);
+      start.setHours(0, 0, 0, 0);
+      const performed = DAY_NAMES.map((_, i) => buildDayData(start, i, null));
+      // Check if there's a plan for the current week
+      const monKey = getMondayKey(start);
+      const plansByMonday = {};
+      for (const plan of weeklyPlans) {
+        if (!plan.startDate) continue;
+        plansByMonday[getMondayKey(new Date(plan.startDate))] = plan;
+      }
+      const curPlan = plansByMonday[monKey];
+      const hasPlan = !!(curPlan && curPlan.workouts?.length);
+      const planned = hasPlan
+        ? DAY_NAMES.map((_, i) => {
+            const wo = curPlan.workouts.find((pw) => pw.dayOfWeek === i);
+            return buildDayDataFromPlan(wo, i, start);
+          })
+        : null;
+      data.push({
+        week: currentKey,
+        km: 0, hrs: 0, elev: 0,
+        month: start.toLocaleString("en", { month: "short" }).toUpperCase(),
+        dateRange: {
+          days: DAY_NAMES,
+          dates: DAY_NAMES.map((_, i) => {
+            const day = new Date(start);
+            day.setDate(start.getDate() + i);
+            return `${String(day.getDate()).padStart(2, "0")}/${String(day.getMonth() + 1).padStart(2, "0")}`;
+          }),
+          label: formatWeekDateRange(start),
+        },
+        startDate: start,
+        dayBuckets: {},
+        planned,
+        performed,
+        hasPlan,
+        activities: [],
+      });
+    }
+    return data;
+  }, [apiActivities, weeklyPlans]);
 
   const visibleCount = ZOOM_STEPS[zoomLevel];
-  const visibleData = weeklyData.slice(-visibleCount);
   const minZoomReached = visibleCount >= 12;
   const maxZoomReached = zoomLevel === ZOOM_STEPS.length - 1;
 
   const dataLen = weeklyData.length;
   const lastIdx = dataLen - 1;
+
+  // windowStart: index of the first visible week; null = pinned to the most recent weeks
+  const [windowStart, setWindowStart] = useState(null);
+
+  // Reset window to end whenever zoom level changes
+  useEffect(() => { setWindowStart(null); }, [zoomLevel]);
+
+  // Resolved window boundaries
+  const resolvedWindowStart = Math.max(
+    0,
+    Math.min(
+      windowStart !== null ? windowStart : Math.max(0, dataLen - visibleCount),
+      Math.max(0, dataLen - visibleCount)
+    )
+  );
+  const visibleData = weeklyData.slice(resolvedWindowStart, resolvedWindowStart + visibleCount);
+
+  // activeIdx = MAX_SAFE_INTEGER means "always track the most recent week"
   const clampedActiveIdx = Math.max(
-    dataLen - visibleCount,
-    Math.min(activeIdx, lastIdx)
+    0,
+    Math.min(
+      activeIdx === Number.MAX_SAFE_INTEGER ? lastIdx : activeIdx,
+      lastIdx
+    )
   );
   const activeWeek = weeklyData[clampedActiveIdx] || null;
+
+  // Keyboard arrow navigation — works after clicking into the chart area
+  useEffect(() => {
+    const el = chartContainerRef.current;
+    if (!el) return;
+    const handleKeyDown = (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const delta = e.key === "ArrowLeft" ? -1 : 1;
+
+      setActiveIdx((prev) => {
+        const curr =
+          prev === Number.MAX_SAFE_INTEGER ? lastIdx : Math.max(0, Math.min(prev, lastIdx));
+        const next = Math.max(0, Math.min(lastIdx, curr + delta));
+
+        // Slide the visible window to keep the selected week in view
+        setWindowStart((ws) => {
+          const base = ws !== null ? ws : Math.max(0, dataLen - visibleCount);
+          if (next < base) return Math.max(0, base - 1);
+          if (next >= base + visibleCount) return Math.min(Math.max(0, dataLen - visibleCount), base + 1);
+          return ws; // no change needed
+        });
+
+        return next;
+      });
+    };
+    el.addEventListener("keydown", handleKeyDown);
+    return () => el.removeEventListener("keydown", handleKeyDown);
+  }, [dataLen, visibleCount, lastIdx]);
 
   const W = 980;
   const H = 240;
@@ -242,10 +400,10 @@ export default function WeeklyGraph({ activities: apiActivities }) {
             : (i / (visibleData.length - 1)) * chartW),
         y: PAD.t + (1 - d.km / yMax) * chartH,
         ...d,
-        globalIdx: dataLen - visibleData.length + i,
+        globalIdx: resolvedWindowStart + i,
         localIdx: i,
       })),
-    [visibleData, chartW, chartH, yMax, dataLen]
+    [visibleData, chartW, chartH, yMax, resolvedWindowStart]
   );
 
   const linePath = pts.length > 0
@@ -256,7 +414,42 @@ export default function WeeklyGraph({ activities: apiActivities }) {
   const areaPath = linePath && lastPt && firstPt
     ? `${linePath} L${lastPt.x.toFixed(1)},${PAD.t + chartH} L${firstPt.x.toFixed(1)},${PAD.t + chartH} Z`
     : "";
-  const monthPts = pts.filter((p) => p.month);
+  const monthPts = useMemo(() => {
+    // Count weeks and sum x-positions per calendar month
+    const weekCountByMonth = {};
+    const monthSumX = {};
+    pts.forEach((p) => {
+      const d = new Date(p.startDate);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      weekCountByMonth[key] = (weekCountByMonth[key] || 0) + 1;
+      monthSumX[key] = (monthSumX[key] || 0) + p.x;
+    });
+
+    // Build one entry per month, centered under all its visible weeks
+    const seen = new Set();
+    const candidates = [];
+    pts.forEach((p) => {
+      const d = new Date(p.startDate);
+      const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+      if (!seen.has(monthKey)) {
+        seen.add(monthKey);
+        const count = weekCountByMonth[monthKey] || 0;
+        // Only show month label if at least 2 weeks are visible for that month
+        if (count >= 2) {
+          candidates.push({
+            ...p,
+            x: monthSumX[monthKey] / count,
+            month: d.toLocaleString("en", { month: "short" }).toUpperCase(),
+            monthKey,
+          });
+        }
+      }
+    });
+
+    const pointSpacing = pts.length > 1 ? chartW / (pts.length - 1) : chartW;
+    const minGap = Math.max(48, Math.min(72, pointSpacing * 0.85));
+    return pickVisibleMonthLabels(candidates, minGap);
+  }, [pts, chartW]);
 
   return (
     <div
@@ -426,6 +619,12 @@ export default function WeeklyGraph({ activities: apiActivities }) {
       <div style={{ paddingTop: 12, paddingBottom: 12 }}>
         <div style={{ display: "flex", gap: 40, flexWrap: "wrap", justifyContent: "center" }}>
           {[
+            {
+              label: "Date Range",
+              display: activeWeek?.dateRange?.label || "—",
+              color: "#D1D5DB",
+              size: 20,
+            },
             { label: "Distance", val: activeWeek ? activeWeek.km : 0, unit: "km", decimals: 2, color: "white" },
             {
               label: "Time",
@@ -450,13 +649,14 @@ export default function WeeklyGraph({ activities: apiActivities }) {
               </div>
               <div style={{
                 fontFamily: "'DM Sans', sans-serif",
-                fontSize: 28, fontWeight: 700, color: s.color, lineHeight: 1,
+                fontSize: s.size || 28, fontWeight: 700, color: s.color, lineHeight: 1,
                 display: "flex", alignItems: "baseline", gap: 4,
+                whiteSpace: "nowrap",
               }}>
                 {s.display ? s.display : (
                   <>
                     <span>{(typeof s.val === 'number' ? s.val.toFixed(s.decimals ?? 0) : s.val)}</span>
-                    <span style={{ fontSize: 22 }}> {s.unit}</span>
+                    <span style={{ fontSize: s.size ? s.size - 2 : 22 }}> {s.unit}</span>
                   </>
                 )}
               </div>
@@ -466,7 +666,12 @@ export default function WeeklyGraph({ activities: apiActivities }) {
       </div>
 
       {/* ── CHART ── */}
-      <div style={{ position: "relative", userSelect: "none" }}>
+      <div
+        ref={chartContainerRef}
+        tabIndex={0}
+        style={{ position: "relative", userSelect: "none", outline: "none" }}
+        onFocus={() => {}}
+      >
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}
@@ -637,18 +842,38 @@ export default function WeeklyGraph({ activities: apiActivities }) {
               );
             })()}
 
+          {/* X-axis baseline */}
+          <line
+            x1={PAD.l}
+            y1={PAD.t + chartH}
+            x2={W - PAD.r}
+            y2={PAD.t + chartH}
+            stroke="rgba(255,255,255,0.08)"
+            strokeWidth="1"
+          />
+
           {monthPts.map((p) => (
             <text
-              key={`ml-${p.month}`}
+              key={`ml-${p.monthKey}`}
               x={p.x}
-              y={H - 6}
+              y={PAD.t + chartH + 26}
               textAnchor="middle"
               fill="#9CA3AF"
-              style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13 }}
+              style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 12, fontWeight: 600 }}
             >
               {p.month}
             </text>
           ))}
+          {/* Keyboard navigation hint */}
+          <text
+            x={W - PAD.r}
+            y={PAD.t + chartH + 26}
+            textAnchor="end"
+            fill="rgba(255,255,255,0.18)"
+            style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 10 }}
+          >
+            ← → to navigate
+          </text>
         </svg>
       </div>
 
@@ -696,7 +921,7 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                   marginLeft: 10,
                 }}
               >
-                · {activeWeek.dateRange.dates[0]} → {activeWeek.dateRange.dates[6]}
+                · {activeWeek.dateRange.label}
               </span>
             </div>
 
@@ -731,7 +956,56 @@ export default function WeeklyGraph({ activities: apiActivities }) {
             </div>
           </div>
 
-          <div style={{ minWidth: 760 }}>
+          {/* Mobile & tablet: day cards */}
+          <div className="space-y-2 lg:hidden">
+            {activeWeek.performed.map((perf, i) => {
+              const row = activeWeek.planned ? activeWeek.planned[i] : null;
+              const status = row ? statusOf(row.activity, perf.activity) : (perf.activity === "Rest" ? "rest" : "done");
+              const meta = STATUS_META[status];
+
+              return (
+                <div
+                  key={`mobile-${i}`}
+                  className="rounded-xl border border-white/[0.08] bg-white/[0.02] px-4 py-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <p className="font-dmSans text-sm font-bold text-white">{perf.day}</p>
+                      <p className="font-dmSans text-[11px] text-white/40">{perf.date}</p>
+                    </div>
+                    <span
+                      className="rounded px-2 py-0.5 font-dmSans text-[9px] font-semibold uppercase tracking-wide"
+                      style={{ background: meta.bg, border: `1px solid ${meta.border}`, color: meta.text }}
+                    >
+                      {meta.label}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="rounded-lg bg-[#FF5500]/5 px-3 py-2">
+                      <p className="font-dmSans text-[10px] uppercase tracking-wide text-[#FF5500]/70">Planned</p>
+                      {row ? (
+                        <>
+                          <p className="mt-1 truncate font-dmSans text-sm text-white/80">{activityEmoji(row.activity)} {row.activity}</p>
+                          <p className="font-dmSans text-xs text-white/45">{row.distance !== "—" ? row.distance : ""}{row.time && row.time !== "—" ? ` · ${row.time}` : ""}</p>
+                          {row.notes ? <p className="font-dmSans text-[10px] text-white/30 mt-0.5 line-clamp-2">{row.notes}</p> : null}
+                        </>
+                      ) : (
+                        <p className="mt-1 font-dmSans text-sm text-white/30 italic">No plan</p>
+                      )}
+                    </div>
+                    <div className="rounded-lg bg-white/[0.03] px-3 py-2">
+                      <p className="font-dmSans text-[10px] uppercase tracking-wide text-white/35">Performed</p>
+                      <p className="mt-1 truncate font-dmSans text-sm text-white/80">{activityEmoji(perf.activity)} {perf.activity}</p>
+                      <p className="font-dmSans text-xs text-white/45">{perf.time}{perf.distance ? ` · ${perf.distance}` : ""}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Laptop / desktop: full table */}
+          <div className="hidden lg:block" style={{ minWidth: 760 }}>
             <div
               style={{
                 display: "grid",
@@ -911,11 +1185,11 @@ export default function WeeklyGraph({ activities: apiActivities }) {
               </div>
             </div>
 
-            {activeWeek.planned.map((row, i) => {
-              const perf = activeWeek.performed[i];
-              const status = statusOf(row.activity, perf.activity);
+            {activeWeek.performed.map((perf, i) => {
+              const row = activeWeek.planned ? activeWeek.planned[i] : null;
+              const status = row ? statusOf(row.activity, perf.activity) : (perf.activity === "Rest" ? "rest" : "done");
               const meta = STATUS_META[status];
-              const isLast = i === activeWeek.planned.length - 1;
+              const isLast = i === activeWeek.performed.length - 1;
 
               return (
                 <motion.div
@@ -940,28 +1214,15 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                       alignItems: "center",
                     }}
                   >
-                    <div
-                      style={{
-                        fontFamily: "'DM Sans',sans-serif",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: "white",
-                      }}
-                    >
-                      {row.day}
+                    <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 12, fontWeight: 700, color: "white" }}>
+                      {perf.day}
                     </div>
-                    <div
-                      style={{
-                        fontFamily: "'DM Sans',sans-serif",
-                        fontSize: 10,
-                        color: "#6B7280",
-                        marginTop: 1,
-                      }}
-                    >
-                      {row.date}
+                    <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 10, color: "#6B7280", marginTop: 1 }}>
+                      {perf.date}
                     </div>
                   </div>
 
+                  {/* PLANNED column */}
                   <div
                     style={{
                       padding: "12px 16px",
@@ -972,32 +1233,30 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                       alignItems: "center",
                     }}
                   >
-                    <div
-                      style={{
-                        fontFamily: "'DM Sans',sans-serif",
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: row.activity === "Rest" ? "#4B5563" : "#D1D5DB",
-                        textAlign: "center",
-                        minWidth: 0,
-                        borderRight: "1px solid rgba(255,255,255,0.1)",
-                        paddingRight: 8,
-                      }}
-                    >
-                      {activityEmoji(row.activity)} {row.activity}
-                    </div>
-                    <div
-                      style={{
-                        fontFamily: "'DM Sans',sans-serif",
-                        fontSize: 11,
-                        color: "#6B7280",
-                        textAlign: "center",
-                      }}
-                    >
-                      {row.time}
-                    </div>
+                    {row ? (
+                      <>
+                        <div style={{ minWidth: 0, borderRight: "1px solid rgba(255,255,255,0.1)", paddingRight: 8 }}>
+                          <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, color: row.activity === "Rest" ? "#4B5563" : "#D1D5DB", textAlign: "center" }}>
+                            {activityEmoji(row.activity)} {row.activity}
+                          </div>
+                          {row.notes && (
+                            <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 10, color: "#6B7280", textAlign: "center", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {row.notes}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, color: "#6B7280", textAlign: "center" }}>
+                          {row.distance !== "—" ? row.distance : row.time !== "—" ? row.time : "—"}
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ gridColumn: "1 / -1", fontFamily: "'DM Sans',sans-serif", fontSize: 12, color: "rgba(255,255,255,0.2)", textAlign: "center", fontStyle: "italic" }}>
+                        No plan generated
+                      </div>
+                    )}
                   </div>
 
+                  {/* PERFORMED column */}
                   <div
                     style={{
                       padding: "12px 16px",
@@ -1008,60 +1267,18 @@ export default function WeeklyGraph({ activities: apiActivities }) {
                       alignItems: "center",
                     }}
                   >
-                      <div
-                        style={{
-                          fontFamily: "'DM Sans',sans-serif",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color:
-                            perf.activity === "Rest"
-                              ? "#4B5563"
-                              : "#D1D5DB",
-                          textAlign: "center",
-                          minWidth: 0,
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                          borderRight: "1px solid rgba(255,255,255,0.1)",
-                          paddingRight: 8,
-                        }}
-                      >
-                        {activityEmoji(perf.activity)} {perf.activity}
-                      </div>
-
-                    <div
-                      style={{
-                        fontFamily: "'DM Sans',sans-serif",
-                        fontSize: 11,
-                        color: "#D1D5DB",
-                        textAlign: "center",
-                        borderRight: "1px solid rgba(255,255,255,0.1)",
-                        paddingRight: 8,
-                      }}
-                    >
+                    <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 13, fontWeight: 600, color: perf.activity === "Rest" ? "#4B5563" : "#D1D5DB", textAlign: "center", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", borderRight: "1px solid rgba(255,255,255,0.1)", paddingRight: 8 }}>
+                      {activityEmoji(perf.activity)} {perf.activity}
+                    </div>
+                    <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, color: "#D1D5DB", textAlign: "center", borderRight: "1px solid rgba(255,255,255,0.1)", paddingRight: 8 }}>
                       {perf.time}
                     </div>
-
-                    <div
-                      style={{
-                        fontFamily: "'DM Sans',sans-serif",
-                        fontSize: 11,
-                        color: "#D1D5DB",
-                        textAlign: "center",
-                      }}
-                    >
+                    <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: 11, color: "#D1D5DB", textAlign: "center" }}>
                       {perf.distance || "—"}
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      padding: "12px 8px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
+                  <div style={{ padding: "12px 8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <div
                       style={{
                         background: meta.bg,

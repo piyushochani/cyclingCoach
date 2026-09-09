@@ -17,25 +17,30 @@ const OnboardingChat = ({ onComplete }) => {
   const [answers, setAnswers] = useState({});
   const [input, setInput] = useState("");
   const [saving, setSaving] = useState(false);
-  const [show, setShow] = useState(true);
+  const [show, setShow] = useState(false);
+  const [gateActive, setGateActive] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
-    const alreadyDone = localStorage.getItem("cyclogenai_onboarding_done") === "true";
-    if (alreadyDone) {
-      setShow(false);
-      onComplete?.();
-      return;
-    }
+    const onGateChange = (e) => setGateActive(Boolean(e.detail));
+    window.addEventListener("strava-gate-change", onGateChange);
+    return () => window.removeEventListener("strava-gate-change", onGateChange);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     (async () => {
-      const stored = localStorage.getItem("cyclogenai_user");
-      if (stored) {
-        try {
+      try {
+        if (localStorage.getItem("cyclogenai_onboarding_done") === "true") {
+          if (!cancelled) { setShow(false); onComplete?.(); }
+          return;
+        }
+        const stored = localStorage.getItem("cyclogenai_user");
+        if (stored) {
           const u = JSON.parse(stored);
           if (u.onboardingSummary) {
             localStorage.setItem("cyclogenai_onboarding_done", "true");
-            setShow(false);
-            onComplete?.();
+            if (!cancelled) { setShow(false); onComplete?.(); }
             return;
           }
           if (u.email) {
@@ -45,16 +50,19 @@ const OnboardingChat = ({ onComplete }) => {
                 u.onboardingSummary = userData.onboardingSummary;
                 localStorage.setItem("cyclogenai_user", JSON.stringify(u));
                 localStorage.setItem("cyclogenai_onboarding_done", "true");
-                setShow(false);
-                onComplete?.();
+                if (!cancelled) { setShow(false); onComplete?.(); }
                 return;
               }
             } catch {}
           }
-        } catch {}
+        }
+      } catch {}
+      if (!cancelled) {
+        setShow(true);
+        inputRef.current?.focus();
       }
-      if (show) inputRef.current?.focus();
     })();
+    return () => { cancelled = true; };
   }, [step, show]);
 
   const handleSubmit = (e) => {
@@ -103,7 +111,7 @@ const OnboardingChat = ({ onComplete }) => {
 
   return (
     <AnimatePresence>
-      {show && (
+      {show && !gateActive && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

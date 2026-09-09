@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
-import { buildJobId, DEFAULT_JOB_OPTIONS, QUEUES } from '../common/queue/queue.constants';
-import { MockQueue } from '../common/queue/mock-queue';
 import { Model } from 'mongoose';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -18,6 +15,10 @@ import { TrainingContextService } from '../training-context/training-context.ser
 import { logKeyHealth } from '../common/gemini-key-validator';
 import { callGroqSimple } from '../common/groq-client';
 import { isGeminiQuotaError } from '../common/llm-config';
+import { ApiUsageService } from '../apiusage/api-usage.service';
+import { PineconeClient } from './pinecone-client';
+import { buildRichSummary } from './rag-context.util';
+import { DEFAULT_QUEUE_JOB_OPTIONS } from '../common/queue/queue.module';
 
 const DAILY_PROMPT = `# Daily Review
 
@@ -189,8 +190,10 @@ export class AnalysisService {
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Activity.name) private activityModel: Model<Activity>,
     @InjectModel(Race.name) private raceModel: Model<Race>,
-    @InjectQueue(QUEUES.ANALYSIS) private readonly analysisQueue: Queue | MockQueue,
+    @InjectQueue('analysis') private readonly analysisQueue: any,
     private readonly trainingContext: TrainingContextService,
+    private readonly pinecone: PineconeClient,
+    private readonly apiUsageService: ApiUsageService,
   ) {
     logKeyHealth(this.logger, 'sync').catch(() => {});
   }
@@ -409,51 +412,11 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
     }
   }
 
-  async ensurePlans(userId: string): Promise<{ generated: number; message: string }> {
-    if (!userId) return { generated: 0, message: 'User ID required' };
-
-    const generated: number[] = [];
-
-    const recentActivities = await this.activityModel
-      .find({
-        user: userId as any,
-        sport: { $regex: /ride|cycling|bike|bicycle|velomobile|handcycle/i },
-      })
-      .sort({ date: -1 })
-      .limit(20)
-      .lean()
-      .exec();
-
-    for (const relativeWeek of [0, 1]) {
-      const existing = await this.trainingContext.getWeeklyPlan(userId, relativeWeek);
-      if (existing && existing.workouts && existing.workouts.length > 0) continue;
-
-      try {
-        const result = await this.generateNextWeekPlan(recentActivities, userId);
-        if (result.workouts?.length > 0) {
-          await this.trainingContext.upsertWeeklyPlan(userId, relativeWeek, {
-            workouts: result.workouts,
-            coachNotes: result.coachNotes,
-            status: 'generated',
-          });
-          generated.push(relativeWeek);
-        }
-      } catch (err) {
-        this.logger.error(`Failed to generate plan for week ${relativeWeek}: ${err}`);
-      }
-    }
-
-    return {
-      generated: generated.length,
-      message: generated.length > 0 ? `${generated.length} plan(s) generated` : 'All plans already exist',
-    };
-  }
-
-  async runWeeklyReview(userId: string): Promise<{ analysis: string }> {
+  async generateWeeklyReview(userId: string): Promise<{ analysis: string }> {
     return this.analyze({ type: 'weekly', activities: [], message: 'Weekly review' }, userId);
   }
 
-  async runMonthlyReview(userId: string): Promise<{ analysis: string }> {
+  async generateMonthlyReview(userId: string): Promise<{ analysis: string }> {
     return this.analyze({ type: 'monthly', activities: [], message: 'Monthly review' }, userId);
   }
 
@@ -461,7 +424,7 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
     await this.analysisQueue.add(
       'weekly',
       { userId, type: 'weekly' },
-      { ...DEFAULT_JOB_OPTIONS, jobId: buildJobId(QUEUES.ANALYSIS, userId, 'weekly'), attempts: 2 },
+      DEFAULT_QUEUE_JOB_OPTIONS,
     );
   }
 
@@ -469,7 +432,7 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
     await this.analysisQueue.add(
       'monthly',
       { userId, type: 'monthly' },
-      { ...DEFAULT_JOB_OPTIONS, jobId: buildJobId(QUEUES.ANALYSIS, userId, 'monthly'), attempts: 2 },
+      DEFAULT_QUEUE_JOB_OPTIONS,
     );
   }
 
@@ -477,16 +440,12 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
     await this.analysisQueue.add(
       'activity',
       { activityId, userId, type: 'activity' },
-      {
-        ...DEFAULT_JOB_OPTIONS,
-        jobId: buildJobId(QUEUES.ANALYSIS, userId, `activity:${activityId}`),
-        attempts: 2,
-      },
+      DEFAULT_QUEUE_JOB_OPTIONS,
     );
   }
 
   async generateActivityAnalysis(activityId: string, userId: string): Promise<string> {
-    const activity = await this.activityModel.findById(activityId).lean().exec() as any;
+    const activity = await this.activityModel.findOne({ _id: activityId, user: userId as any }).lean().exec() as any;
     if (!activity) return '';
 
     const sameDay = new Date(activity.date);
@@ -528,11 +487,20 @@ Generate a 7-day training plan for the NEXT week. Respond with ONLY valid JSON m
       { $set: { llmAnalysis: result } },
     ).exec();
 
+    if (activity.vectorId && this.pinecone.isConfigured) {
+      try {
+        const richSummary = buildRichSummary(activity.summaryText, result);
+        await this.pinecone.updateMetadata(activity.vectorId, { summary: richSummary });
+      } catch (err) {
+        this.logger.warn(`Failed to update Pinecone metadata for ${activity.vectorId}: ${err}`);
+      }
+    }
+
     return result;
   }
 
   async deepReviewActivity(activityId: string, userId: string): Promise<{ review: string }> {
-    const activity = await this.activityModel.findById(activityId).lean().exec() as any;
+    const activity = await this.activityModel.findOne({ _id: activityId, user: userId as any }).lean().exec() as any;
     if (!activity) return { review: 'Activity not found.' };
 
     const sameDay = new Date(activity.date);
@@ -669,12 +637,44 @@ One or two specific, actionable recommendations based on this ride and the athle
       return 'AI analysis is not configured. Please set GOOGLE_GENERATIVE_AI_SYNC_API_KEYS in your environment.';
     }
 
+    let unhealthyHashes: string[] = [];
+    try {
+      unhealthyHashes = await this.apiUsageService.getUnhealthyHashes();
+      if (unhealthyHashes.length > 0) {
+        const before = apiKeys.length;
+        const set = new Set(unhealthyHashes);
+        apiKeys = apiKeys.filter((k) => !set.has(this.apiUsageService.getKeyHash(k)));
+        if (apiKeys.length !== before) {
+          this.logger.warn(
+            `Skipping ${before - apiKeys.length} exhausted/invalid Gemini key(s); remaining ${apiKeys.length}`,
+          );
+        }
+        if (apiKeys.length === 0) {
+          this.logger.warn('All Gemini keys marked unhealthy — will fall back to Groq.');
+        }
+      }
+    } catch (err) {
+      this.logger.warn(`Could not read API health for rotation: ${err}`);
+    }
+
     const temperature = opts?.temperature ?? 0.7;
     const maxTokens = opts?.maxTokens ?? 2048;
 
     const maxAttempts = apiKeys.length * 2;
     const fallbackModel = 'gemini-2.0-flash-lite';
     let usedFallback = false;
+    let groqTried = false;
+
+    const tryGroqFallback = async (): Promise<string | null> => {
+      if (groqTried) return null;
+      groqTried = true;
+      this.logger.warn('Falling back to Groq');
+      return callGroqSimple(this.logger, prompt, {
+        temperature,
+        maxTokens,
+        skipKeyHashes: unhealthyHashes,
+      });
+    };
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const key = apiKeys[attempt % apiKeys.length];
@@ -699,8 +699,7 @@ One or two specific, actionable recommendations based on this ride and the athle
           const errBody = await response.text().catch(() => '');
           this.logger.warn(`LLM rate limited — quota likely exhausted for key`);
           if (isGeminiQuotaError(response.status, errBody)) {
-            this.logger.warn('Gemini quota exhausted — falling back to Groq');
-            const groqAnswer = await callGroqSimple(this.logger, prompt, { temperature, maxTokens });
+            const groqAnswer = await tryGroqFallback();
             if (groqAnswer) return groqAnswer;
             return 'Sorry, the AI analysis service is currently unavailable due to API quota limits. Please try again later or add more API keys.';
           }
@@ -710,7 +709,7 @@ One or two specific, actionable recommendations based on this ride and the athle
             await new Promise((r) => setTimeout(r, 2000));
             continue;
           }
-          const groqAnswer = await callGroqSimple(this.logger, prompt, { temperature, maxTokens });
+          const groqAnswer = await tryGroqFallback();
           if (groqAnswer) return groqAnswer;
           return 'Sorry, the AI analysis service is currently unavailable due to API quota limits. Please try again later or add more API keys.';
         }
@@ -724,21 +723,30 @@ One or two specific, actionable recommendations based on this ride and the athle
         if (!response.ok) {
           const errText = await response.text();
           this.logger.error(`Gemini API error: ${response.status} ${errText}`);
+          const groqAnswer = await tryGroqFallback();
+          if (groqAnswer) return groqAnswer;
           return 'Sorry, the AI analysis service encountered an error. Please try again later.';
         }
 
         const data = await response.json();
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        return text || 'No analysis could be generated.';
+        if (text) return text;
+        const groqAnswer = await tryGroqFallback();
+        if (groqAnswer) return groqAnswer;
+        return 'No analysis could be generated.';
       } catch (err) {
         this.logger.error(`LLM call failed (attempt ${attempt + 1}): ${err}`);
         if (attempt === maxAttempts - 1) {
+          const groqAnswer = await tryGroqFallback();
+          if (groqAnswer) return groqAnswer;
           return 'Sorry, the AI analysis service is currently unavailable.';
         }
         await new Promise((r) => setTimeout(r, 3000));
       }
     }
 
+    const finalGroqAnswer = await tryGroqFallback();
+    if (finalGroqAnswer) return finalGroqAnswer;
     return 'Sorry, the AI analysis service is currently unavailable.';
   }
 }

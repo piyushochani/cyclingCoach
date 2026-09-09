@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { api } from "../../lib/api";
+import BikeLoader from "../ui/BikeLoader";
 
 const graphColors = ["#FF5500", "#FF7744", "#FF9933", "#FFBB22", "#FFDD11"];
 
@@ -51,13 +52,13 @@ export default function StravaConnectOverlay({ children }: { children: React.Rea
   const pathname = usePathname();
 
   useEffect(() => {
-    api.get("/strava/status")
-      .then((res: any) => {
+    api.get<{ connected?: boolean }>("/strava/status")
+      .then((res) => {
         const connected = res?.connected === true;
         setStravaConnected(connected);
         if (!connected) {
-          api.get("/strava/auth-url")
-            .then((r: any) => setAuthUrl(r?.url ?? null))
+          api.get<{ url?: string }>("/strava/auth-url")
+            .then((r) => setAuthUrl(r?.url ?? null))
             .catch(() => setAuthError(true));
         }
       })
@@ -76,11 +77,17 @@ export default function StravaConnectOverlay({ children }: { children: React.Rea
       const stored = localStorage.getItem("cyclogenai_user");
       if (!stored) return false;
       const u = JSON.parse(stored);
-      return !!(u.stravaUpdatedAt || u.isStravaUpToDate);
+      return !!(u.stravaAccessToken || u.stravaUpdatedAt || u.isStravaUpToDate);
     } catch { return false; }
   }, []);
 
-  if (stravaConnected === null) return <>{children}</>;
+  useEffect(() => {
+    if (stravaConnected === null) return;
+    const gateActive = !hasPrevSync && !stravaConnected && !isPublic;
+    window.dispatchEvent(new CustomEvent("strava-gate-change", { detail: gateActive }));
+  }, [stravaConnected, hasPrevSync, isPublic]);
+
+  if (stravaConnected === null) return <BikeLoader fullscreen size={128} />;
   if (hasPrevSync || stravaConnected || isPublic) return <>{children}</>;
 
   return (

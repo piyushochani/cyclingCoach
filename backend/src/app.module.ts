@@ -16,14 +16,18 @@ import { BestEffortsModule } from './best-efforts/best-efforts.module';
 import { ExpenseModule } from './expense/expense.module';
 import { GearModule } from './gear/gear.module';
 import { AnalysisModule } from './analysis/analysis.module';
-import { ChatQueryModule } from './chat-query/chat-query.module';
 import { TrainingContextModule } from './training-context/training-context.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { NotificationModule } from './notification/notification.module';
 import { AgentModule } from './agent/agent.module';
 import { GeminiStatusModule } from './gemini-status/gemini-status.module';
 import { HealthModule } from './health/health.module';
+import { AdminModule } from './admin/admin.module';
+import { ApiUsageModule } from './apiusage/api-usage.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { QueueModule } from './common/queue/queue.module';
+import { JobsModule } from './common/queue/jobs.module';
+import { DummyPaymentModule } from './common/dummy-payment/dummy-payment.module';
 
 @Module({
   imports: [
@@ -48,11 +52,13 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
     AnalysisModule,
     TrainingContextModule,
     SubscriptionModule,
-    ChatQueryModule,
     NotificationModule,
     AgentModule,
     GeminiStatusModule,
     HealthModule,
+    ApiUsageModule,
+    DummyPaymentModule,
+    JobsModule,
   ],
   controllers: [],
   providers: [

@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, clearApiCache, dispatchDataRefetch } from "../../../../../lib/api";
+import { api, clearApiCache, dispatchDataRefetch, postSyncAndWait } from "../../../../../lib/api";
 import FirstSyncTutorial from "../../../../../components/layout/FirstSyncTutorial";
 import OnboardingChat from "../../../../../components/layout/OnboardingChat";
 
@@ -12,7 +12,7 @@ function StravaCallbackInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<SyncStatus>("exchanging");
-  const [message, setMessage] = useState("Exchanging authorization code for tokens...");
+  const [message, setMessage] = useState("Connecting your Strava account...");
   const [tutorialDone, setTutorialDone] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -31,37 +31,39 @@ function StravaCallbackInner() {
     const code = searchParams.get("code");
     if (!code) {
       setStatus("error");
-      setMessage("No authorization code received from Strava.");
+      setMessage(
+        searchParams.get("error") === "access_denied"
+          ? "Strava authorization was cancelled. Nothing was connected."
+          : "No authorization code received from Strava."
+      );
       return;
     }
 
     let cancelled = false;
 
     api
-      .post("/strava/exchange", { code })
-      .then((data: any) => {
-        if (cancelled) return;
-        setStatus("storing");
-        setMessage("Tokens obtained! Storing them...");
-
-        return api.post("/strava/store-tokens", {
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-          expiresAt: data.expiresAt,
-        });
-      })
+      .post("/strava/connect", { code, state: searchParams.get("state") || undefined })
       .then(() => {
         if (cancelled) return;
         setStatus("syncing");
         setMessage("First sync in progress...");
-        return api.post("/sync/refresh", {});
+        return postSyncAndWait("/sync/refresh");
       })
-      .then(async (syncResult) => {
+      .then(async () => {
         if (cancelled) return;
         clearApiCache();
         dispatchDataRefetch();
         window.dispatchEvent(new CustomEvent("sync-completed", { detail: Date.now() }));
         api.post("/best-efforts/refresh", {}).catch(() => {});
+        try {
+          const stored = localStorage.getItem("cyclogenai_user");
+          if (stored) {
+            const u = JSON.parse(stored);
+            u.stravaConnected = true;
+            u.stravaUpdatedAt = new Date().toISOString();
+            localStorage.setItem("cyclogenai_user", JSON.stringify(u));
+          }
+        } catch {}
         try {
           const stored = localStorage.getItem("cyclogenai_user");
           if (stored) {

@@ -1,21 +1,14 @@
 import { Controller, Get, Post, Delete, Body, Param, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PaymentCardsService } from './payment-cards.service';
-import { StripeService } from '../common/stripe/stripe.service';
+import { DummyPaymentService } from '../common/dummy-payment/dummy-payment.service';
 import { UserId } from '../common/user-id.decorator';
 
 @Controller('payment-cards')
 export class PaymentCardsController {
   constructor(
     private readonly cardsService: PaymentCardsService,
-    private readonly stripeService: StripeService,
+    private readonly dummyPaymentService: DummyPaymentService,
   ) {}
-
-  @Post('create-setup-intent')
-  async createSetupIntent(@UserId() userId: string) {
-    if (!userId) throw new NotFoundException('User ID required');
-    const setupIntent = await this.stripeService.createSetupIntent();
-    return { clientSecret: setupIntent.client_secret };
-  }
 
   @Get()
   async listCards(@UserId() userId: string) {
@@ -27,28 +20,25 @@ export class PaymentCardsController {
   async addCard(
     @UserId() userId: string,
     @Body() body: {
-      stripePaymentMethodId: string;
+      cardNumber: string;
+      expiry: string;
+      cvc: string;
       cardHolderName?: string;
     },
   ) {
     if (!userId) throw new NotFoundException('User ID required');
-    if (!body.stripePaymentMethodId) {
-      throw new BadRequestException('stripePaymentMethodId is required');
+    if (!body.cardNumber || !body.expiry || !body.cvc) {
+      throw new BadRequestException('cardNumber, expiry, and cvc are required');
     }
 
-    const pm = await this.stripeService.getPaymentMethod(body.stripePaymentMethodId);
-    if (pm.type !== 'card' || !pm.card) {
-      throw new BadRequestException('Invalid payment method — not a card');
-    }
+    const cardInfo = this.dummyPaymentService.validateCard(body.cardNumber, body.expiry, body.cvc);
 
     return this.cardsService.addCard(userId, {
-      lastFour: pm.card.last4,
-      cardHolderName: body.cardHolderName || pm.billing_details?.name || '',
-      expiryMonth: pm.card.exp_month,
-      expiryYear: pm.card.exp_year,
-      brand: pm.card.brand,
-      stripePaymentMethodId: body.stripePaymentMethodId,
-      cardFingerprint: pm.card.fingerprint,
+      lastFour: cardInfo.lastFour,
+      cardHolderName: body.cardHolderName || cardInfo.cardHolderName,
+      expiryMonth: cardInfo.expiryMonth,
+      expiryYear: cardInfo.expiryYear,
+      brand: cardInfo.brand,
     });
   }
 

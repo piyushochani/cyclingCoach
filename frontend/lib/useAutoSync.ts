@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { api } from "./api";
+import { api, postSyncAndWait } from "./api";
 
 const SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const STORAGE_KEY = "cyclogenai_last_sync";
@@ -76,25 +76,6 @@ function setLastSyncTime(ts: number) {
   } catch {}
 }
 
-async function waitForJob(jobId: string, timeoutMs = 120000): Promise<boolean> {
-  const started = Date.now();
-  while Date.now() - started < timeoutMs) {
-    const job: any = await api.get(`/jobs/${encodeURIComponent(jobId)}`);
-    if (job.status === "completed") return true;
-    if (job.status === "failed") return false;
-    await new Promise((r) => setTimeout(r, 2000));
-  }
-  return false;
-}
-
-async function runSyncEndpoint(path: string): Promise<boolean> {
-  const res: any = await api.post(path, {});
-  if (res?.jobId) {
-    return waitForJob(res.jobId);
-  }
-  return true;
-}
-
 /** Kick off background data loading after login or signup (non-blocking). */
 export function triggerBackgroundSyncAfterAuth(isSignup = false): void {
   if (typeof window === "undefined") return;
@@ -150,8 +131,7 @@ export async function triggerGlobalSync(): Promise<boolean> {
 
   setSyncStatus("syncing");
   try {
-    const ok = await runSyncEndpoint("/sync/refresh");
-    if (!ok) throw new Error("Sync job failed");
+    await postSyncAndWait("/sync/refresh");
     api.post("/best-efforts/refresh", {}).catch(() => {});
     const now = Date.now();
     setLastSyncTime(now);
@@ -180,8 +160,7 @@ async function triggerIncrementalSync(): Promise<boolean> {
   const current = getSyncStatus();
   if (current === "syncing") return false;
   try {
-    const ok = await runSyncEndpoint("/sync/incremental");
-    if (!ok) return false;
+    await postSyncAndWait("/sync/incremental");
     setLastSyncTime(Date.now());
     return true;
   } catch {

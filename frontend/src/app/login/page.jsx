@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { api } from "../../../lib/api";
-import { completeAuthSession, isAuthenticated } from "../../../lib/auth";
+import { completeAuthSession } from "../../../lib/auth";
 import { triggerBackgroundSyncAfterAuth } from "../../../lib/useAutoSync";
 
 export default function LoginPage() {
@@ -14,12 +14,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (isAuthenticated()) {
-      router.replace("/dashboard");
-    }
-  }, [router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -52,12 +46,17 @@ export default function LoginPage() {
         className="relative w-full max-w-md"
       >
         <div className="rounded-[24px] border border-white/10 bg-[#111318]/90 p-8 shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-xl">
-          <div className="mb-8 text-center">
-            <Link href="/" className="inline-flex items-center gap-2">
-              <img src="/images/cyclogen_logo.png" alt="Cyclogen" className="h-15 w-40" />
+          <div className="mb-8 flex items-center">
+            <Link
+              href="/"
+              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 font-dmSans text-xs text-white/30 transition hover:border-white/20 hover:bg-white/10 hover:text-white/50"
+            >
+              &larr;
             </Link>
-            <div className="mt-3">
-              <Link href="/" className="font-dmSans text-xs text-white/30 transition hover:text-white/50">&larr; Back to home</Link>
+            <div className="flex-1 text-center">
+              <Link href="/" className="inline-flex items-center gap-2">
+                <img src="/images/new_cyclogenAI_logo.png" alt="Cyclogen" className="h-15 w-40" />
+              </Link>
             </div>
           </div>
 
@@ -113,7 +112,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-4 text-center">
-            <Link href="/forgot-password" className="font-dmSans text-sm text-white/40 transition hover:text-white/60">
+            <Link href="/forgot-password" prefetch={false} className="font-dmSans text-sm text-white/40 transition hover:text-white/60">
               Forgot password?
             </Link>
           </div>

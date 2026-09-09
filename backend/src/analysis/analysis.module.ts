@@ -10,12 +10,15 @@ import { SummaryBuilderService } from './summary-builder.service';
 import { PineconeClient } from './pinecone-client';
 import { EmbeddingService } from './embedding.service';
 import { ActivitySyncPipelineService } from './activity-sync-pipeline.service';
+import { EmbeddingRetryService } from './embedding-retry.service';
+import { QueueSchedulerService } from '../common/queue/queue-scheduler.service';
 import { Activity, ActivitySchema } from '../activity/activity.schema';
 import { User, UserSchema } from '../user/user.schema';
 import { Race, RaceSchema } from '../race/race.schema';
 import { NotificationModule } from '../notification/notification.module';
 import { PlanModule } from '../plan/plan.module';
 import { TrainingContextModule } from '../training-context/training-context.module';
+import { ApiUsageModule } from '../apiusage/api-usage.module';
 import { createQueueModule } from '../common/queue/conditional-queue';
 import { isRedisEnabled, QUEUES } from '../common/queue/queue.constants';
 
@@ -30,6 +33,7 @@ import { isRedisEnabled, QUEUES } from '../common/queue/queue.constants';
     NotificationModule,
     forwardRef(() => PlanModule),
     TrainingContextModule,
+    ApiUsageModule,
   ],
   controllers: [AnalysisController],
   providers: [
@@ -42,6 +46,8 @@ import { isRedisEnabled, QUEUES } from '../common/queue/queue.constants';
     PineconeClient,
     EmbeddingService,
     ActivitySyncPipelineService,
+    EmbeddingRetryService,
+    QueueSchedulerService,
   ],
   exports: [AnalysisService, ActivitySyncPipelineService, PineconeClient, EmbeddingService],
 })

@@ -1,88 +1,39 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { readFileSync, existsSync, writeFileSync, appendFileSync } from 'fs';
-import { homedir } from 'os';
-import { join, resolve, dirname } from 'path';
-import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
+import { Injectable, Logger, ConflictException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { User } from '../user/user.schema';
+import { StravaTokenService, StravaTokens } from './strava-token.service';
 
 @Injectable()
 export class StravaAuthService {
   private readonly logger = new Logger(StravaAuthService.name);
 
-  private configPaths = [
-    join(homedir(), '.cycling-coach', 'config.yaml'),
-    join(homedir(), '.config', 'cycling-coach', 'config.yaml'),
-    join(homedir(), '.enduragent', 'cycling-coach', 'config.yaml'),
-  ];
+  constructor(
+    private readonly tokenService: StravaTokenService,
+    @InjectModel(User.name) private userModel: Model<User>,
+  ) {}
 
-  private projectRoot = resolve(__dirname, '..', '..', '..');
-
-  private readStravaConfig(): { clientId: string; clientSecret: string } {
-    // 1. Try environment variables first
-    const envClientId = process.env.STRAVA_CLIENT_ID || '';
-    const envClientSecret = process.env.STRAVA_CLIENT_SECRET || '';
-    if (envClientId && envClientSecret) {
-      return { clientId: envClientId, clientSecret: envClientSecret };
-    }
-
-    // 2. Fallback to config.yaml
-    for (const filePath of this.configPaths) {
-      if (existsSync(filePath)) {
-        try {
-          const raw = readFileSync(filePath, 'utf-8');
-          const config = parseYaml(raw) as any;
-          const strava = config?.strava;
-          if (strava?.client_id && strava?.client_secret) {
-            return { clientId: String(strava.client_id), clientSecret: String(strava.client_secret) };
-          }
-        } catch (err) {
-          this.logger.warn(`Failed to read config from ${filePath}: ${err}`);
-        }
-      }
-    }
-
-    throw new Error('Strava client credentials not configured. Add STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET to backend/.env');
+  async getStatus(userId: string): Promise<{ connected: boolean; lastSyncAt: Date | null; stravaConnectedAt: Date | null }> {
+    return this.tokenService.getUserStatus(userId);
   }
 
-  private findConfigPath(): string | null {
-    for (const filePath of this.configPaths) {
-      if (existsSync(filePath)) return filePath;
-    }
-    return this.configPaths[0];
-  }
-
-  getStatus(): { connected: boolean } {
-    // 1. Try environment variables first
-    if (process.env.STRAVA_ACCESS_TOKEN && process.env.STRAVA_REFRESH_TOKEN) {
-      return { connected: true };
-    }
-
-    // 2. Fallback to config.yaml
-    for (const filePath of this.configPaths) {
-      if (existsSync(filePath)) {
-        try {
-          const raw = readFileSync(filePath, 'utf-8');
-          const config = parseYaml(raw) as any;
-          const strava = config?.strava;
-          if (strava?.access_token && strava?.refresh_token) {
-            return { connected: true };
-          }
-        } catch {}
-      }
-    }
-    const token = process.env.STRAVA_ACCESS_TOKEN;
-    return { connected: !!token };
-  }
-
-  getAuthUrl(): { url: string } {
-    const { clientId } = this.readStravaConfig();
-    const redirectUri = 'http://localhost:3000/auth/strava/callback';
-    const url = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&approval_prompt=force&scope=read,activity:read_all,profile:read_all`;
+  getAuthUrl(userId: string): { url: string } {
+    const { clientId } = this.tokenService.requireAppCredentials();
+    const redirectUri = this.tokenService.getRedirectUri();
+    const state = Buffer.from(JSON.stringify({ userId })).toString('base64url');
+    const url = `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read,activity:read_all,profile:read_all&state=${state}`;
     return { url };
   }
 
-  async exchangeCode(code: string): Promise<{ accessToken: string; refreshToken: string; expiresAt: number }> {
-    const { clientId, clientSecret } = this.readStravaConfig();
-    const redirectUri = 'http://localhost:3000/auth/strava/callback';
+  async exchangeAndStore(userId: string, code: string): Promise<{ success: true }> {
+    const tokens = await this.exchangeCode(code);
+    await this.storeTokensForUser(userId, tokens);
+    return { success: true };
+  }
+
+  async exchangeCode(code: string): Promise<StravaTokens & { athleteId: number }> {
+    const { clientId, clientSecret } = this.tokenService.requireAppCredentials();
+    const redirectUri = this.tokenService.getRedirectUri();
 
     const res = await fetch('https://www.strava.com/oauth/token', {
       method: 'POST',
@@ -105,70 +56,43 @@ export class StravaAuthService {
       access_token: string;
       refresh_token: string;
       expires_at: number;
+      athlete: { id: number };
     };
 
     return {
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
       expiresAt: data.expires_at,
+      athleteId: data.athlete.id,
     };
   }
 
-  async storeTokens(accessToken: string, refreshToken: string, expiresAt: number): Promise<void> {
-    // 1. Write to config.yaml
-    const configPath = this.findConfigPath();
-    if (configPath) {
-      try {
-        let content = readFileSync(configPath, 'utf-8');
-        const updates: Record<string, string> = {
-          access_token: accessToken,
-          refresh_token: refreshToken,
-          expires_at: String(expiresAt),
-        };
-        for (const [key, val] of Object.entries(updates)) {
-          const lineRegex = new RegExp(`^(\\s*)(${key}:\\s*).*$`, 'm');
-          if (lineRegex.test(content)) {
-            content = content.replace(lineRegex, `$1$2${val}`);
-          } else if (/^(\s*)strava:/m.test(content)) {
-            content = content.replace(/^(\s*strava:.*)$/m, `$1\n    ${key}: ${val}`);
-          }
-        }
-        writeFileSync(configPath, content, 'utf-8');
-        this.logger.log(`Updated tokens in ${configPath}`);
-      } catch (err) {
-        this.logger.error(`Failed to write tokens to config.yaml: ${err}`);
+  async storeTokensForUser(userId: string, tokens: StravaTokens): Promise<void> {
+    if (tokens.athleteId != null) {
+      const existing = await this.userModel.findOne({
+        stravaAthleteId: tokens.athleteId,
+        _id: { $ne: userId },
+      }).lean().exec();
+      if (existing) {
+        throw new ConflictException('This Strava account is already linked to another user.');
       }
     }
 
-    // 2. Write to root .env and backend .env
-    const envFiles = [
-      join(this.projectRoot, '.env'),
-      join(this.projectRoot, 'backend', '.env'),
-    ];
-    for (const envPath of envFiles) {
-      try {
-        let content = '';
-        if (existsSync(envPath)) {
-          content = readFileSync(envPath, 'utf-8');
-        }
-        const envUpdates: Record<string, string> = {
-          STRAVA_ACCESS_TOKEN: accessToken,
-          STRAVA_REFRESH_TOKEN: refreshToken,
-          STRAVA_EXPIRES_AT: String(expiresAt),
-        };
-        for (const [key, val] of Object.entries(envUpdates)) {
-          const lineRegex = new RegExp(`^#?\\s*${key}=.*$`, 'm');
-          if (lineRegex.test(content)) {
-            content = content.replace(lineRegex, `${key}=${val}`);
-          } else {
-            content += (content.endsWith('\n') ? '' : '\n') + `${key}=${val}\n`;
-          }
-        }
-        writeFileSync(envPath, content, 'utf-8');
-        this.logger.log(`Updated tokens in ${envPath}`);
-      } catch (err) {
-        this.logger.error(`Failed to write tokens to ${envPath}: ${err}`);
-      }
+    await this.tokenService.saveTokensForUser(userId, tokens);
+  }
+
+  async disconnect(userId: string): Promise<void> {
+    await this.tokenService.disconnectUser(userId);
+  }
+
+  parseState(state: string | null, fallbackUserId: string): string {
+    if (!state) return fallbackUserId;
+    try {
+      const parsed = JSON.parse(Buffer.from(state, 'base64url').toString('utf-8'));
+      if (parsed?.userId) return String(parsed.userId);
+    } catch {
+      this.logger.warn('Invalid Strava OAuth state parameter');
     }
+    return fallbackUserId;
   }
 }

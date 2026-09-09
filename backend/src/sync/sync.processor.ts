@@ -1,50 +1,57 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
+import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Job, Queue } from 'bullmq';
-import { SyncQueueService } from './sync-queue.service';
-import { JobStatusService } from '../common/queue/job-status.service';
+import { Job } from 'bullmq';
+import { SyncService } from './sync.service';
+import { AnalysisService } from '../analysis/analysis.service';
 import { MockQueue } from '../common/queue/mock-queue';
-import { QUEUES } from '../common/queue/queue.constants';
 
+@Processor('sync')
 @Injectable()
-export class SyncJobHandler {
-  private readonly logger = new Logger(SyncJobHandler.name);
+export class SyncProcessor extends WorkerHost implements OnApplicationBootstrap {
+  private readonly logger = new Logger(SyncProcessor.name);
 
   constructor(
-    private readonly syncQueueService: SyncQueueService,
-    private readonly jobStatusService: JobStatusService,
-  ) {}
+    private readonly syncService: SyncService,
+    private readonly analysisService: AnalysisService,
+    @InjectQueue('sync') private readonly queue: any,
+  ) {
+    super();
+  }
 
-  async process(job: Job<{ userId: string; type: string }>): Promise<{ newActivities: number }> {
-    const bullJobId = String(job.id);
-    await this.jobStatusService.updateStatus(bullJobId, 'active').catch(() => {});
-
-    try {
-      const result = await this.syncQueueService.handleSyncJob(job.name, job.data);
-      await this.jobStatusService.updateStatus(bullJobId, 'completed', { result });
-      return result;
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Sync job ${bullJobId} failed: ${message}`);
-      await this.jobStatusService.updateStatus(bullJobId, 'failed', { error: message });
-      throw error;
+  async onApplicationBootstrap() {
+    if (this.queue instanceof MockQueue) {
+      this.queue.registerDirectHandler(async (jobName: string, data: any) => {
+        const mockJob = { data, name: jobName, id: `mock_${Date.now()}` } as Job;
+        return this.process(mockJob);
+      });
     }
   }
-}
 
-/** Runs sync jobs inline when Redis is disabled (local dev). */
-@Injectable()
-export class SyncMockProcessor implements OnApplicationBootstrap {
-  constructor(
-    private readonly syncJobHandler: SyncJobHandler,
-    @InjectQueue(QUEUES.SYNC) private readonly queue: MockQueue,
-  ) {}
+  async process(job: Job<any, any, string>): Promise<any> {
+    const { userId } = job.data;
+    const type = job.data.type || job.name;
+    this.logger.log(`Starting ${type} sync for user: ${userId}`);
 
-  onApplicationBootstrap() {
-    if (!(this.queue instanceof MockQueue)) return;
-    this.queue.registerDirectHandler(async (jobName: string, data: { userId: string; type: string }) => {
-      const mockJob = { data, name: jobName, id: `mock_${Date.now()}` } as Job;
-      return this.syncJobHandler.process(mockJob);
-    });
+    try {
+      let result;
+      if (type === 'incremental') {
+        result = await this.syncService.incrementalSync(userId);
+      } else if (type === 'full') {
+        result = await this.syncService.fullSync(userId);
+      } else if (type === 'latest') {
+        result = await this.syncService.syncLatestActivity(userId);
+      }
+
+      if (result && result.newActivities > 0) {
+        this.logger.log(`Sync complete. Triggering background analysis for user: ${userId}`);
+        await this.analysisService.queueWeeklyReview(userId);
+      }
+
+      return result;
+    } catch (error: unknown) {
+      this.logger.error(`Failed to process ${type} sync for user ${userId}: ${(error as Error).message}`);
+      throw error;
+    }
   }
 }
